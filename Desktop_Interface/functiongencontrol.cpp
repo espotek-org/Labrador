@@ -11,94 +11,40 @@ void SingleChannelController::waveformName(QString newName)
 {
     qDebug() << "newName = " << newName;
     m_data.waveform = newName;
-    newName.append(".tlw");
-
-	int length;
 
 #ifdef PLATFORM_ANDROID
-    QString waveformFilePath("assets:/waveforms/");
-    waveformFilePath.append(newName);
-
-    QFile fptr(waveformFilePath);
-    bool success = fptr.open(QIODevice::ReadOnly);
-
-    QByteArray line;
-    char lengthString[16];
-    char divisibilityString[16];
-
-    line = fptr.readLine();
-    strcpy(lengthString, line.data());
-    sscanf(lengthString, "%d", &length);
-    qDebug() << "lengthString" << lengthString;
-
-    line = fptr.readLine();
-    strcpy(divisibilityString, line.data());
-    sscanf(divisibilityString, "%d", &m_data.divisibility);
-    qDebug() << "divisibilityString" << divisibilityString;
-
-    qDebug() << "Length = " << length;
-    qDebug() << "Divisibility = " << m_data.divisibility;
-
-    QByteArray remainingData = fptr.readAll();
-    char *dataString = remainingData.data();
-
-	m_data.samples.resize(length);
-
-    int dummy;
-    char *dataStringCurrent = dataString;
-    for (int i = 0; i < length; i++)
-	{
-        sscanf(dataStringCurrent, "%d", &dummy);
-        dataStringCurrent += strcspn(dataStringCurrent, "\t") + 1;
-        m_data.samples[i] = static_cast<uint8_t>(dummy);
-    }
-
+    QString path("assets:");
 #else
+    QString path = QCoreApplication::applicationDirPath();
+#endif
+    QFile file(path.append("/waveforms/").append(newName).append(".tlw"));
 
-    QByteArray filePath = QCoreApplication::applicationDirPath()
-		.append("/waveforms/").append(newName).toLocal8Bit();
+    qDebug() << "opening" << file.fileName();
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        qFatal("could not open %s", qUtf8Printable(file.fileName()));
 
-    qDebug() << "opening" << filePath;
-
-    FILE *fptr = fopen(filePath.constData(), "r");
-    if (fptr == NULL)
-        qFatal("%s could not be opened!", filePath.constData());
-
-    char lengthString[16];
-    fgets(lengthString, 5, fptr);
-    sscanf(lengthString, "%d", &length);
-
-    char divisibilityString[16];
-    //Bit of bullshit to deal with CRLF line endings on Mac.
-    do
-	{
-		fgets(divisibilityString, 5, fptr);
-	}
-	while ((divisibilityString[0] == '\r') || (divisibilityString[0] == '\n'));
-
-    sscanf(divisibilityString, "%d", &m_data.divisibility);
+    int length = file.readLine().toInt();
+    m_data.divisibility = file.readLine().toInt();
+    QByteArray data = file.readLine().trimmed();
+    file.close();
 
     qDebug() << "Length = " << length;
     qDebug() << "Divisibility = " << m_data.divisibility;
 
-	m_data.samples.resize(length);
+    // Length is redundant, could be derived from the sample list.
+    if (length != data.count('\t') + 1)
+        qFatal("%s: sample count mismatch", qUtf8Printable(file.fileName()));
+    m_data.samples.resize(length);
 
-    char *dataString = (char *) malloc(length*5+1);
-    fgets(dataString, length*5+1, fptr);
-
-    int dummy;
-    char *dataStringCurrent = dataString;
-    for (int i = 0; i < length; i++)
-	{
-        sscanf(dataStringCurrent, "%d", &dummy);
-        dataStringCurrent += strcspn(dataStringCurrent, "\t") + 1;
-        m_data.samples[i] = static_cast<uint8_t>(dummy);
+    data.replace('\t', '\0');
+    const char *dataString = data.constData();
+    QByteArray dataElem;
+    for (auto &sample : m_data.samples) {
+        dataElem.setRawData(dataString, strlen(dataString));
+        sample = static_cast<uint8_t>(dataElem.toInt());
+        dataString += dataElem.size() + 1;
     }
     m_data.repeat_forever = true;
-
-    free(dataString);
-    fclose(fptr);
-#endif
 
 	double newMaxFreq = DAC_SPS / (length >> (m_data.divisibility - 1));
 	double newMinFreq = double(CLOCK_FREQ) / 1024.0 / 65535.0 / static_cast<double>(length);
