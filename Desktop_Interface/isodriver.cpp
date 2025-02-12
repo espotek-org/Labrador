@@ -1,3 +1,4 @@
+#include <Eigen/Dense>
 #include "isodriver.h"
 #include "isobuffer.h"
 #include "isobuffer_file.h"
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <omp.h>
 
+#define PI 3.141592653589793  // Predefined value for pi
 static constexpr int kSpectrumCounterMax = 4;
 
 isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
@@ -617,7 +619,6 @@ void isoDriver::setTriggerMode(int newMode)
 //0 for off, 1 for ana, 2 for dig, -1 for ana750, -2 for file
 void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)  
 {
-
     // The Spectrum is computationally expensive to calculate, so we don't want to do it on every frame
     static int spectrumCounter = 0;
     if(spectrum)
@@ -631,6 +632,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     internalBuffer375_CH1->enableDftWrite(spectrum);
     internalBuffer375_CH2->enableDftWrite(spectrum);
     // internalBuffer750->enableDftWrite(spectrum);
+
+    internalBuffer375_CH1->enableFreqResp(freqResp, freqValue_CH1->value());
+    internalBuffer375_CH2->enableFreqResp(freqResp, freqValue_CH1->value());
 
     //qDebug() << "made it to frameActionGeneric";
     if(!paused_CH1 && CH1_mode == - 1){
@@ -680,24 +684,33 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
-    if (!spectrum) {
+    if (!spectrum && !freqResp) {
         readData375_CH1 = internalBuffer375_CH1->readBuffer(display.window,GRAPH_SAMPLES,CH1_mode==2, display.delay + triggerDelay);
         if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display.window,GRAPH_SAMPLES,CH2_mode==2, display.delay + triggerDelay);
         if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(display.window,GRAPH_SAMPLES,false, display.delay + triggerDelay);
         if(CH1_mode == -2) readDataFile = internalBufferFile->readBuffer(display.window,GRAPH_SAMPLES,false, display.delay);
     } else {
-        /*Don't allow moving frequency spectrum right or left
-                 * by overwriting display window and delay before reading
-                 * the buffer each time.
-                 * @TODO improve this limitation.
-                */
-                double const_displ_window = ((double)internalBuffer375_CH1->async_dft->n_samples)/(internalBuffer375_CH1->m_samplesPerSecond);
-                double const_displ_delay = 0;
-                display.delay = const_displ_delay;
-                display.window = const_displ_window;
-                readData375_CH1 = internalBuffer375_CH1->readBuffer(display.window,GRAPH_SAMPLES,CH1_mode==2, display.delay + triggerDelay);
-                if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display.window,GRAPH_SAMPLES,CH2_mode==2, display.delay + triggerDelay);
-                if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(display.window,GRAPH_SAMPLES,false, display.delay + triggerDelay);
+        if(spectrum)
+        {
+            /*Don't allow moving frequency spectrum right or left
+             * by overwriting display window and delay before reading
+             * the buffer each time.
+             * @TODO improve this limitation.
+            */
+            double const_displ_window = ((double)internalBuffer375_CH1->async_dft->n_samples)/(internalBuffer375_CH1->m_samplesPerSecond);
+            double const_displ_delay = 0;
+            display.delay = const_displ_delay;
+            display.window = const_displ_window;
+            readData375_CH1 = internalBuffer375_CH1->readBuffer(display.window,GRAPH_SAMPLES,CH1_mode==2, display.delay + triggerDelay);
+            if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display.window,GRAPH_SAMPLES,CH2_mode==2, display.delay + triggerDelay);
+            if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(display.window,GRAPH_SAMPLES,false, display.delay + triggerDelay);
+        }
+        else
+        {
+            double freqResp_window = 1/freqValue_CH1->value();
+            readData375_CH1 = internalBuffer375_CH1->readBuffer(freqResp_window, internalBuffer375_CH1->freqResp_samples, CH1_mode==2, triggerDelay);
+            readData375_CH2 = internalBuffer375_CH2->readBuffer(freqResp_window, internalBuffer375_CH2->freqResp_samples, CH2_mode==2, triggerDelay);
+        }
     }
     /*Convert data also for spectrum CH1 and CH2*/
     std::unique_ptr<short[]> dt_samples1;
@@ -712,7 +725,11 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         converted_dt_samples1.resize(internalBuffer375_CH1->async_dft->n_samples),
         converted_dt_samples2.resize(internalBuffer375_CH2->async_dft->n_samples);
     }
-
+    else if (freqResp)
+    {
+        converted_dt_samples1.resize(internalBuffer375_CH1->freqResp_samples),
+        converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
+    }
 
     if (CH1_mode == 1){
         analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
@@ -725,6 +742,15 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         if (spectrum)
         {
             analogConvert(dt_samples1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
+            for (int i=0; i < converted_dt_samples1.size(); i++)
+            {
+                converted_dt_samples1[i] /= m_attenuation_CH1;
+                converted_dt_samples1[i] += m_offset_CH1;
+            }
+        }
+        else if (freqResp)
+        {
+            analogConvert(readData375_CH1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
             for (int i=0; i < converted_dt_samples1.size(); i++)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
@@ -752,6 +778,15 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         if (spectrum)
         {
             analogConvert(dt_samples2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
+            for (int i=0; i < converted_dt_samples2.size(); i++)
+            {
+                converted_dt_samples2[i] /= m_attenuation_CH1;
+                converted_dt_samples2[i] += m_offset_CH1;
+            }
+        }
+        else if (freqResp)
+        {
+            analogConvert(readData375_CH2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
             for (int i=0; i < converted_dt_samples2.size(); i++)
             {
                 converted_dt_samples2[i] /= m_attenuation_CH1;
@@ -821,6 +856,127 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 std::cout << "Cannot yet get correct value for DFT" << std::endl;
             }
 
+        } else if (freqResp){
+            if(!paused_CH1)
+            {
+                // Using least squares, fit a sinusoid to measured samples
+                int nof_elements = converted_dt_samples1.size();
+                double delta = 2 * PI / (nof_elements - 1);
+                double amp1, amp2, gain, gain_avg_db, phase1, phase2, phase_diff, phase_avg, norm_rms1, norm_rms2;
+                static double gain_sum = 0, phase_sum = 0;
+                static int freqResp_cnt = 0, err_cnt = 0;
+                Eigen::MatrixXf A(nof_elements, 3);
+                Eigen::VectorXf b1(nof_elements), b2(nof_elements), x1(3), x2(3), r1(nof_elements), r2(nof_elements);
+                for (int i = 0; i < nof_elements; i++)
+                {
+                    A(i, 0) = 1;
+                    A(i, 1) = std::sin(i*delta);
+                    A(i, 2) = std::cos(i*delta);
+                    b1(i) = converted_dt_samples1[i];
+                    b2(i) = converted_dt_samples2[i];
+                }
+
+                // Solve the least squares solution Ax=b (using QR decomposition)
+                x1 = A.colPivHouseholderQr().solve(b1);
+                x2 = A.colPivHouseholderQr().solve(b2);
+
+                // Calculate amplitude and phase
+                amp1 = hypot(x1(1), x1(2));
+                amp2 = hypot(x2(1), x2(2));
+                phase1 = atan2(-x1(2), x1(1)) * 180.0 / PI;
+                phase2 = atan2(-x2(2), x2(1)) * 180.0 / PI;
+
+                // Calculate normalized fitting risidual
+                r1 = A * x1 - b1;
+                r2 = A * x2 - b2;
+                norm_rms1 = sqrt((r1/amp1).cwiseAbs2().mean());
+                norm_rms2 = sqrt((r2/amp2).cwiseAbs2().mean());
+                // std::cout << "rms1 = " << norm_rms1 << " rms2 = " << norm_rms2 << "\n";
+
+                // If there is too much error in the least square fitting, discard current trace
+                if(norm_rms1 > 0.1 || norm_rms2 > 2)
+                {
+                    err_cnt++;
+                }
+                else
+                {
+                    // Calculate gain, and phase difference
+                    gain = amp2 / amp1;
+                    phase_diff = phase2 - phase1;
+                    phase_diff = phase_diff > 180 ? phase_diff - 360 : (phase_diff < -180 ? phase_diff + 360 : phase_diff);
+
+                    // Calculate average gain (dB) and average phase
+                    if(freqResp_cnt < 10)
+                    {
+                        gain_sum += gain;
+                        phase_sum += phase_diff;
+                    }
+                    else
+                    {
+                        gain_avg_db = 20 * log10(gain_sum/freqResp_cnt);
+                        phase_avg = phase_sum/freqResp_cnt;
+                        // std::cout << "gain_dB = " << gain_avg_db << " phase = " << phase_avg << "\n";
+
+                        // Search first occurrence
+                        int index = m_freqRespFreq.indexOf(freqValue_CH1->value());
+                        // Update if record exists
+                        if (index != -1)
+                        {
+                            m_freqRespGain[index] = gain_avg_db;
+                            m_freqRespPhase[index] = phase_avg;
+                        }
+                        // Append if record does not exist
+                        else
+                        {
+                            m_freqRespFreq.append(freqValue_CH1->value());
+                            m_freqRespGain.append(gain_avg_db);
+                            m_freqRespPhase.append(phase_avg);
+                        }
+                    }
+                    freqResp_cnt ++;
+                }
+
+                // Prepare for next cycle
+                if(freqResp_cnt > 10 || err_cnt > 10)
+                {
+                    // Reset frequency response vectors, when a user updates min/max/step parameters
+                    if(m_freqRespFlag)
+                    {
+                        m_freqRespFreq.clear();
+                        m_freqRespGain.clear();
+                        m_freqRespPhase.clear();
+                        m_freqRespFlag = false;
+                    }
+
+                    // Select new frequency
+                    double freqValue = freqValue_CH1->value() + m_freqRespStep;
+                    if(freqValue >= m_freqRespMax || freqValue < m_freqRespMin || m_freqRespFreq.size() == 0)
+                        freqValue = m_freqRespMin + m_freqRespStep;
+                    freqValue_CH1->setValue(freqValue);
+
+                    // Reset iterators
+                    gain_sum = 0;
+                    phase_sum = 0;
+                    freqResp_cnt = 0;
+                    err_cnt = 0;
+                }
+            }
+
+            // Plot gain response
+            if(m_freqRespType == 0)
+            {
+                axes->graph(0)->setData(m_freqRespFreq, m_freqRespGain);
+                axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
+                axes->yAxis->setRange(*std::min_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())-10, *std::max_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())+10);
+            }
+            // Plot phase response
+            else
+            {
+                axes->graph(0)->setData(m_freqRespFreq, m_freqRespPhase);
+                axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
+                axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
+            }
+            axes->graph(1)->clearData();
         } else {
             axes->graph(0)->setData(x,CH1);
             if(CH2_mode) axes->graph(1)->setData(x,CH2);
@@ -1674,5 +1830,28 @@ void isoDriver::setMinSpectrum(int minSpectrum)
 void isoDriver::setMaxSpectrum(int maxSpectrum)
 {
     m_spectrumMaxX = static_cast<double>(maxSpectrum);
+}
+
+void isoDriver::setMinFreqResp(int minFreqResp)
+{
+    m_freqRespMin = static_cast<double>(minFreqResp);
+    m_freqRespFlag = true;
+}
+
+void isoDriver::setMaxFreqResp(int maxFreqResp)
+{
+    m_freqRespMax = static_cast<double>(maxFreqResp);
+    m_freqRespFlag = true;
+}
+
+void isoDriver::setFreqRespStep(int freqRespStep)
+{
+    m_freqRespStep = freqRespStep;
+    m_freqRespFlag = true;
+}
+
+void isoDriver::setFreqRespType(int freqRespType)
+{
+    m_freqRespType = freqRespType;
 }
 

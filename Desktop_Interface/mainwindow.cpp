@@ -53,6 +53,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->controller_iso->setDriver(new _PLATFORM_DEPENDENT_USB_OBJECT());
     ui->controller_iso->setAxes(ui->scopeAxes);
 
+    ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
+    connect(ui->frequencyValue_CH1, SIGNAL(valueChanged(double)), this, SLOT(display(double)));
+
     ui->timeBaseSlider->setMaximum(10*log10(MAX_WINDOW_SIZE));
 
     //ui->controller_iso->driver->setBufferPtr(ui->bufferDisplay);
@@ -244,11 +247,13 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifndef PLATFORM_ANDROID
     connect(ui->offsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH1(double)));
     connect(ui->offsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH2(double)));
+
     connect(ui->attenuationComboBox_CH1, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH1(int)));
     connect(ui->attenuationComboBox_CH2, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH2(int)));
 #endif
     connect(ui->controller_iso, &isoDriver::enableCursorGroup, this, &MainWindow::cursorGroupEnabled);
 
+    // Frequency spectrum
     spectrumMinXSpinbox = new QSpinBox();
     spectrumMaxXSpinbox = new QSpinBox();
     spectrumLayoutWidget = new QWidget();
@@ -280,6 +285,64 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->verticalLayout->addWidget(spectrumLayoutWidget);
     spectrumLayoutWidget->setVisible(false);
+
+    // Frequency response
+    freqRespLayout1Widget = new QWidget();
+    freqRespLayout2Widget = new QWidget();
+    freqRespMinXSpinbox   = new QSpinBox();
+    freqRespMaxXSpinbox   = new QSpinBox();
+    freqRespStepSpinbox   = new QSpinBox();
+    freqRespTypeComboBox  = new QComboBox();
+    QHBoxLayout* freqRespLayout1 = new QHBoxLayout(freqRespLayout1Widget);
+    QHBoxLayout* freqRespLayout2 = new QHBoxLayout(freqRespLayout2Widget);
+    QLabel* freqRespMinFreqLabel = new QLabel("Min Frequency (Hz)");
+    QLabel* freqRespMaxFreqLabel = new QLabel("Max Frequency (Hz)");
+    QLabel* freqRespStepLabel = new QLabel("Step (Hz)");
+    QLabel* freqRespTypeLabel = new QLabel("Response");
+
+    freqRespLayout1Widget->setLayout(freqRespLayout1);
+    freqRespMinXSpinbox->setMinimum(100);
+    freqRespMinXSpinbox->setMaximum(62500);
+    freqRespMaxXSpinbox->setMinimum(100);
+    freqRespMaxXSpinbox->setMaximum(62500);
+    freqRespMaxXSpinbox->setValue(32500);
+
+    freqRespLayout1->addItem(spacer);
+    freqRespLayout1->addWidget(freqRespMinFreqLabel);
+    freqRespLayout1->addWidget(freqRespMinXSpinbox);
+    freqRespLayout1->addItem(spacer);
+    freqRespLayout1->addWidget(freqRespMaxFreqLabel);
+    freqRespLayout1->addWidget(freqRespMaxXSpinbox);
+    freqRespLayout1->addItem(spacer);
+
+    freqRespLayout2Widget->setLayout(freqRespLayout2);
+    freqRespStepSpinbox->setMinimum(10);
+    freqRespStepSpinbox->setMaximum(10000);
+    freqRespStepSpinbox->setValue(100);
+    freqRespTypeComboBox->addItem("Gain");
+    freqRespTypeComboBox->addItem("Phase");
+    freqRespTypeComboBox->setCurrentIndex(0);
+
+    freqRespLayout2->addItem(spacer);
+    freqRespLayout2->addWidget(freqRespStepLabel);
+    freqRespLayout2->addWidget(freqRespStepSpinbox);
+    freqRespLayout2->addItem(spacer);
+    freqRespLayout2->addWidget(freqRespTypeLabel);
+    freqRespLayout2->addWidget(freqRespTypeComboBox);
+    freqRespLayout2->addItem(spacer);
+
+    connect(freqRespMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMinFreqResp);
+    connect(freqRespMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMaxFreqResp);
+    connect(freqRespStepSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setFreqRespStep);
+    connect(freqRespTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), ui->controller_iso, &isoDriver::setFreqRespType);
+
+    connect(freqRespMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), freqRespMaxXSpinbox, &QSpinBox::setMinimum);
+    connect(freqRespMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), freqRespMinXSpinbox, &QSpinBox::setMaximum);
+
+    ui->verticalLayout->addWidget(freqRespLayout1Widget);
+    ui->verticalLayout->addWidget(freqRespLayout2Widget);
+    freqRespLayout1Widget->setVisible(false);
+    freqRespLayout2Widget->setVisible(false);
 }
 
 MainWindow::~MainWindow()
@@ -2567,11 +2630,33 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
 {
     ui->controller_iso->spectrum = checked;
     spectrumLayoutWidget->setVisible(checked);
+    if(checked)
+    {
+        ui->controller_iso->freqResp = false;
+        freqRespLayout1Widget->setVisible(false);
+        freqRespLayout2Widget->setVisible(false);
+        ui->actionFrequency_Response->setChecked(false);
+    }
 
     if (checked == true)
         MAX_WINDOW_SIZE = 1<<17;
     else
         MAX_WINDOW_SIZE = 10;
+}
+
+void MainWindow::on_actionFrequency_Response_triggered(bool checked)
+{
+    ui->controller_iso->freqResp = checked;
+    freqRespLayout1Widget->setVisible(checked);
+    freqRespLayout2Widget->setVisible(checked);
+    if(checked)
+    {
+        ui->controller_iso->spectrum = false;
+        spectrumLayoutWidget->setVisible(false);
+        ui->actionFrequency_Spectrum->setChecked(false);
+        ui->scopeGroup_CH2->setChecked(true);
+    }
+    ui->scopeGroup_CH2->setDisabled(checked);
 }
 
 std::vector<uint8_t> MainWindow::uartEncode(const QString& text, UartParity parity)

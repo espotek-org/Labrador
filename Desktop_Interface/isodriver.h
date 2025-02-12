@@ -11,6 +11,7 @@
 #include "siprint.h"
 #include "i2cdecoder.h"
 #include "uartstyledecoder.h"
+#include "espospinbox.h"
 
 class isoBuffer;
 class isoBuffer_file;
@@ -90,6 +91,8 @@ public:
     bool fileModeEnabled = false;
     double daq_maxWindowSize;
     bool spectrum = false;
+    bool freqResp = false;
+    espoSpinBox *freqValue_CH1 = NULL;
 private:
     //Those bloody bools that just Enable/Disable a single property
     bool paused_CH1 = false;
@@ -191,6 +194,15 @@ private:
     //Spectrum
     double m_spectrumMinX = 0;
     double m_spectrumMaxX = 187500;
+    //Frequency response
+    QVector<double> m_freqRespFreq;
+    QVector<double> m_freqRespGain;
+    QVector<double> m_freqRespPhase;
+    double m_freqRespMin = 0;
+    double m_freqRespMax = 62500;
+    int m_freqRespStep = 100;
+    int m_freqRespType = 0;
+    bool m_freqRespFlag = false;
 
 signals:
     void setGain(double newGain);
@@ -290,6 +302,10 @@ public slots:
     void setHexDisplay_CH2(bool enabled);
     void setMinSpectrum(int minSpectrum);
     void setMaxSpectrum(int maxSpectrum);
+    void setMinFreqResp(int minFreqResp);
+    void setMaxFreqResp(int maxFreqResp);
+    void setFreqRespStep(int stepFreqResp);
+    void setFreqRespType(int typeFreqResp);
 };
 
 #endif // ISODRIVER_H

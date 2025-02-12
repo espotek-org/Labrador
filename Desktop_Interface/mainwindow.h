@@ -227,6 +227,7 @@ private slots:
 
     void on_actionShow_Debug_Console_triggered(bool checked);
     void on_actionFrequency_Spectrum_triggered(bool checked);
+    void on_actionFrequency_Response_triggered(bool checked);
 
     void on_serialEncodingCheck_CH1_toggled(bool checked);
     void on_txuart_textChanged();
@@ -303,9 +304,18 @@ private:
     QShortcut *shortcut_Debug;
     QShortcut *shortcut_Esc;
 
+    // Frequency spectrum
     QWidget* spectrumLayoutWidget = nullptr;
     QSpinBox* spectrumMinXSpinbox = nullptr;
     QSpinBox* spectrumMaxXSpinbox = nullptr;
+
+    // Frequency response
+    QWidget* freqRespLayout1Widget = nullptr;
+    QWidget* freqRespLayout2Widget = nullptr;
+    QSpinBox* freqRespMinXSpinbox = nullptr;
+    QSpinBox* freqRespMaxXSpinbox = nullptr;
+    QSpinBox* freqRespStepSpinbox = nullptr;
+    QComboBox* freqRespTypeComboBox = nullptr;
 
     //Duct Tape
     bool dt_AlreadyAskedAboutCalibration = false;

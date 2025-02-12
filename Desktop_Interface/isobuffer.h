@@ -58,6 +58,7 @@ public:
 	void gainBuffer(int gain_log);
 
 	void enableDftWrite(bool enable);
+	void enableFreqResp(bool enable, double freqValue);
 
 // Advanced buffer operations
 private:
@@ -107,6 +108,10 @@ public:
 	uint32_t m_insertedCount = 0;
 	uint32_t m_bufferLen;
 
+	std::list<short> freqResp_buffer;
+	uint32_t freqResp_count = 0;
+	uint32_t freqResp_samples = 0;
+
 // Conversion And Sampling
 	double m_voltage_ref = 1.65;
 	double m_frontendGain = (R4 / (R3 + R4));
@@ -135,6 +140,7 @@ private:
     uint32_t m_lastTriggerDetlaT = 0;
 
 	bool m_asyncDftActive = false;
+	bool m_freqRespActive = false;
 
 	isoDriver* m_virtualParent;
 

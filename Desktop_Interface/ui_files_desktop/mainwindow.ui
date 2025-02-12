@@ -1699,6 +1699,7 @@
     <addaction name="separator"/>
     <addaction name="actionHide_Widget_Oscilloscope"/>
     <addaction name="actionFrequency_Spectrum"/>
+    <addaction name="actionFrequency_Response"/>
    </widget>
    <widget class="QMenu" name="menuMultimeter_2">
     <property name="title">
@@ -2747,6 +2748,14 @@
    </property>
    <property name="text">
     <string>Frequency Spectrum</string>
+   </property>
+  </action>
+  <action name="actionFrequency_Response">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Frequency Response</string>
    </property>
   </action>
  </widget>

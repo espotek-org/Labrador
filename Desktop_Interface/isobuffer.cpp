@@ -61,6 +61,24 @@ void isoBuffer::insertIntoBuffer(short item)
     if (m_asyncDftActive)
         async_dft->addSample(item);
 
+    /* Fill-in freqResp buffer */
+    if(m_freqRespActive)
+    {
+        if (freqResp_count >= freqResp_samples)
+        {
+            /* Shift freqResp buffer once by removing first element and adding an element to the end */
+            freqResp_buffer.pop_front();
+            freqResp_buffer.push_back(item);
+            freqResp_count = freqResp_samples;
+        }
+        else
+        {
+            freqResp_buffer.push_back(item);
+        }
+        /* Update number of freqResp samples */
+        freqResp_count++;
+    }
+
     checkTriggered();
 }
 
@@ -188,6 +206,12 @@ void isoBuffer::enableDftWrite(bool enable)
     }
 
     m_asyncDftActive = enable;
+}
+
+void isoBuffer::enableFreqResp(bool enable, double freqValue)
+{
+    m_freqRespActive = enable;
+    freqResp_samples = uint32_t(m_samplesPerSecond/freqValue);
 }
 
 void isoBuffer::outputSampleToFile(double averageSample)
