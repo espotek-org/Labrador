@@ -10,13 +10,13 @@ void bufferControl::refreshImage(void){
 
     switch(numBuffers){
     case 0:
-        bufferImage = QPixmap(":/bitmap/buffer_0.bmp");
+        bufferImage = QPixmap(":/bitmap/buffer_0.png");
         break;
     case 1:
-        bufferImage = QPixmap(":/bitmap/buffer_1.bmp");
+        bufferImage = QPixmap(":/bitmap/buffer_1.png");
         break;
     case 2:
-        bufferImage = QPixmap(":/bitmap/buffer_2.bmp");
+        bufferImage = QPixmap(":/bitmap/buffer_2.png");
         break;
     }
 

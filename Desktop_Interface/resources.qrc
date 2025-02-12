@@ -1,8 +1,8 @@
 <RCC>
     <qresource prefix="/bitmap">
-        <file>buffer_0.bmp</file>
-        <file>buffer_1.bmp</file>
-        <file>buffer_2.bmp</file>
+        <file>buffer_0.png</file>
+        <file>buffer_1.png</file>
+        <file>buffer_2.png</file>
         <file>diagram.png</file>
     </qresource>
 </RCC>
