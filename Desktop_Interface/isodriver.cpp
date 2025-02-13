@@ -1271,8 +1271,7 @@ void isoDriver::slowTimerTick(){
             siprint triggerFreqSiprint("Hz", triggerFrequency);
             siprint periodSiprint("s", 1. / triggerFrequency);
 
-            QString cursorString;
-            cursorString.sprintf(" Trigger ΔT = %s, f = %s ", periodSiprint.printVal(), triggerFreqSiprint.printVal());
+            QString cursorString = QString::asprintf(" Trigger ΔT = %s, f = %s ", periodSiprint.printVal(), triggerFreqSiprint.printVal());
             triggerFrequencyLabel->setText(cursorString);
         }
         qDebug() << triggerFrequency << "Hz";
@@ -1404,7 +1403,7 @@ void isoDriver::loadFileBuffer(QFile *fileToLoad){
         tempList.clear();
     }
 
-    qDebug("There are %d elements!", numel);
+    qDebug() << "There are" << numel << "elements!";
 
     //Prompt user for start and end times
     double defaultSampleRate = 375000;

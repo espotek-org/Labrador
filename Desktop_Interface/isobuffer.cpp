@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cinttypes>
 #include <iostream>
 
 #include "isodriver.h"
@@ -67,7 +68,7 @@ void isoBuffer::insertIntoBuffer(short item)
 short isoBuffer::bufferAt(uint32_t idx) const
 {
     if (idx > m_insertedCount)
-        qFatal("isoBuffer::bufferAt: invalid query, idx = %lu, m_insertedCount = %lu", idx, m_insertedCount);
+        qFatal("isoBuffer::bufferAt: invalid query, idx = %" PRIu32 ", m_insertedCount = %" PRIu32, idx, m_insertedCount);
 
     return m_buffer[(m_back-1) + m_bufferLen - idx];
 }
