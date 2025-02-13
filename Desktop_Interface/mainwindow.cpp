@@ -373,12 +373,10 @@ void MainWindow::initialisePlot()
 }
 
 void MainWindow::labelPsu(){
-    char tempString[4];
     int tempInt = ui->psuSlider->maximum();
     int tempCounter = 0;
     while(tempInt>90){
-        sprintf(tempString, "%dV", tempInt/20);
-        ui->psuSlider->setTickLabel(tempString, tempCounter);
+        ui->psuSlider->setTickLabel(QString("%1V").arg(tempInt/20), tempCounter);
         tempInt -= 20;
         tempCounter++;
     }
@@ -2157,8 +2155,7 @@ void MainWindow::fileLimitReached_CH1(void){
     ui->actionRecord_CH1->setChecked(false);
 
     QMessageBox recordingStoppedMessageBox;
-    char recordingStoppedMessage[256];
-    sprintf(recordingStoppedMessage, "Maximum file size limit of %uMB reached.  Data Acquisition Stopped.", daq_max_file_size/1000000);
+    QString recordingStoppedMessage = QString("Maximum file size limit of %1MB reached.  Data Acquisition Stopped.").arg(daq_max_file_size/1000000);
     recordingStoppedMessageBox.setText(recordingStoppedMessage);
     recordingStoppedMessageBox.exec();
 }
@@ -2167,8 +2164,7 @@ void MainWindow::fileLimitReached_CH2(void){
     ui->actionRecord_CH2->setChecked(false);
 
     QMessageBox recordingStoppedMessageBox;
-    char recordingStoppedMessage[256];
-    sprintf(recordingStoppedMessage, "Maximum file size limit of %uMB reached.  Data Acquisition Stopped.", daq_max_file_size/1000000);
+    QString recordingStoppedMessage = QString("Maximum file size limit of %1MB reached.  Data Acquisition Stopped.").arg(daq_max_file_size/1000000);
     recordingStoppedMessageBox.setText(recordingStoppedMessage);
     recordingStoppedMessageBox.exec();
 }
