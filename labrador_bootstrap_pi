@@ -13,11 +13,13 @@ dpkg -s libusb-1.0-0-dev
 LIBUSB_NOT_INSTALLED=$?
 dpkg -s libfftw3-dev
 FFTW_NOT_INSTALLED=$?
+dpkg -s libeigen3-dev
+EIGEN3_NOT_INSTALLED=$?
 
 # We don't want to bail if one of the first 4 lines returns error.  That's what they're meant to do!
 set -e
 
-if [ $QTBASE_NOT_INSTALLED != 0 ] || [ $QTCHOOSER_NOT_INSTALLED != 0 ] || [ $QMAKE_NOT_INSTALLED != 0 ] || [ $QTDEV_NOT_INSTALLED != 0 ] || [ $LIBUSB_NOT_INSTALLED != 0 ] || [ $FFTW_NOT_INSTALLED != 0 ]; then
+if [ $QTBASE_NOT_INSTALLED != 0 ] || [ $QTCHOOSER_NOT_INSTALLED != 0 ] || [ $QMAKE_NOT_INSTALLED != 0 ] || [ $QTDEV_NOT_INSTALLED != 0 ] || [ $LIBUSB_NOT_INSTALLED != 0 ] || [ $FFTW_NOT_INSTALLED != 0 ] || [ $EIGEN3_NOT_INSTALLED != 0 ]; then
     sudo apt-get update
     sudo apt-get install -y qtbase5-dev
     sudo apt-get install -y qtchooser
@@ -25,6 +27,7 @@ if [ $QTBASE_NOT_INSTALLED != 0 ] || [ $QTCHOOSER_NOT_INSTALLED != 0 ] || [ $QMA
     sudo apt-get install -y qtbase5-dev-tools
     sudo apt-get install -y libusb-1.0-0-dev
     sudo apt-get install -y libfftw3-dev
+    sudo apt-get install -y libeigen3-dev
 else
     echo "Prerequesites are already installed.  Skipping step."
 fi

@@ -130,6 +130,7 @@ unix:!android:!macx{
     CONFIG += link_pkgconfig
     PKGCONFIG += libusb-1.0  ##make sure you have the libusb-1.0-0-dev package!
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
+    PKGCONFIG += eigen3      ##make sure you have the libeigen3-dev package!
     contains(QT_ARCH, arm) {
             message("Building for Raspberry Pi")
             #libdfuprog include
