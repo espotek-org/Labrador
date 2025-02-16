@@ -17,12 +17,13 @@ jobs:
           sudo apt-get install -y build-essential libfftw3-dev qt5-default libusb-1.0-0-dev wget
 
       - name: Build AppImage
+        working-directory: ./Desktop_Interface
         run: |
-          cd Desktop_Interface
           ./make_appimage
 
       - name: Run uploadtool for Linux
         if: github.ref == 'refs/heads/master'
+        working-directory: ./Desktop_Interface
         run: |
           export UPLOADTOOL_SUFFIX="Linux"
           export UPLOADTOOL_BODY="EspoTek Labrador software for Linux. This should be compatible with all modern 64-bit distros. If you're running 32-bit Linux, please see the wiki for build instructions. https://github.com/espotek-org/Labrador/wiki/Building-for-32-bit-Linux"
