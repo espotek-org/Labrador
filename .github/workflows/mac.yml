@@ -32,6 +32,7 @@ jobs:
           macdeployqt bin/Labrador.app -dmg -libpath=build_mac/libdfuprog/lib/
 
       - name: Run uploadtool for macOS
+        if: github.ref == 'refs/heads/master'
         run: |
           export UPLOADTOOL_SUFFIX="macOS"
           export UPLOADTOOL_BODY="EspoTek Labrador software for macOS 10.13 and later. If you are running an older version of macOS, please use the macOS Legacy build below."

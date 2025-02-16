@@ -19,6 +19,7 @@ jobs:
           ./make_appimage
 
       - name: Run uploadtool for Linux
+        if: github.ref == 'refs/heads/master'
         run: |
           export UPLOADTOOL_SUFFIX="Linux"
           export UPLOADTOOL_BODY="EspoTek Labrador software for Linux. This should be compatible with all modern 64-bit distros. If you're running 32-bit Linux, please see the wiki for build instructions. https://github.com/espotek-org/Labrador/wiki/Building-for-32-bit-Linux"
