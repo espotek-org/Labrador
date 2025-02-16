@@ -14,9 +14,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common
-          sudo apt-get install -y gcc-7 g++-7 libfftw3-dev qt5-default libusb-1.0-0-dev wget
-          export CC=gcc-7
-          export CXX=g++-7
+          sudo apt-get install -y build-essential libfftw3-dev qt5-default libusb-1.0-0-dev wget
           cd Desktop_Interface
           ./make_appimage
 
