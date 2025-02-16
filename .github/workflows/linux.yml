@@ -15,10 +15,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y software-properties-common
           sudo apt-get install -y gcc-7 g++-7 libfftw3-dev qt5-default libusb-1.0-0-dev wget
-          sudo add-apt-repository ppa:beineri/opt-qt-5.12.9-xenial -y
-          sudo apt-get update -qq
-          sudo apt-get install -y qt512base
-          source /opt/qt*/bin/qt*-env.sh
           export CC=gcc-7
           export CXX=g++-7
           cd Desktop_Interface
