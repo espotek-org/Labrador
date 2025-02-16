@@ -10,11 +10,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies and build AppImage
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common
           sudo apt-get install -y build-essential libfftw3-dev qt5-default libusb-1.0-0-dev wget
+
+      - name: Build AppImage
+        run: |
           cd Desktop_Interface
           ./make_appimage
 
