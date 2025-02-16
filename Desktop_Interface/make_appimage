@@ -4,14 +4,14 @@ set -e
 
 qmake APPIMAGE=1 CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-parse --short HEAD)
 make -j$(nproc) CXX=${CXX} CC=${CC} LINK=${CXX}
-make INSTALL_ROOT=appdir install ; find appdir/
+make INSTALL_ROOT=AppDir install ; find AppDir/
 wget -N -nv "https://github.com/probonopd/linuxdeployqt/releases/download/6/linuxdeployqt-6-x86_64.AppImage"
 chmod a+x linuxdeployqt-*.AppImage
 unset QTDIR; unset QT_PLUGIN_PATH ; unset LD_LIBRARY_PATH
 export VERSION=$(git rev-parse --short HEAD)
-./linuxdeployqt-*.AppImage appdir/usr/share/applications/*.desktop -bundle-non-qt-libs -verbose=2 -no-strip -unsupported-allow-new-glibc
-#mkdir -p appdir/usr/optional/ ; wget https://github.com/darealshinji/AppImageKit-checkrt/releases/download/continuous/exec-x86_64.so -O ./appdir/usr/optional/exec.so
-mkdir -p appdir/usr/optional/libstdc++/ ; cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 ./appdir/usr/optional/libstdc++/
+./linuxdeployqt-*.AppImage AppDir/usr/share/applications/*.desktop -bundle-non-qt-libs -verbose=2 -no-strip -unsupported-allow-new-glibc
+#mkdir -p AppDir/usr/optional/ ; wget https://github.com/darealshinji/AppImageKit-checkrt/releases/download/continuous/exec-x86_64.so -O ./AppDir/usr/optional/exec.so
+mkdir -p AppDir/usr/optional/libstdc++/ ; cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 ./AppDir/usr/optional/libstdc++/
 ./linuxdeployqt-*.AppImage --appimage-extract
-rm ./appdir/AppRun ; cp ./resources/AppRun appdir/ ; chmod a+x ./appdir/AppRun
-PATH=./squashfs-root/usr/bin:$PATH ./squashfs-root/usr/bin/appimagetool -g ./appdir/
+rm ./AppDir/AppRun ; cp ./resources/AppRun AppDir/ ; chmod a+x ./AppDir/AppRun
+PATH=./squashfs-root/usr/bin:$PATH ./squashfs-root/usr/bin/appimagetool -g ./AppDir/
