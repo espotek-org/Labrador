@@ -14,7 +14,7 @@ export VERSION=$(git rev-parse --short HEAD)
 
 mkdir -p AppDir/usr/optional/libstdc++/ ; cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 ./AppDir/usr/optional/libstdc++/
 
-wget -N -nv https://github.com/darealshinji/linuxdeploy-plugin-checkrt/raw/refs/heads/master/exec.c
+wget -N -nv https://github.com/EspoTek/linuxdeploy-plugin-checkrt/raw/refs/heads/master/exec.c
 cc -shared -O2 -fPIC exec.c -o AppDir/usr/optional/exec.so -Wl,--as-needed -static-libgcc -ldl -s
 
 ./linuxdeployqt-*.AppImage --appimage-extract
