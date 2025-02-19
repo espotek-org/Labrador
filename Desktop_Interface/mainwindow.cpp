@@ -264,10 +264,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     spectrumLayoutWidget->setLayout(spectrumLayout);
     spectrumMinXSpinbox->setMinimum(0);
-    spectrumMinXSpinbox->setMaximum(187500);
+    spectrumMinXSpinbox->setMaximum(375000);
     spectrumMaxXSpinbox->setMinimum(0);
-    spectrumMaxXSpinbox->setMaximum(187500);
-    spectrumMaxXSpinbox->setValue(187500);
+    spectrumMaxXSpinbox->setMaximum(375000);
+    spectrumMaxXSpinbox->setValue(375000);
 
     spectrumLayout->addItem(spacer);
     spectrumLayout->addWidget(spectrumMinFreqLabel);
