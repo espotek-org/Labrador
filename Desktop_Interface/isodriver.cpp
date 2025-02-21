@@ -269,20 +269,21 @@ void isoDriver::setVoltageRange(QWheelEvent* event)
 
 void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused, double maxWindowSize, QCustomPlot* axes)
 {
+    double steps = event->delta() / 120.0;
     if (!(event->modifiers() == Qt::ControlModifier) && event->orientation() == Qt::Orientation::Vertical) {
         double c = (topRange - botRange) / (double)400;
 
         QCPRange range = axes->yAxis->range();
 
         double pixPct = (double)100 - ((double)100 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
-        if (pixPct < 0) pixPct = 0; 
+        if (pixPct < 0) pixPct = 0;
         if (pixPct > 100) pixPct = 100;
 
         qDebug() << "WHEEL @ " << pixPct << "%";
         qDebug() << range.upper;
 
-        topRange -= event->delta() / 120.0 * c * pixPct;
-        botRange += event->delta() / 120.0 * c * (100.0 - pixPct);
+        topRange -= steps * c * pixPct;
+        botRange += steps * c * (100.0 - pixPct);
 
         if (topRange > (double)20) topRange = (double)20;
         if (botRange < -(double)20) botRange = (double)-20;
@@ -306,7 +307,6 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
             pixPct = 100;
 
         qDebug() << "WHEEL @ " << pixPct << "%";
-        qDebug() << event->delta();
 
         if (! isProperlyPaused)
         {
@@ -317,8 +317,8 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
             qDebug() << c * ((double)100 - (double)pixPct) * pixPct / 100;
         }
 
-        window -= event->delta() / 120.0 * c * pixPct;
-        delay += event->delta() / 120.0 * c * (100.0 - pixPct) * pixPct / 100.0;
+        window -= steps * c * pixPct;
+        delay += steps * c * (100.0 - pixPct) * pixPct / 100.0;
 
         // NOTE: delayUpdated and timeWindowUpdated are called more than once beyond here,
         // maybe they should only be called once at the end?
@@ -617,7 +617,7 @@ void isoDriver::setTriggerMode(int newMode)
 }
 
 //0 for off, 1 for ana, 2 for dig, -1 for ana750, -2 for file
-void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)  
+void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 {
     // The Spectrum is computationally expensive to calculate, so we don't want to do it on every frame
     static int spectrumCounter = 0;
@@ -774,7 +774,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             CH2[i] /= m_attenuation_CH2;
             CH2[i] += m_offset_CH2;
         }
-        
+
         if (spectrum)
         {
             analogConvert(dt_samples2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
@@ -1369,7 +1369,7 @@ void isoDriver::setXYmode(bool enabled){
             axes->graph(i)->setVisible(graphState[i]);
         }
     }
-    
+
     QCPCurve* curve = reinterpret_cast<QCPCurve*>(axes->plottable(0));
     curve->setVisible(enabled);
     emit enableCursorGroup(!enabled);
@@ -1858,4 +1858,3 @@ void isoDriver::restartFreqResp()
 {
     m_freqRespFlag = true;
 }
-
