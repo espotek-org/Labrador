@@ -157,7 +157,7 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 		connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 			// Force a trigger refresh
-			ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());	
+			ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());
 		});
         connect(ui->bufferDisplay, SIGNAL(updateDig(int)), ui->controller_iso->driver, SLOT(newDig(int)));
 
@@ -214,7 +214,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->realTimeButton, SIGNAL(pressed()), ui->controller_iso, SLOT(disableFileMode()));
 
 
-	
+
     connect(ui->pausedLabeL_CH1, SIGNAL(toggled(bool)), this, SLOT(paused(bool)));
     connect(ui->pausedLabel_CH2, SIGNAL(toggled(bool)), this, SLOT(paused(bool)));
     connect(ui->pause_LA, SIGNAL(toggled(bool)), this, SLOT(paused(bool)));
@@ -232,9 +232,10 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
     ui->realTimeButton->setVisible(false);
 
-    if ((QApplication::desktop()->availableGeometry().width() < 1520) || (QApplication::desktop()->geometry().height() < 800))
+    auto geom = QGuiApplication::primaryScreen()->availableGeometry();
+    if ((geom.width() < 1520) || (geom.height() < 800))
     {
-        qDebug() << "Low resolution detected:" << QApplication::desktop()->availableGeometry().width() << "x" << QApplication::desktop()->availableGeometry().height();
+        qDebug() << "Low resolution detected:" << geom.width() << "x" << geom.height();
         this->setMinimumSize(1280, 700);
         this->resize(1280, 700);
     }
@@ -1459,7 +1460,7 @@ void MainWindow::reinitUsbStage2(void){
     connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 	connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 		// Force a trigger refresh
-		ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());	
+		ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());
 	});
     connect(ui->bufferDisplay, SIGNAL(updateDig(int)), ui->controller_iso->driver, SLOT(newDig(int)));
 
@@ -2480,7 +2481,7 @@ void MainWindow::paused(bool enabled)
 	qDebug() << "MainWindow::paused(" << enabled << ")";
 	ui->hideCH1Box->setVisible(enabled);
 	ui->hideCH2Box->setVisible(enabled);
-	
+
 	if (! enabled)
 	{
 		ui->hideCH1Box->setChecked(false);
@@ -2548,7 +2549,7 @@ void MainWindow::cursorGroupEnabled(bool enabled)
         ui->makeCursorsNicer->setTurnedOn(false);
         ui->cursorGroup->setEnabled(false);
     }
-    
+
 }
 
 void MainWindow::on_actionHide_Widget_Oscilloscope_triggered(bool checked)
@@ -2816,4 +2817,3 @@ void MainWindow::on_txuart_textChanged()
         prev_text = text;
     }
 }
-
