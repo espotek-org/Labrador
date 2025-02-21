@@ -42,10 +42,10 @@ void espoSlider::moveEvent(QMoveEvent *event){
 
 
 void espoSlider::setTickInterval(int ti){
-    addressBook.resize(maxTick(ti) + 1, NULL); //Leaky, but not significantly.  Old qlabels never deleted.
-    for (int i=0; i<addressBook.size();i++){
-        if (addressBook.at(i)==NULL)
-            addressBook.at(i) = new QLabel(windowPointer);
+    addressBook.resize(maxTick(ti) + 1, nullptr); //Leaky, but not significantly.  Old qlabels never deleted.
+    for (auto &it : addressBook){
+        if (!it)
+            it = new QLabel(windowPointer);
     }
     QSlider::setTickInterval(ti);
     return;
@@ -103,4 +103,3 @@ void espoSlider::poke(void){
     //qDebug() << "Refreshing to voltage" <<  ((double) (this->value())) / 20;
     voltageChanged(((double) (this->value())) / 20);
 }
-
