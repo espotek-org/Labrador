@@ -28,7 +28,7 @@ unixUsbDriver::~unixUsbDriver(void){
 				qDebug() << "isRunning?" << workerThread->isFinished();
 				QThread::msleep(100);
 			}
-		}	
+		}
 		if (isoHandler)
 	        delete(isoHandler);
         //delete(workerThread);
@@ -143,7 +143,7 @@ static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 
 int unixUsbDriver::usbIsoInit(void){
     int error;
-	
+
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
@@ -214,7 +214,7 @@ void unixUsbDriver::isoTimerTick(void){
     int n, error, earliest = MAX_OVERLAP;
     qint64 minFrame = 9223372036854775807; //max value for 64 bit signed
 
-    unsigned int i, packetLength = 0;
+    unsigned int packetLength = 0;
     unsigned char* packetPointer;
 
     tcBlockMutex.lock();
@@ -244,7 +244,7 @@ void unixUsbDriver::isoTimerTick(void){
     }
 
     //Copy iso data into mid-buffer
-    for(i=0;i<isoCtx[0][earliest]->num_iso_packets;i++){
+    for(int i=0;i<isoCtx[0][earliest]->num_iso_packets;i++){
         for(unsigned char k=0; k<NUM_ISO_ENDPOINTS;k++){
             packetPointer = libusb_get_iso_packet_buffer_simple(isoCtx[k][earliest], i);
             //qDebug() << packetLength;
@@ -257,7 +257,7 @@ void unixUsbDriver::isoTimerTick(void){
     //Read out from mid-buffer to out-buffer
     unsigned char *srcPtr;
     qint64 current_offset;
-    for(i=0;i<isoCtx[0][earliest]->num_iso_packets;i++){
+    for(int i=0;i<isoCtx[0][earliest]->num_iso_packets;i++){
         for(unsigned char k=0; k<NUM_ISO_ENDPOINTS;k++){
             current_offset = midBufferOffsets[k] + i;
             if(current_offset >= 0){
