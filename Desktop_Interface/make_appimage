@@ -12,6 +12,8 @@ wget -N -nv "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/downl
 wget -N -nv "https://github.com/darealshinji/linuxdeploy-plugin-checkrt/releases/download/continuous/linuxdeploy-plugin-checkrt.sh"
 chmod a+x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage linuxdeploy-plugin-checkrt.sh
 
-unset QTDIR; unset QT_PLUGIN_PATH ; unset LD_LIBRARY_PATH
+unset QTDIR
+unset QT_PLUGIN_PATH
+export LD_LIBRARY_PATH=$(realpath AppDir/usr/lib)
 export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
 ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin=qt --plugin=checkrt --plugin=udev --output=appimage
