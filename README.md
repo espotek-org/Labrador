@@ -1,10 +1,6 @@
 ![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-win32/Labrador_Installer.exe)
+![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-Linux/EspoTek_Labrador-ca7ac83-x86_64.AppImage)
 
-[![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/v/release/espotek-org/Labrador?style=for-the-badge)(https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-win32/Labrador_Installer.exe)
-
-(https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-win32/Labrador_Installer.exe)
-
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/espotek-org/Labrador?style=for-the-badge)](https://github.com/espotek-org/Labrador/releases/latest)
 [![GitHub All Releases](https://img.shields.io/github/downloads/espotek-org/Labrador/total?logo=github&style=for-the-badge)](https://github.com/espotek-org/Labrador/releases/latest)
 
 
