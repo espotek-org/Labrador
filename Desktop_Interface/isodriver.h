@@ -193,7 +193,7 @@ private:
     double daqLoad_startTime, daqLoad_endTime;
     //Spectrum
     double m_spectrumMinX = 0;
-    double m_spectrumMaxX = 187500;
+    double m_spectrumMaxX = 375000;
     //Frequency response
     QVector<double> m_freqRespFreq;
     QVector<double> m_freqRespGain;
