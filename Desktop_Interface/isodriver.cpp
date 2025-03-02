@@ -244,9 +244,21 @@ void isoDriver::startTimer(){
 }
 
 void isoDriver::clearBuffers(bool ch3751, bool ch3752, bool ch750){
-    if(ch3751) internalBuffer375_CH1->clearBuffer();
-    if(ch3752) internalBuffer375_CH2->clearBuffer();
-    if(ch750) internalBuffer750->clearBuffer();
+    if(ch3751)
+    {
+        internalBuffer375_CH1->clearBuffer();
+        internalBuffer375_CH1->async_dft->clearWindow();
+    }
+    if(ch3752)
+    {
+        internalBuffer375_CH2->clearBuffer();
+        internalBuffer375_CH2->async_dft->clearWindow();
+    }
+    if(ch750)
+    {
+        internalBuffer750->clearBuffer();
+        internalBuffer750->async_dft->clearWindow();
+    }
 }
 
 void isoDriver::setVisible_CH2(bool visible){
@@ -631,7 +643,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     internalBuffer375_CH1->enableDftWrite(spectrum);
     internalBuffer375_CH2->enableDftWrite(spectrum);
-    // internalBuffer750->enableDftWrite(spectrum);
+    internalBuffer750->enableDftWrite(spectrum);
 
     internalBuffer375_CH1->enableFreqResp(freqResp, freqValue_CH1->value());
     internalBuffer375_CH2->enableFreqResp(freqResp, freqValue_CH1->value());
@@ -720,14 +732,20 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if (spectrum)
     {
-        dt_samples1  = internalBuffer375_CH1->async_dft->getWindow();
+        if(CH1_mode == -1)
+            dt_samples1  = internalBuffer750->async_dft->getWindow();
+        else
+            dt_samples1  = internalBuffer375_CH1->async_dft->getWindow();
         dt_samples2  = internalBuffer375_CH2->async_dft->getWindow();
-        converted_dt_samples1.resize(internalBuffer375_CH1->async_dft->n_samples),
+        if(CH1_mode == -1)
+            converted_dt_samples1.resize(internalBuffer750->async_dft->n_samples);
+        else
+            converted_dt_samples1.resize(internalBuffer375_CH1->async_dft->n_samples);
         converted_dt_samples2.resize(internalBuffer375_CH2->async_dft->n_samples);
     }
     else if (freqResp)
     {
-        converted_dt_samples1.resize(internalBuffer375_CH1->freqResp_samples),
+        converted_dt_samples1.resize(internalBuffer375_CH1->freqResp_samples);
         converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
     }
 
@@ -801,6 +819,16 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if(CH1_mode == -1) {
         analogConvert(readData750.get(), &CH1, 128, AC_CH1, 1);
+
+        if (spectrum)
+        {
+            analogConvert(dt_samples1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
+            for (int i=0; i < converted_dt_samples1.size(); i++)
+            {
+                converted_dt_samples1[i] /= m_attenuation_CH1;
+                converted_dt_samples1[i] += m_offset_CH1;
+            }
+        }
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
         xmax = (currentVmax > xmax) ? currentVmax : xmax;
         broadcastStats(0);
@@ -830,12 +858,24 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         if (spectrum) { /*If frequency spectrum mode*/
             try {
                 /*Creating DFT amplitudes*/
-                QVector<double> amplitude1 = internalBuffer375_CH1->async_dft->getPowerSpectrum(converted_dt_samples1);
+                QVector<double> amplitude1;
+                if(CH1_mode == -1)
+                    amplitude1 = internalBuffer750->async_dft->getPowerSpectrum(converted_dt_samples1);
+                else
+                    amplitude1 = internalBuffer375_CH1->async_dft->getPowerSpectrum(converted_dt_samples1);
                 /*Getting array of frequencies for display purposes*/
-                QVector<double> f = internalBuffer375_CH1->async_dft->getFrequenciyWindow(internalBuffer375_CH1->m_samplesPerSecond);
+                QVector<double> f;
+                if(CH1_mode == -1)
+                    f = internalBuffer750->async_dft->getFrequenciyWindow(internalBuffer750->m_samplesPerSecond);
+                else
+                    f = internalBuffer375_CH1->async_dft->getFrequenciyWindow(internalBuffer375_CH1->m_samplesPerSecond);
 
                 /*Max amplitude for display purposes*/
-                double max1 = internalBuffer375_CH1->async_dft->maximum;
+                double max1;
+                if(CH1_mode == -1)
+                    max1 = internalBuffer750->async_dft->maximum;
+                else
+                    max1 = internalBuffer375_CH1->async_dft->maximum;
                 double max2 = -1;
 
                 if(CH2_mode) {
@@ -847,7 +887,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 }
 
                 /*Decision for normalization & display purposes*/
-                amplitude1 = internalBuffer375_CH1->async_dft->normalizeDFT(max2, amplitude1);
+                if(CH1_mode == -1)
+                    amplitude1 = internalBuffer750->async_dft->normalizeDFT(max2, amplitude1);
+                else
+                    amplitude1 = internalBuffer375_CH1->async_dft->normalizeDFT(max2, amplitude1);
                 axes->graph(0)->setData(f, amplitude1);
                 axes->xAxis->setRange(m_spectrumMinX, m_spectrumMaxX);
                 /*Setting maximum/minimum y-axis 0%-100%*/

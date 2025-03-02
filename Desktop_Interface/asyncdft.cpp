@@ -72,6 +72,12 @@ void AsyncDFT::addSample(short sample)
     samples_count++;
 }
 
+void AsyncDFT::clearWindow()
+{
+    window.clear();
+    samples_count = 0;
+}
+
 QVector<double> AsyncDFT::getPowerSpectrum(QVector<double> input)
 {
     /*Before doing anything, check if sliding DFT is computable*/

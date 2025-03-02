@@ -22,6 +22,9 @@ public:
     /*Add a sample to the time domain samples*/
     void addSample(short sample);
 
+    /*Clear the window*/
+    void clearWindow();
+
     /*Return the window of samples*/
     std::unique_ptr<short[]> getWindow();
 
