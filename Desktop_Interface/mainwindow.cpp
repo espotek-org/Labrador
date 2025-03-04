@@ -267,13 +267,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     spectrumLayoutWidget->setLayout(spectrumLayout);
     spectrumMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    spectrumMinXSpinbox->setMinimum(0);
-    spectrumMinXSpinbox->setMaximum(375000);
+    spectrumMinXSpinbox->setRange(0, 375000);
     spectrumMinXSpinbox->setValue(0);
     spectrumMinXSpinbox->setSingleStep(1000);
     spectrumMaxXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    spectrumMaxXSpinbox->setMinimum(0);
-    spectrumMaxXSpinbox->setMaximum(375000);
+    spectrumMaxXSpinbox->setRange(0, 375000);
     spectrumMaxXSpinbox->setValue(375000);
     spectrumMaxXSpinbox->setSingleStep(10000);
     windowingComboBox->addItem("Rectangular");
@@ -324,13 +322,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     freqRespLayout1Widget->setLayout(freqRespLayout1);
     freqRespMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespMinXSpinbox->setMinimum(100);
-    freqRespMinXSpinbox->setMaximum(62500);
+    freqRespMinXSpinbox->setRange(100, 62500);
     freqRespMinXSpinbox->setValue(100);
     freqRespMinXSpinbox->setSingleStep(10);
     freqRespMaxXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespMaxXSpinbox->setMinimum(100);
-    freqRespMaxXSpinbox->setMaximum(62500);
+    freqRespMaxXSpinbox->setRange(100, 62500);
     freqRespMaxXSpinbox->setValue(32500);
     freqRespMaxXSpinbox->setSingleStep(1000);
 
@@ -344,8 +340,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     freqRespLayout2Widget->setLayout(freqRespLayout2);
     freqRespStepSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespStepSpinbox->setMinimum(10);
-    freqRespStepSpinbox->setMaximum(10000);
+    freqRespStepSpinbox->setRange(10, 10000);
     freqRespStepSpinbox->setValue(100);
     freqRespStepSpinbox->setSingleStep(10);
     freqRespTypeComboBox->addItem("Gain");
