@@ -202,7 +202,7 @@ private:
     QVector<double> m_freqRespPhase;
     double m_freqRespMin = 100;
     double m_freqRespMax = 32500;
-    int m_freqRespStep = 100;
+    double m_freqRespStep = 100;
     int m_freqRespType = 0;
     bool m_freqRespFlag = false;
 
@@ -302,12 +302,12 @@ public slots:
     void attenuationChanged_CH2(int attenuationIndex);
     void setHexDisplay_CH1(bool enabled);
     void setHexDisplay_CH2(bool enabled);
-    void setMinSpectrum(int minSpectrum);
-    void setMaxSpectrum(int maxSpectrum);
+    void setMinSpectrum(double minSpectrum);
+    void setMaxSpectrum(double maxSpectrum);
     void setWindowingType(int windowing);
-    void setMinFreqResp(int minFreqResp);
-    void setMaxFreqResp(int maxFreqResp);
-    void setFreqRespStep(int stepFreqResp);
+    void setMinFreqResp(double minFreqResp);
+    void setMaxFreqResp(double maxFreqResp);
+    void setFreqRespStep(double stepFreqResp);
     void setFreqRespType(int typeFreqResp);
     void restartFreqResp();
 };

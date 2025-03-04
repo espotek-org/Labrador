@@ -1915,14 +1915,14 @@ void isoDriver::setHexDisplay_CH2(bool enabled)
     hexDisplay_CH2 = enabled;
 }
 
-void isoDriver::setMinSpectrum(int minSpectrum)
+void isoDriver::setMinSpectrum(double minSpectrum)
 {
-    m_spectrumMinX = static_cast<double>(minSpectrum);
+    m_spectrumMinX = minSpectrum;
 }
 
-void isoDriver::setMaxSpectrum(int maxSpectrum)
+void isoDriver::setMaxSpectrum(double maxSpectrum)
 {
-    m_spectrumMaxX = static_cast<double>(maxSpectrum);
+    m_spectrumMaxX = maxSpectrum;
 }
 
 void isoDriver::setWindowingType(int windowingType)
@@ -1930,19 +1930,19 @@ void isoDriver::setWindowingType(int windowingType)
     m_windowingType = windowingType;
 }
 
-void isoDriver::setMinFreqResp(int minFreqResp)
+void isoDriver::setMinFreqResp(double minFreqResp)
 {
-    m_freqRespMin = static_cast<double>(minFreqResp);
+    m_freqRespMin = minFreqResp;
     m_freqRespFlag = true;
 }
 
-void isoDriver::setMaxFreqResp(int maxFreqResp)
+void isoDriver::setMaxFreqResp(double maxFreqResp)
 {
-    m_freqRespMax = static_cast<double>(maxFreqResp);
+    m_freqRespMax = maxFreqResp;
     m_freqRespFlag = true;
 }
 
-void isoDriver::setFreqRespStep(int freqRespStep)
+void isoDriver::setFreqRespStep(double freqRespStep)
 {
     m_freqRespStep = freqRespStep;
     m_freqRespFlag = true;
