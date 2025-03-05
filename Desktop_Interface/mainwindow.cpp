@@ -255,20 +255,22 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->controller_iso, &isoDriver::enableCursorGroup, this, &MainWindow::cursorGroupEnabled);
 
     // Frequency spectrum
-    spectrumMinXSpinbox = new QSpinBox();
-    spectrumMaxXSpinbox = new QSpinBox();
+    spectrumMinXSpinbox = new espoSpinBox();
+    spectrumMaxXSpinbox = new espoSpinBox();
     spectrumLayoutWidget = new QWidget();
     QHBoxLayout* spectrumLayout = new QHBoxLayout(spectrumLayoutWidget);
-    QLabel* spectrumMinFreqLabel = new QLabel("Min Frequency (Hz)");
-    QLabel* spectrumMaxFreqLabel = new QLabel("Max Frequency (Hz)");
+    QLabel* spectrumMinFreqLabel = new QLabel("Min Frequency");
+    QLabel* spectrumMaxFreqLabel = new QLabel("Max Frequency");
     QSpacerItem* spacer = new QSpacerItem(20, 40, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     spectrumLayoutWidget->setLayout(spectrumLayout);
-    spectrumMinXSpinbox->setMinimum(0);
-    spectrumMinXSpinbox->setMaximum(187500);
-    spectrumMaxXSpinbox->setMinimum(0);
-    spectrumMaxXSpinbox->setMaximum(187500);
+    spectrumMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
+    spectrumMinXSpinbox->setRange(0, 187500);
+    spectrumMinXSpinbox->setSingleStep(1000);
+    spectrumMaxXSpinbox->setSuffix(QString::fromUtf8("Hz"));
+    spectrumMaxXSpinbox->setRange(0, 187500);
     spectrumMaxXSpinbox->setValue(187500);
+    spectrumMaxXSpinbox->setSingleStep(10000);
 
     spectrumLayout->addItem(spacer);
     spectrumLayout->addWidget(spectrumMinFreqLabel);
@@ -278,11 +280,14 @@ MainWindow::MainWindow(QWidget *parent) :
     spectrumLayout->addWidget(spectrumMaxXSpinbox);
     spectrumLayout->addItem(spacer);
 
-    connect(spectrumMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMinSpectrum);
-    connect(spectrumMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMaxSpectrum);
+    connect(spectrumMinXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMinSpectrum);
+    connect(spectrumMaxXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMaxSpectrum);
 
-    connect(spectrumMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), spectrumMaxXSpinbox, &QSpinBox::setMinimum);
-    connect(spectrumMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), spectrumMinXSpinbox, &QSpinBox::setMaximum);
+    connect(spectrumMinXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), spectrumMaxXSpinbox, &espoSpinBox::setMinimum);
+    connect(spectrumMaxXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), spectrumMinXSpinbox, &espoSpinBox::setMaximum);
+
+    connect(spectrumMinXSpinbox, SIGNAL(valueChanged(double)), spectrumMinXSpinbox, SLOT(changeStepping(double)));
+    connect(spectrumMaxXSpinbox, SIGNAL(valueChanged(double)), spectrumMaxXSpinbox, SLOT(changeStepping(double)));
 
     ui->verticalLayout->addWidget(spectrumLayoutWidget);
     spectrumLayoutWidget->setVisible(false);
@@ -304,13 +309,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     freqRespLayout1Widget->setLayout(freqRespLayout1);
     freqRespMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespMinXSpinbox->setMinimum(100);
-    freqRespMinXSpinbox->setMaximum(62500);
+    freqRespMinXSpinbox->setRange(100, 62500);
     freqRespMinXSpinbox->setValue(100);
+    freqRespMinXSpinbox->setSingleStep(10);
     freqRespMaxXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespMaxXSpinbox->setMinimum(100);
-    freqRespMaxXSpinbox->setMaximum(62500);
+    freqRespMaxXSpinbox->setRange(100, 62500);
     freqRespMaxXSpinbox->setValue(32500);
+    freqRespMaxXSpinbox->setSingleStep(1000);
 
     freqRespLayout1->addItem(spacer);
     freqRespLayout1->addWidget(freqRespMinFreqLabel);
@@ -322,9 +327,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     freqRespLayout2Widget->setLayout(freqRespLayout2);
     freqRespStepSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    freqRespStepSpinbox->setMinimum(10);
-    freqRespStepSpinbox->setMaximum(10000);
+    freqRespStepSpinbox->setRange(10, 10000);
     freqRespStepSpinbox->setValue(100);
+    freqRespStepSpinbox->setSingleStep(10);
     freqRespTypeComboBox->addItem("Gain");
     freqRespTypeComboBox->addItem("Phase");
     freqRespTypeComboBox->setCurrentIndex(0);

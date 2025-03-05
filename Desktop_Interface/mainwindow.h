@@ -306,8 +306,8 @@ private:
 
     // Frequency spectrum
     QWidget* spectrumLayoutWidget = nullptr;
-    QSpinBox* spectrumMinXSpinbox = nullptr;
-    QSpinBox* spectrumMaxXSpinbox = nullptr;
+    espoSpinBox* spectrumMinXSpinbox = nullptr;
+    espoSpinBox* spectrumMaxXSpinbox = nullptr;
 
     // Frequency response
     QWidget* freqRespLayout1Widget = nullptr;
