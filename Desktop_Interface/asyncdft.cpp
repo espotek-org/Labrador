@@ -78,7 +78,7 @@ void AsyncDFT::clearWindow()
     samples_count = 0;
 }
 
-QVector<double> AsyncDFT::getPowerSpectrum(QVector<double> input)
+QVector<double> AsyncDFT::getPowerSpectrum_db(QVector<double> input)
 {
     /*Before doing anything, check if sliding DFT is computable*/
     if (data_valid == false) {
@@ -95,17 +95,17 @@ QVector<double> AsyncDFT::getPowerSpectrum(QVector<double> input)
 
     /*Executing FFTW plan*/
     fftw_execute(plan);
-    amplitude[0] = sqrt(out_buffer[0][0]*out_buffer[0][0] + out_buffer[0][1]*out_buffer[0][1]);  /* DC component */
+    amplitude[0] = 10*(6+std::log10(out_buffer[0][0]*out_buffer[0][0] + out_buffer[0][1]*out_buffer[0][1])-10.235019853);  /* DC component */
 
     maximum = (amplitude[0] > maximum ) ? amplitude[0] : maximum;
 
     for (int k = 1; k < (n_samples+1)/2; ++k) {  /* (k < N/2 rounded up) */
-         amplitude[k] = sqrt(out_buffer[k][0]*out_buffer[k][0] + out_buffer[k][1]*out_buffer[k][1]);
+         amplitude[k] = 10*(6+std::log10(out_buffer[k][0]*out_buffer[k][0] + out_buffer[k][1]*out_buffer[k][1])-10.235019853);
 
          maximum = (amplitude[k] > maximum ) ? amplitude[k] : maximum;
     }
     if (n_samples % 2 == 0) { /* N is even */
-         amplitude[n_samples/2] = sqrt(out_buffer[n_samples/2][0]*out_buffer[n_samples/2][0]);  /* Nyquist freq. */
+         amplitude[n_samples/2] = 10*(6+std::log10(out_buffer[n_samples/2][0]*out_buffer[n_samples/2][0])-10.235019853);  /* Nyquist freq. */
 
          maximum = (amplitude[n_samples/2] > maximum ) ? amplitude[n_samples/2] : maximum;
 

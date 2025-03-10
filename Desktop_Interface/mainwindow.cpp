@@ -257,10 +257,12 @@ MainWindow::MainWindow(QWidget *parent) :
     // Frequency spectrum
     spectrumMinXSpinbox = new QSpinBox();
     spectrumMaxXSpinbox = new QSpinBox();
+    windowingComboBox = new QComboBox();
     spectrumLayoutWidget = new QWidget();
     QHBoxLayout* spectrumLayout = new QHBoxLayout(spectrumLayoutWidget);
     QLabel* spectrumMinFreqLabel = new QLabel("Min Frequency (Hz)");
     QLabel* spectrumMaxFreqLabel = new QLabel("Max Frequency (Hz)");
+    QLabel* windowingLabel = new QLabel("Window");
     QSpacerItem* spacer = new QSpacerItem(20, 40, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     spectrumLayoutWidget->setLayout(spectrumLayout);
@@ -269,6 +271,12 @@ MainWindow::MainWindow(QWidget *parent) :
     spectrumMaxXSpinbox->setMinimum(0);
     spectrumMaxXSpinbox->setMaximum(375000);
     spectrumMaxXSpinbox->setValue(375000);
+    windowingComboBox->addItem("Rectangular");
+    windowingComboBox->addItem("Hann");
+    windowingComboBox->addItem("Hamming");
+    windowingComboBox->addItem("Blackman");
+    windowingComboBox->addItem("Flat top");
+    windowingComboBox->setCurrentIndex(0);
 
     spectrumLayout->addItem(spacer);
     spectrumLayout->addWidget(spectrumMinFreqLabel);
@@ -277,9 +285,13 @@ MainWindow::MainWindow(QWidget *parent) :
     spectrumLayout->addWidget(spectrumMaxFreqLabel);
     spectrumLayout->addWidget(spectrumMaxXSpinbox);
     spectrumLayout->addItem(spacer);
+    spectrumLayout->addWidget(windowingLabel);
+    spectrumLayout->addWidget(windowingComboBox);
+    spectrumLayout->addItem(spacer);
 
     connect(spectrumMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMinSpectrum);
     connect(spectrumMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMaxSpectrum);
+    connect(windowingComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), ui->controller_iso, &isoDriver::setWindowingType);
 
     connect(spectrumMinXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), spectrumMaxXSpinbox, &QSpinBox::setMinimum);
     connect(spectrumMaxXSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), spectrumMinXSpinbox, &QSpinBox::setMaximum);
