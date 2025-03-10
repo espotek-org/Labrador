@@ -7,17 +7,14 @@ qmake APPIMAGE=1 CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-p
 make -j$(nproc) ${CC:+CC=${CC}} ${CXX:+CXX=${CXX} LINK=${CXX}}
 make INSTALL_ROOT=AppDir install ; find AppDir/
 
-wget -N -nv "https://github.com/probonopd/linuxdeployqt/releases/download/6/linuxdeployqt-6-x86_64.AppImage"
-chmod a+x linuxdeployqt-*.AppImage
-unset QTDIR; unset QT_PLUGIN_PATH ; unset LD_LIBRARY_PATH
-export VERSION=$(git rev-parse --short HEAD)
-./linuxdeployqt-*.AppImage AppDir/usr/share/applications/*.desktop -bundle-non-qt-libs -verbose=2 -no-strip -unsupported-allow-new-glibc
 
-mkdir -p AppDir/usr/optional/libstdc++/ ; cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 ./AppDir/usr/optional/libstdc++/
+wget -N -nv "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-x86_64.AppImage"
+wget -N -nv "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage"
+wget -N -nv "https://github.com/darealshinji/linuxdeploy-plugin-checkrt/releases/download/r1/linuxdeploy-plugin-checkrt.sh"
+chmod a+x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage linuxdeploy-plugin-checkrt.sh
 
-wget -N -nv https://github.com/EspoTek/linuxdeploy-plugin-checkrt/raw/refs/heads/master/exec.c
-cc -shared -O2 -fPIC exec.c -o AppDir/usr/optional/exec.so -Wl,--as-needed -static-libgcc -ldl -s
-
-./linuxdeployqt-*.AppImage --appimage-extract
-rm ./AppDir/AppRun ; cp ./resources/AppRun AppDir/ ; chmod a+x ./AppDir/AppRun
-PATH=./squashfs-root/usr/bin:$PATH ./squashfs-root/usr/bin/appimagetool -g ./AppDir/
+unset QTDIR
+unset QT_PLUGIN_PATH
+export LD_LIBRARY_PATH=$(realpath AppDir/usr/lib)
+export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
+./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin=qt --plugin=checkrt --plugin=udev --output=appimage
