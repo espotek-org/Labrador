@@ -122,6 +122,26 @@ std::vector<double> * librador_get_analog_data_sincelast(int channel, double tim
 
 }
 
+std::vector<uint8_t> * librador_get_digital_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds){
+    VECTOR_API_INIT_CHECK
+    VECTOR_USB_INIT_CHECK
+
+    double subsamples_per_second = internal_librador_object->usb_driver->get_samples_per_second() * 8;
+
+    if(subsamples_per_second == 0){
+        return NULL;
+    }
+
+
+    int interval_subsamples = round(subsamples_per_second / sample_rate_hz);
+    int feasible_window_end = round(delay_seconds * subsamples_per_second);
+    int feasible_window_begin = round((delay_seconds + timeWindow_max_seconds) * subsamples_per_second);
+
+    printf("interval_subsamples = %d\nfeasible_window_end = %d\nfeasible_window_begin = %d\n", interval_subsamples, feasible_window_end, feasible_window_begin);
+
+    return internal_librador_object->usb_driver->getMany_singleBit_sincelast(channel, feasible_window_begin, feasible_window_end, interval_subsamples);
+}
+
 
 int librador_reset_usb(){
     CHECK_API_INITIALISED
