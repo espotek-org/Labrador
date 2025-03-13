@@ -1,25 +1,15 @@
 #!/bin/bash
 
-# Install prerequisites
-dpkg -s qtbase5-dev
-QTBASE_NOT_INSTALLED=$?
-dpkg -s qtchooser
-QTCHOOSER_NOT_INSTALLED=$?
-dpkg -s qt5-qmake
-QMAKE_NOT_INSTALLED=$?
-dpkg -s qtbase5-dev-tools
-QTDEV_NOT_INSTALLED=$?
-dpkg -s libusb-1.0-0-dev
-LIBUSB_NOT_INSTALLED=$?
-dpkg -s libfftw3-dev
-FFTW_NOT_INSTALLED=$?
-dpkg -s libeigen3-dev
-EIGEN3_NOT_INSTALLED=$?
-
-# We don't want to bail if one of the first 4 lines returns error.  That's what they're meant to do!
 set -e
 
-if [ $QTBASE_NOT_INSTALLED != 0 ] || [ $QTCHOOSER_NOT_INSTALLED != 0 ] || [ $QMAKE_NOT_INSTALLED != 0 ] || [ $QTDEV_NOT_INSTALLED != 0 ] || [ $LIBUSB_NOT_INSTALLED != 0 ] || [ $FFTW_NOT_INSTALLED != 0 ] || [ $EIGEN3_NOT_INSTALLED != 0 ]; then
+# Install prerequisites
+if ! dpkg -s qtbase5-dev \
+|| ! dpkg -s qtchooser \
+|| ! dpkg -s qt5-qmake \
+|| ! dpkg -s qtbase5-dev-tools \
+|| ! dpkg -s libusb-1.0-0-dev \
+|| ! dpkg -s libfftw3-dev \
+|| ! dpkg -s libeigen3-dev; then
     sudo apt-get update
     sudo apt-get install -y qtbase5-dev
     sudo apt-get install -y qtchooser
