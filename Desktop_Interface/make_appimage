@@ -4,7 +4,7 @@ set -e
 
 rm -rf AppDir
 qmake APPIMAGE=1 CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-parse --short HEAD)
-make -j$(nproc) ${CC:+CC=${CC}} ${CXX:+CXX=${CXX} LINK=${CXX}}
+make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
 
 wget -N -nv "https://github.com/probonopd/linuxdeployqt/releases/download/6/linuxdeployqt-6-x86_64.AppImage"
