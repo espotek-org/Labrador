@@ -25,24 +25,9 @@ fi
 # Move to /tmp so we don't leave junk in the user's folders
 cd /tmp
 
-# Install gcc-8.10, which is modern C++ friendly
-# see https://solarianprogrammer.com/2017/12/08/raspberry-pi-raspbian-install-gcc-compile-cpp-17-programs/
-if [ -d "/usr/local/gcc-8.1.0-labrador" ]; then
-    echo "gcc-8.1.0-labrador is already installed.  Skipping step."
-else
-    rm -rf raspberry-pi-gcc-binary
-    git clone --depth 1 https://github.com/espotek-org/raspberry-pi-gcc-binary
-    cd ./raspberry-pi-gcc-binary
-    tar xf gcc-8.1.0.tar.bz2
-    sudo mv gcc-8.1.0 /usr/local/gcc-8.1.0-labrador
-fi
-
 # Clone the latest version of Labrador
 rm -rf labrador
 git clone --depth 1 https://github.com/espotek-org/labrador
-
-# Set PATH so that make can find gcc-8.10
-export PATH=/usr/local/gcc-8.1.0-labrador/bin:$PATH
 
 # Set QT_SELECT so qtchooser picks the right version
 export QT_SELECT=qt5
@@ -50,11 +35,10 @@ export QT_SELECT=qt5
 # Build labrador
 cd labrador/Desktop_Interface
 qmake
-make CXX=g++-8.1.0 CC=gcc-8.1.0
+make
 sudo make install
 
 # Cleanup
-rm -rf raspberry-pi-gcc-binary
 rm -rf labrador
 
 echo "Labrador installation success!"
