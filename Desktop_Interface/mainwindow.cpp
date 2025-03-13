@@ -2785,7 +2785,7 @@ void MainWindow::on_txuart_textChanged()
 
     // Check if key pressed in backspace
     if (text.length() == prev_text.length()-1)
-        new_char = '\b';
+        new_char = "\b";
     else
         new_char = text.right(1);
 
@@ -2794,7 +2794,7 @@ void MainWindow::on_txuart_textChanged()
     parity_CH1 = ui->controller_iso->parity_CH1;
 
     // Encode txuart data
-    if (new_char == '\n')
+    if (new_char == "\n")
         new_char = "\r\n";
     data = uartEncode(new_char, parity_CH1);
 
@@ -2803,7 +2803,7 @@ void MainWindow::on_txuart_textChanged()
     ui->controller_fg->txuartUpdate(ChannelID::CH1, baudRate_CH1, data);
 
     // Check if the last character is newline
-    if (new_char == '\r')
+    if (new_char == "\r")
     {
         // Clear txuart screen
         ui->txuart->clear();
