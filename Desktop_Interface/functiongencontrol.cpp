@@ -23,8 +23,8 @@ void SingleChannelController::waveformName(QString newName)
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         qFatal("could not open %s", qUtf8Printable(file.fileName()));
 
-    int length = file.readLine().toInt();
-    m_data.divisibility = file.readLine().toInt();
+    int length = file.readLine().trimmed().toInt();
+    m_data.divisibility = file.readLine().trimmed().toInt();
     QByteArray data = file.readLine().trimmed();
     file.close();
 
