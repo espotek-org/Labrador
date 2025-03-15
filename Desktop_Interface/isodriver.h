@@ -133,6 +133,7 @@ private:
     //Generic Functions
     void analogConvert(short *shortPtr, QVector<double> *doublePtr, int TOP, bool AC, int channel);
     void digitalConvert(short *shortPtr, QVector<double> *doublePtr);
+    double windowing_factor(int m_windowingType, int n_samples, int index);
     void fileStreamConvert(float *floatPtr, QVector<double> *doublePtr);
     bool properlyPaused();
     void udateCursors(void);
@@ -194,6 +195,7 @@ private:
     //Spectrum
     double m_spectrumMinX = 0;
     double m_spectrumMaxX = 375000;
+    int m_windowingType = 0;
     //Frequency response
     QVector<double> m_freqRespFreq;
     QVector<double> m_freqRespGain;
@@ -302,6 +304,7 @@ public slots:
     void setHexDisplay_CH2(bool enabled);
     void setMinSpectrum(int minSpectrum);
     void setMaxSpectrum(int maxSpectrum);
+    void setWindowingType(int windowing);
     void setMinFreqResp(int minFreqResp);
     void setMaxFreqResp(int maxFreqResp);
     void setFreqRespStep(int stepFreqResp);

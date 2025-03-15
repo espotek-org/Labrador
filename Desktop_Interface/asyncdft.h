@@ -16,7 +16,7 @@ public:
     static const int n_samples = 1<<17;
 
     /* Raise exception if not ready yet*/
-    QVector<double> getPowerSpectrum(QVector<double> input);
+    QVector<double> getPowerSpectrum_dbmv(QVector<double> input, double wind_fact_sum);
     QVector<double> getFrequenciyWindow(int samplesPerSeconds);
 
     /*Add a sample to the time domain samples*/
