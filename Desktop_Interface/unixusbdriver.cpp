@@ -359,44 +359,39 @@ int unixUsbDriver::flashFirmware(void){
     char* buffer = array.data();
     //qDebug() << buffer;
 
-
     //Set up interface to dfuprog
-    int exit_code = 1;
-    char command1[256];
-    sprintf(command1, "dfu-programmer atxmega32a4u erase --force");
-    char command2[256];
-    sprintf(command2, "dfu-programmer atxmega32a4u flash %s", buffer);
-    char command3[256];
-    sprintf(command3, "dfu-programmer atxmega32a4u launch");
-    char command4[256];
-    sprintf(command4, "dfu-programmer atxmega32a4u launch");
+    int exit_code;
+    char command[256];
 
     //Run stage 1, until there's a success
-    while(exit_code){
+    do {
         QThread::msleep(200);
-        exit_code = dfuprog_virtual_cmd(command1);
+        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force");
+        exit_code = dfuprog_virtual_cmd(command);
         QApplication::processEvents();
-    }
+    } while (exit_code);
 
     //Run stage 2
-    exit_code = dfuprog_virtual_cmd(command2);
-    if(exit_code){
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", buffer);
+    exit_code = dfuprog_virtual_cmd(command);
+    if (exit_code) {
         return exit_code+200;
     }
 
     //Run stage 3
-    exit_code = dfuprog_virtual_cmd(command3);
-    if(exit_code){
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+    exit_code = dfuprog_virtual_cmd(command);
+    if (exit_code) {
        return exit_code+300;
     }
 
     //Run stage 4 - double launch to clear the eeprom flag from bootloaderJump.
-    exit_code = 1;
-    while(exit_code){
+    do {
         QThread::msleep(200);
-        exit_code = dfuprog_virtual_cmd(command4);
+        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+        exit_code = dfuprog_virtual_cmd(command);
         QApplication::processEvents();
-    }
+    } while (exit_code);
 
     libusb_release_interface(handle, 0);
     qDebug() << "Interface released";
@@ -424,13 +419,9 @@ void unixUsbDriver::manualFirmwareRecovery(void){
     QByteArray array = dirString.toLocal8Bit();
     char* buffer = array.data();
 
-    char leaveBootloaderCommand[256];
-    sprintf(leaveBootloaderCommand, "dfu-programmer atxmega32a4u launch");
+    //Set up interface to dfuprog
     int exit_code;
-    char eraseCommand[256];
-    sprintf(eraseCommand, "dfu-programmer atxmega32a4u erase --force");
-    char flashCommand[256];
-    sprintf(flashCommand, "dfu-programmer atxmega32a4u flash %s", buffer);
+    char command[256];
 
     //Intro
     QMessageBox manualFirmwareMessages;
@@ -453,7 +444,7 @@ void unixUsbDriver::manualFirmwareRecovery(void){
     //Real troubleshooting begins here.....
 
     //USB Problems.
-    if(connected){
+    if (connected) {
         manualFirmwareMessages.setText("It seems like your board is already connected and configured correctly.\n\nIf your board is not functioning correctly, this indicates that there is an issue with the USB driver.\n\nLet's go through some manual troubleshooting steps.");
         manualFirmwareMessages.exec();
         manualFirmwareMessages.setText("There are two main possibilities:\n\n - Your USB Controller does not support Isochronous mode at USB 2.0 FS\n - Another device is competing with Labrador for bandwidth.");
@@ -468,23 +459,27 @@ void unixUsbDriver::manualFirmwareRecovery(void){
         manualFirmwareMessages.exec();
         return;
     } else {
-        exit_code = dfuprog_virtual_cmd(leaveBootloaderCommand);
+        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+        exit_code = dfuprog_virtual_cmd(command);
         manualFirmwareMessages.setText("No Labrador board could be detected.\n\nIt's possible that you're stuck in booloader mode.\n\nI've attempted to launch the firmware manually.");
         manualFirmwareMessages.exec();
-        if(exit_code){
+        if (exit_code) {
             manualFirmwareMessages.setText("Command failed.  This usually means that no device is detected.\n\nPlease Ensure that the cable you're using can carry data (for example, by using it to transfer data to your phone).\n\nSome cables are for charging only, and not physically contain data lines.\n\nAlso note that the red light on the Labrador board is a power indicator for the PSU output pins.\nIt will turn on even if no data lines are present.");
             manualFirmwareMessages.exec();
             return;
         }
         //Firmware launch failed, but bootloader preset
-        if(!connected){
-            exit_code = dfuprog_virtual_cmd(eraseCommand);
-            exit_code += dfuprog_virtual_cmd(flashCommand);
+        if (!connected) {
+            snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force");
+            exit_code = dfuprog_virtual_cmd(command);
+            snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", buffer);
+            exit_code += dfuprog_virtual_cmd(command);
             manualFirmwareMessages.setText("The bootloader is present, but firmware launch failed.  I've attempted to reprogram it.");
             manualFirmwareMessages.exec();
 
-            if(!exit_code){            //Reprogramming was successful, but board is still in bootloader mode.
-                exit_code = dfuprog_virtual_cmd(leaveBootloaderCommand);
+            if (!exit_code) { //Reprogramming was successful, but board is still in bootloader mode.
+                snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+                exit_code = dfuprog_virtual_cmd(command);
                 manualFirmwareMessages.setText("Reprogramming was successful!  Attempting to launch the board.\n\nIf it does not start working immediately, please wait 10 seconds and then reconnect the board.");
                 manualFirmwareMessages.exec();
             } else { //Programming failed.

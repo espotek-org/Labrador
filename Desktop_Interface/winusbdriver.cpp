@@ -335,7 +335,6 @@ int winUsbDriver::flashFirmware(void){
     signalFirmwareFlash();
     QApplication::processEvents();
 
-
     //Go to bootloader mode
     bootloaderJump();
 
@@ -355,22 +354,19 @@ int winUsbDriver::flashFirmware(void){
     QStringList args_stage4;
     args_stage4 << "atxmega32a4u" << "launch";
 
-    bool atxmega32a4u_connected = false;
     //Run stage 1, until there's a success
-    while(!atxmega32a4u_connected){
+    do {
         QThread::msleep(200);
         dfu_exe.start(dfuprog_location, args_stage1);
         dfu_exe.waitForFinished(-1);
         qDebug() << "stdio_stage1" << dfu_exe.readAllStandardOutput();
         qDebug() << "sterr_stage1" << dfu_exe.readAllStandardError();
         qDebug() << "EXIT_CODE stage1" << dfu_exe.exitCode();
-        atxmega32a4u_connected = !dfu_exe.exitCode();
         /*if(dfu_exe.exitCode()){
             return dfu_exe.exitCode()+100;
         }*/
         QApplication::processEvents();
-    }
-
+    } while (dfu_exe.exitCode());
 
     //Run stage 2
     dfu_exe.start(dfuprog_location, args_stage2);
@@ -378,7 +374,7 @@ int winUsbDriver::flashFirmware(void){
     qDebug() << "stdio_stage2" << dfu_exe.readAllStandardOutput();
     qDebug() << "sterr_stage2" << dfu_exe.readAllStandardError();
     qDebug() << "EXIT_CODE stage2" << dfu_exe.exitCode();
-    if(dfu_exe.exitCode()){
+    if (dfu_exe.exitCode()) {
         return dfu_exe.exitCode()+200;
     }
 
@@ -388,23 +384,21 @@ int winUsbDriver::flashFirmware(void){
     qDebug() << "stdio_stage3" << dfu_exe.readAllStandardOutput();
     qDebug() << "sterr_stage3" << dfu_exe.readAllStandardError();
     qDebug() << "EXIT_CODE stage3" << dfu_exe.exitCode();
-    if(dfu_exe.exitCode()){
+    if (dfu_exe.exitCode()) {
         return dfu_exe.exitCode()+300;
     }
 
     //Run stage 4 - double launch to clear the eeprom flag from bootloaderJump.
     //Connect back to labrador
-    while(atxmega32a4u_connected){
+    do {
         QThread::msleep(200);
         dfu_exe.start(dfuprog_location, args_stage4);
         dfu_exe.waitForFinished(-1);
         qDebug() << "stdio_stage4" << dfu_exe.readAllStandardOutput();
         qDebug() << "sterr_stage4" << dfu_exe.readAllStandardError();
         qDebug() << "EXIT_CODE stage4" << dfu_exe.exitCode();
-        atxmega32a4u_connected = (dfu_exe.exitCode()!=0);
         QApplication::processEvents();
-    }
-
+    } while (dfu_exe.exitCode());
 
     return 0;
 }
@@ -421,10 +415,8 @@ void winUsbDriver::manualFirmwareRecovery(void){
     QString dfuprog_location = QCoreApplication::applicationDirPath();
     dfuprog_location.append("/firmware/dfu-programmer");
     QProcess dfu_exe;
-
     QStringList leaveBootloaderCommand;
     leaveBootloaderCommand << "atxmega32a4u" << "launch";
-    int exit_code;
     QStringList eraseCommand;
     eraseCommand << "atxmega32a4u" << "erase" << "--force";
     QStringList flashCommand;
@@ -451,7 +443,7 @@ void winUsbDriver::manualFirmwareRecovery(void){
     //Real troubleshooting begins here.....
 
     //USB Problems.
-    if(connected){
+    if (connected) {
         manualFirmwareMessages.setText("It seems like your board is already connected and configured correctly.\n\nIf your board is not functioning correctly, this indicates that there is an issue with the USB driver.\n\nLet's go through some manual troubleshooting steps.");
         manualFirmwareMessages.exec();
         manualFirmwareMessages.setText("There are two main possibilities:\n\n - Your USB Controller does not support Isochronous mode at USB 2.0 FS\n - Another device is competing with Labrador for bandwidth.");
@@ -469,38 +461,36 @@ void winUsbDriver::manualFirmwareRecovery(void){
         qDebug() << "Attempting to leave bootloader!";
         dfu_exe.start(dfuprog_location, leaveBootloaderCommand);
         dfu_exe.waitForFinished(-1);
-        exit_code = dfu_exe.exitCode();
         manualFirmwareMessages.setText("No Labrador board could be detected.\n\nIt's possible that you're stuck in booloader mode.\n\nI've attempted to launch the firmware manually.");
         manualFirmwareMessages.exec();
-        if(exit_code){
-            qDebug("Exit code = %d", exit_code);
+        if (dfu_exe.exitCode()) {
+            qDebug() << "Exit code =" << dfu_exe.exitCode();
             manualFirmwareMessages.setText("Command failed.  This usually means that no device is detected.\n\nPlease Ensure that the cable you're using can carry data (for example, by using it to transfer data to your phone).\n\nSome cables are for charging only, and not physically contain data lines.\n\nAlso note that the red light on the Labrador board is a power indicator for the PSU output pins.\nIt will turn on even if no data lines are present.");
             manualFirmwareMessages.exec();
             return;
         }
         //Firmware launch failed, but bootloader preset
-        if(!connected){
+        if (!connected) {
             qDebug() << "Attempting to erase!";
             dfu_exe.start(dfuprog_location, eraseCommand);
             dfu_exe.waitForFinished(-1);
-            exit_code = dfu_exe.exitCode();
+            int exit_code = dfu_exe.exitCode();
 
-            qDebug("Exit code for erase = %d", exit_code);
+            qDebug() << "Exit code for erase =" << dfu_exe.exitCode();
 
             qDebug("Attempting to flash file %s!", file_location.toLocal8Bit().data());
             dfu_exe.start(dfuprog_location, flashCommand);
             dfu_exe.waitForFinished(-1);
             exit_code += dfu_exe.exitCode();
 
-            qDebug("Exit code for flash = %d", exit_code);
+            qDebug() << "Exit code for flash =" << dfu_exe.exitCode();
 
             manualFirmwareMessages.setText("The bootloader is present, but firmware launch failed.  I've attempted to reprogram it.");
             manualFirmwareMessages.exec();
 
-            if(!exit_code){            //Reprogramming was successful, but board is still in bootloader mode.
+            if (!exit_code) { //Reprogramming was successful, but board is still in bootloader mode.
                 dfu_exe.start(dfuprog_location, leaveBootloaderCommand);
                 dfu_exe.waitForFinished(-1);
-                exit_code = dfu_exe.exitCode();
                 manualFirmwareMessages.setText("Reprogramming was successful!  Attempting to launch the board.\n\nIf it does not start working immediately, please wait 10 seconds and then reconnect the board.");
                 manualFirmwareMessages.exec();
             } else { //Programming failed.

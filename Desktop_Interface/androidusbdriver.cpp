@@ -158,29 +158,29 @@ int androidUsbDriver::flashFirmware(void){
     QFile asset_file(fname);
     qDebug() << "asset_file.exists()" << asset_file.exists();
 
-     QString filePath = QStandardPaths::writableLocation( QStandardPaths::StandardLocation::AppDataLocation );
-     filePath.append( "/firmware.hex");
-     if (asset_file.exists()) {
-         if( QFile::exists( filePath ) ){
-             qDebug() << "File already exists in temporary path.  Removing....";
-             QFile::remove( filePath );
-         }
+    QString filePath = QStandardPaths::writableLocation(QStandardPaths::StandardLocation::AppDataLocation);
+    filePath.append("/firmware.hex");
+    if (asset_file.exists()) {
+        if (QFile::exists(filePath)) {
+            qDebug() << "File already exists in temporary path.  Removing....";
+            QFile::remove(filePath);
+        }
 
-         if( asset_file.copy( filePath ) ){
-             QFile::setPermissions( filePath, QFile::WriteOwner | QFile::ReadOwner );
+        if (asset_file.copy(filePath)) {
+            QFile::setPermissions(filePath, QFile::WriteOwner | QFile::ReadOwner);
             qDebug() << "firmware temp file copied to" << filePath;
-         } else {
-             qDebug() << "\n\n\nERROR: COULD NOT CREATE TEMP FIRMWARE FILE\n\n\n";
-         }
-     } else qDebug() << "File not found in assets";
+        } else {
+            qDebug() << "\n\n\nERROR: COULD NOT CREATE TEMP FIRMWARE FILE\n\n\n";
+        }
+    } else qDebug() << "File not found in assets";
 
-     std::string filePath_stdstr = filePath.toStdString();
-     char filePath_cstring[256];
-     strcpy(filePath_cstring, filePath_stdstr.c_str());
+    std::string filePath_stdstr = filePath.toStdString();
+    char filePath_cstring[256];
+    strcpy(filePath_cstring, filePath_stdstr.c_str());
 
-     qDebug() << "File path is" << filePath_cstring;
+    qDebug() << "File path is" << filePath_cstring;
 
-    if(connected) {
+    if (connected) {
         //Switch from application mode to bootloader mode.  Otherwise assume we are in bootloader.
         bootloaderJump();
         mainActivity.callMethod<void>("closeDevice");
@@ -191,16 +191,16 @@ int androidUsbDriver::flashFirmware(void){
         qDebug() << "BA94 closed";
 
         QThread::msleep(2000);
-}
+    }
 
     //Initialise libusb-martin-kuldeep
     libusb_context *ctx;
-    libusb_device * device_ptr;
+    libusb_device *device_ptr;
     libusb_device_handle *handle;
     int error = get_new_bootloader_ctx(&device_ptr, &handle, &ctx);
-    if(error){
-            qDebug() << "get_new_bootloader_ctx FAILED";
-            return 69;
+    if (error) {
+        qDebug() << "get_new_bootloader_ctx FAILED";
+        return 69;
     }
 
     /*
@@ -224,75 +224,67 @@ int androidUsbDriver::flashFirmware(void){
 
     qDebug() << busNumber;
     qDebug() << devNumber;
-*/
+    */
 
     //Set up interface to dfuprog
     int exit_code;
-    char command1[256];
-    sprintf(command1, "dfu-programmer atxmega32a4u erase --force --debug 300");
-    char command2[256];
-    sprintf(command2, "dfu-programmer atxmega32a4u flash %s --debug 300", filePath_cstring);
-    char command3[256];
-    sprintf(command3, "dfu-programmer atxmega32a4u launch");
-    char command4[256];
-    sprintf(command4, "dfu-programmer atxmega32a4u launch");
-
-    qDebug() << "\n\nFlashing Firmware, stage 1.\n\n";
+    char command[256];
 
     //Run stage 1
-    exit_code = dfuprog_virtual_cmd(command1, device_ptr, handle, ctx,  0);
-    if(exit_code){
+    qDebug() << "\n\nFlashing Firmware, stage 1.\n\n";
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force --debug 300");
+    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    if (exit_code) {
         qDebug() << "ERROR ERASING FIRMWARE.";
         //return exit_code+100;
     }
 
     error = get_new_bootloader_ctx(&device_ptr, &handle, &ctx);
-    if(error){
-            qDebug() << "\n\n\nget_new_bootloader_ctx FAILED\n\n\n";
-            return 169;
+    if (error) {
+        qDebug() << "\n\n\nget_new_bootloader_ctx FAILED\n\n\n";
+        return 169;
     }
 
-    qDebug() << "\n\nFlashing Firmware, stage 2.\n\n";
-
     //Run stage 2
-    exit_code = dfuprog_virtual_cmd(command2, device_ptr, handle, ctx,  0);
-    if(exit_code){
+    qDebug() << "\n\nFlashing Firmware, stage 2.\n\n";
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s --debug 300", filePath_cstring);
+    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    if (exit_code) {
         qDebug() << "\n\n\nERROR WRITING NEW FIRMWARE TO DEVICE.\n\n\n";
         //return exit_code+200;
     }
 
     error = get_new_bootloader_ctx(&device_ptr, &handle, &ctx);
-    if(error){
-            qDebug() << "get_new_bootloader_ctx FAILED";
-            return 269;
+    if (error) {
+        qDebug() << "get_new_bootloader_ctx FAILED";
+        return 269;
     }
 
-    qDebug() << "\n\nFlashing Firmware, stage 3.\n\n";
-
     //Run stage 3
-    exit_code = dfuprog_virtual_cmd(command3, device_ptr, handle, ctx,  0);
-    if(exit_code){
+    qDebug() << "\n\nFlashing Firmware, stage 3.\n\n";
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    if (exit_code) {
         qDebug() << "\n\n\nERROR LAUNCHING DEVICE (INITIAL).\n\n\n";
-       //return exit_code+300;
+        //return exit_code+300;
     }
 
     QThread::msleep(2000);
 
     error = get_new_bootloader_ctx(&device_ptr, &handle, &ctx);
-    if(error){
-            qDebug() << "get_new_bootloader_ctx FAILED";
-            return 369;
+    if (error) {
+        qDebug() << "get_new_bootloader_ctx FAILED";
+        return 369;
     }
 
-    qDebug() << "\n\nFlashing Firmware, stage 4.\n\n";
-
     //Run stage 4 - double launch to clear the eeprom flag from bootloaderJump.
-    exit_code = dfuprog_virtual_cmd(command4, device_ptr, handle, ctx,  0);
-    if(exit_code){
+    qDebug() << "\n\nFlashing Firmware, stage 4.\n\n";
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
+    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    if (exit_code) {
         qDebug() << "\n\n\nERROR LAUNCHING DEVICE (SECONDARY).\n\n\n";
-       //return exit_code+300;
+        //return exit_code+300;
     }
     mainActivity.callMethod<void>("closeDevice");
     return 0;
 }
-
