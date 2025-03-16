@@ -424,11 +424,6 @@ void unixUsbDriver::manualFirmwareRecovery(void){
     QByteArray array = dirString.toLocal8Bit();
     char* buffer = array.data();
 
-    //Vars
-    QMessageBox manualFirmwareMessages;
-    int messageBoxReturn;
-
-
     char leaveBootloaderCommand[256];
     sprintf(leaveBootloaderCommand, "dfu-programmer atxmega32a4u launch");
     int exit_code;
@@ -437,24 +432,21 @@ void unixUsbDriver::manualFirmwareRecovery(void){
     char flashCommand[256];
     sprintf(flashCommand, "dfu-programmer atxmega32a4u flash %s", buffer);
 
-
-
-
     //Intro
+    QMessageBox manualFirmwareMessages;
     manualFirmwareMessages.setText("Welcome to the firmware recovery wizard.\nThis tool will attempt various steps to troubleshoot a board with connection issues.\n\nPress OK to continue.");
     manualFirmwareMessages.exec();
-
 
     //Hello, this is IT, can you try turning it off and on again?
     manualFirmwareMessages.setText("Before continuing, please disconnect and reconnect your Labrador board, then wait 10 seconds.\n\nAlso ensure that there are no other instances of the Labrador software running on this machine.");
     manualFirmwareMessages.exec();
     manualFirmwareMessages.setStandardButtons(QMessageBox::Yes|QMessageBox::No);
     manualFirmwareMessages.setText("Did that fix things?");
-    messageBoxReturn = manualFirmwareMessages.exec();
+    int messageBoxReturn = manualFirmwareMessages.exec();
     manualFirmwareMessages.setStandardButtons(QMessageBox::Ok);
-    if(messageBoxReturn == 16384){ //"Yes" is 16384, no is 65536
+    if (messageBoxReturn == QMessageBox::Yes) {
         manualFirmwareMessages.setText("Awesome!  Have fun!");
-        messageBoxReturn = manualFirmwareMessages.exec();
+        manualFirmwareMessages.exec();
         return;
     }
 

@@ -9,7 +9,7 @@ winUsbDriver::winUsbDriver(QWidget *parent) : genericUsbDriver(parent)
 {
 }
 
-winUsbDriver::~winUsbDriver(void){    
+winUsbDriver::~winUsbDriver(void){
 
     //Like any decent destructor, this just frees resources
 
@@ -87,7 +87,7 @@ void winUsbDriver::usbSendControl(uint8_t RequestType, uint8_t Request, uint16_t
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //IF YOU'RE SEEING AN ERROR, CHECK THAT REQUESTTYPE AND REQUEST ARE FORMATTED AS HEX
-    //////////////////////////////////////////////////////////////////////////////////////////    
+    //////////////////////////////////////////////////////////////////////////////////////////
 
     WINUSB_SETUP_PACKET setupPacket;
     unsigned char controlSuccess;
@@ -422,10 +422,6 @@ void winUsbDriver::manualFirmwareRecovery(void){
     dfuprog_location.append("/firmware/dfu-programmer");
     QProcess dfu_exe;
 
-    //Vars
-    QMessageBox manualFirmwareMessages;
-    int messageBoxReturn;
-
     QStringList leaveBootloaderCommand;
     leaveBootloaderCommand << "atxmega32a4u" << "launch";
     int exit_code;
@@ -434,24 +430,21 @@ void winUsbDriver::manualFirmwareRecovery(void){
     QStringList flashCommand;
     flashCommand << "atxmega32a4u" << "flash" << file_location;
 
-
-
-
     //Intro
+    QMessageBox manualFirmwareMessages;
     manualFirmwareMessages.setText("Welcome to the firmware recovery wizard.\nThis tool will attempt various steps to troubleshoot a board with connection issues.\n\nPress OK to continue.");
     manualFirmwareMessages.exec();
-
 
     //Hello, this is IT, can you try turning it off and on again?
     manualFirmwareMessages.setText("Before continuing, please disconnect and reconnect your Labrador board, then wait 10 seconds.\n\nAlso ensure that there are no other instances of the Labrador software running on this machine.");
     manualFirmwareMessages.exec();
     manualFirmwareMessages.setStandardButtons(QMessageBox::Yes|QMessageBox::No);
     manualFirmwareMessages.setText("Did that fix things?");
-    messageBoxReturn = manualFirmwareMessages.exec();
+    int messageBoxReturn = manualFirmwareMessages.exec();
     manualFirmwareMessages.setStandardButtons(QMessageBox::Ok);
-    if(messageBoxReturn == 16384){ //"Yes" is 16384, no is 65536
+    if (messageBoxReturn == QMessageBox::Yes) {
         manualFirmwareMessages.setText("Awesome!  Have fun!");
-        messageBoxReturn = manualFirmwareMessages.exec();
+        manualFirmwareMessages.exec();
         return;
     }
 
