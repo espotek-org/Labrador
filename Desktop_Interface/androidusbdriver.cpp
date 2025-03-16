@@ -147,38 +147,7 @@ int androidUsbDriver::get_new_bootloader_ctx(libusb_device **device_ptr, libusb_
 }
 
 int androidUsbDriver::flashFirmware(void){
-
-    //File name
-    char fname[128];
     qDebug() << "\n\n\n\n\n\n\n\nFLASHING FIRMWARE....\n\n\n\n\n\n\n";
-    sprintf(fname, "assets:/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
-    qDebug() << "FLASHING " << fname;
-
-    //Copy to somewhere that fopen can access
-    QFile asset_file(fname);
-    qDebug() << "asset_file.exists()" << asset_file.exists();
-
-    QString filePath = QStandardPaths::writableLocation(QStandardPaths::StandardLocation::AppDataLocation);
-    filePath.append("/firmware.hex");
-    if (asset_file.exists()) {
-        if (QFile::exists(filePath)) {
-            qDebug() << "File already exists in temporary path.  Removing....";
-            QFile::remove(filePath);
-        }
-
-        if (asset_file.copy(filePath)) {
-            QFile::setPermissions(filePath, QFile::WriteOwner | QFile::ReadOwner);
-            qDebug() << "firmware temp file copied to" << filePath;
-        } else {
-            qDebug() << "\n\n\nERROR: COULD NOT CREATE TEMP FIRMWARE FILE\n\n\n";
-        }
-    } else qDebug() << "File not found in assets";
-
-    std::string filePath_stdstr = filePath.toStdString();
-    char filePath_cstring[256];
-    strcpy(filePath_cstring, filePath_stdstr.c_str());
-
-    qDebug() << "File path is" << filePath_cstring;
 
     if (connected) {
         //Switch from application mode to bootloader mode.  Otherwise assume we are in bootloader.
@@ -226,6 +195,28 @@ int androidUsbDriver::flashFirmware(void){
     qDebug() << devNumber;
     */
 
+    //Copy to somewhere that fopen can access
+    QFile asset_file(QString::asprintf("assets:/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
+    qDebug() << "asset_file.exists()" << asset_file.exists();
+
+    QString firmware_path = QStandardPaths::writableLocation(QStandardPaths::StandardLocation::AppDataLocation);
+    firmware_path.append("/firmware.hex");
+    if (asset_file.exists()) {
+        if (QFile::exists(firmware_path)) {
+            qDebug() << "File already exists in temporary path.  Removing....";
+            QFile::remove(firmware_path);
+        }
+
+        if (asset_file.copy(firmware_path)) {
+            QFile::setPermissions(firmware_path, QFile::WriteOwner | QFile::ReadOwner);
+            qDebug() << "firmware temp file copied to" << firmware_path;
+        } else {
+            qDebug() << "\n\n\nERROR: COULD NOT CREATE TEMP FIRMWARE FILE\n\n\n";
+        }
+    } else qDebug() << "File not found in assets";
+
+    qDebug() << "FLASHING" << firmware_path;
+
     //Set up interface to dfuprog
     int exit_code;
     char command[256];
@@ -247,7 +238,7 @@ int androidUsbDriver::flashFirmware(void){
 
     //Run stage 2
     qDebug() << "\n\nFlashing Firmware, stage 2.\n\n";
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s --debug 300", filePath_cstring);
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s --debug 300", qPrintable(firmware_path));
     exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
     if (exit_code) {
         qDebug() << "\n\n\nERROR WRITING NEW FIRMWARE TO DEVICE.\n\n\n";

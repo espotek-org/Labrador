@@ -327,10 +327,7 @@ void winUsbDriver::shutdownProcedure(){
 }
 
 int winUsbDriver::flashFirmware(void){
-    char fname[64];
     qDebug() << "\n\n\n\n\n\n\n\nFIRMWARE MISMATCH!!!!  FLASHING....\n\n\n\n\n\n\n";
-    sprintf(fname, "labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
-    qDebug() << "FLASHING " << fname;
 
     signalFirmwareFlash();
     QApplication::processEvents();
@@ -338,17 +335,19 @@ int winUsbDriver::flashFirmware(void){
     //Go to bootloader mode
     bootloaderJump();
 
+    //Get location of firmware file
+    QString firmware_path = QCoreApplication::applicationDirPath();
+    firmware_path.append(QString::asprintf("/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
+    qDebug() << "FLASHING " << firmware_path;
+
     //Set up interface to dfuprog
-    QString dfuprog_location = QCoreApplication::applicationDirPath();
-    dfuprog_location.append("/firmware/dfu-programmer");
-    QString file_location = QCoreApplication::applicationDirPath();
-    file_location.append("/firmware/");
-    file_location.append(fname);
+    QString dfuprog_path = QCoreApplication::applicationDirPath();
+    dfuprog_path.append("/firmware/dfu-programmer");
     QProcess dfu_exe;
     QStringList args_stage1;
     args_stage1 << "atxmega32a4u" << "erase" << "--force";
     QStringList args_stage2;
-    args_stage2 << "atxmega32a4u" << "flash" << file_location;
+    args_stage2 << "atxmega32a4u" << "flash" << firmware_path;
     QStringList args_stage3;
     args_stage3 << "atxmega32a4u" << "launch";
     QStringList args_stage4;
@@ -357,7 +356,7 @@ int winUsbDriver::flashFirmware(void){
     //Run stage 1, until there's a success
     do {
         QThread::msleep(200);
-        dfu_exe.start(dfuprog_location, args_stage1);
+        dfu_exe.start(dfuprog_path, args_stage1);
         dfu_exe.waitForFinished(-1);
         qDebug() << "stdio_stage1" << dfu_exe.readAllStandardOutput();
         qDebug() << "sterr_stage1" << dfu_exe.readAllStandardError();
@@ -369,7 +368,7 @@ int winUsbDriver::flashFirmware(void){
     } while (dfu_exe.exitCode());
 
     //Run stage 2
-    dfu_exe.start(dfuprog_location, args_stage2);
+    dfu_exe.start(dfuprog_path, args_stage2);
     dfu_exe.waitForFinished(-1);
     qDebug() << "stdio_stage2" << dfu_exe.readAllStandardOutput();
     qDebug() << "sterr_stage2" << dfu_exe.readAllStandardError();
@@ -379,7 +378,7 @@ int winUsbDriver::flashFirmware(void){
     }
 
     //Run stage 3
-    dfu_exe.start(dfuprog_location, args_stage3);
+    dfu_exe.start(dfuprog_path, args_stage3);
     dfu_exe.waitForFinished(-1);
     qDebug() << "stdio_stage3" << dfu_exe.readAllStandardOutput();
     qDebug() << "sterr_stage3" << dfu_exe.readAllStandardError();
@@ -392,7 +391,7 @@ int winUsbDriver::flashFirmware(void){
     //Connect back to labrador
     do {
         QThread::msleep(200);
-        dfu_exe.start(dfuprog_location, args_stage4);
+        dfu_exe.start(dfuprog_path, args_stage4);
         dfu_exe.waitForFinished(-1);
         qDebug() << "stdio_stage4" << dfu_exe.readAllStandardOutput();
         qDebug() << "sterr_stage4" << dfu_exe.readAllStandardError();
@@ -405,22 +404,19 @@ int winUsbDriver::flashFirmware(void){
 
 void winUsbDriver::manualFirmwareRecovery(void){
     //Get location of firmware file
-    char fname[128];
-    sprintf(fname, "/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
-
-    QString file_location = QCoreApplication::applicationDirPath();
-    file_location.append(fname);
+    QString firmware_path = QCoreApplication::applicationDirPath();
+    firmware_path.append(QString::asprintf("/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
 
     //Set up interface to dfuprog
-    QString dfuprog_location = QCoreApplication::applicationDirPath();
-    dfuprog_location.append("/firmware/dfu-programmer");
+    QString dfuprog_path = QCoreApplication::applicationDirPath();
+    dfuprog_path.append("/firmware/dfu-programmer");
     QProcess dfu_exe;
     QStringList leaveBootloaderCommand;
     leaveBootloaderCommand << "atxmega32a4u" << "launch";
     QStringList eraseCommand;
     eraseCommand << "atxmega32a4u" << "erase" << "--force";
     QStringList flashCommand;
-    flashCommand << "atxmega32a4u" << "flash" << file_location;
+    flashCommand << "atxmega32a4u" << "flash" << firmware_path;
 
     //Intro
     QMessageBox manualFirmwareMessages;
@@ -459,7 +455,7 @@ void winUsbDriver::manualFirmwareRecovery(void){
         return;
     } else {
         qDebug() << "Attempting to leave bootloader!";
-        dfu_exe.start(dfuprog_location, leaveBootloaderCommand);
+        dfu_exe.start(dfuprog_path, leaveBootloaderCommand);
         dfu_exe.waitForFinished(-1);
         manualFirmwareMessages.setText("No Labrador board could be detected.\n\nIt's possible that you're stuck in booloader mode.\n\nI've attempted to launch the firmware manually.");
         manualFirmwareMessages.exec();
@@ -472,14 +468,14 @@ void winUsbDriver::manualFirmwareRecovery(void){
         //Firmware launch failed, but bootloader preset
         if (!connected) {
             qDebug() << "Attempting to erase!";
-            dfu_exe.start(dfuprog_location, eraseCommand);
+            dfu_exe.start(dfuprog_path, eraseCommand);
             dfu_exe.waitForFinished(-1);
             int exit_code = dfu_exe.exitCode();
 
             qDebug() << "Exit code for erase =" << dfu_exe.exitCode();
 
-            qDebug("Attempting to flash file %s!", file_location.toLocal8Bit().data());
-            dfu_exe.start(dfuprog_location, flashCommand);
+            qDebug() << "Attempting to flash file" << firmware_path;
+            dfu_exe.start(dfuprog_path, flashCommand);
             dfu_exe.waitForFinished(-1);
             exit_code += dfu_exe.exitCode();
 
@@ -489,7 +485,7 @@ void winUsbDriver::manualFirmwareRecovery(void){
             manualFirmwareMessages.exec();
 
             if (!exit_code) { //Reprogramming was successful, but board is still in bootloader mode.
-                dfu_exe.start(dfuprog_location, leaveBootloaderCommand);
+                dfu_exe.start(dfuprog_path, leaveBootloaderCommand);
                 dfu_exe.waitForFinished(-1);
                 manualFirmwareMessages.setText("Reprogramming was successful!  Attempting to launch the board.\n\nIf it does not start working immediately, please wait 10 seconds and then reconnect the board.");
                 manualFirmwareMessages.exec();

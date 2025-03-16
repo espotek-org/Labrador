@@ -340,10 +340,7 @@ void unixUsbDriver::backupCleanup(){
 
 int unixUsbDriver::flashFirmware(void){
 #ifndef PLATFORM_ANDROID
-    char fname[128];
     qDebug() << "\n\n\n\n\n\n\n\nFIRMWARE MISMATCH!!!!  FLASHING....\n\n\n\n\n\n\n";
-    sprintf(fname, "/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
-    qDebug() << "FLASHING " << fname;
 
     signalFirmwareFlash();
     QApplication::processEvents();
@@ -353,11 +350,9 @@ int unixUsbDriver::flashFirmware(void){
     qDebug() << "BA94 closed";
 
     //Get location of firmware file
-    QString dirString = QCoreApplication::applicationDirPath();
-    dirString.append(fname);
-    QByteArray array = dirString.toLocal8Bit();
-    char* buffer = array.data();
-    //qDebug() << buffer;
+    QString firmware_path = QCoreApplication::applicationDirPath();
+    firmware_path.append(QString::asprintf("/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
+    qDebug() << "FLASHING" << firmware_path;
 
     //Set up interface to dfuprog
     int exit_code;
@@ -372,7 +367,7 @@ int unixUsbDriver::flashFirmware(void){
     } while (exit_code);
 
     //Run stage 2
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", buffer);
+    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", qPrintable(firmware_path));
     exit_code = dfuprog_virtual_cmd(command);
     if (exit_code) {
         return exit_code+200;
@@ -411,13 +406,8 @@ int unixUsbDriver::flashFirmware(void){
 void unixUsbDriver::manualFirmwareRecovery(void){
 #ifndef PLATFORM_ANDROID
     //Get location of firmware file
-    char fname[128];
-    sprintf(fname, "/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
-
-    QString dirString = QCoreApplication::applicationDirPath();
-    dirString.append(fname);
-    QByteArray array = dirString.toLocal8Bit();
-    char* buffer = array.data();
+    QString firmware_path = QCoreApplication::applicationDirPath();
+    firmware_path.append(QString::asprintf("/firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
 
     //Set up interface to dfuprog
     int exit_code;
@@ -472,7 +462,7 @@ void unixUsbDriver::manualFirmwareRecovery(void){
         if (!connected) {
             snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force");
             exit_code = dfuprog_virtual_cmd(command);
-            snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", buffer);
+            snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", qPrintable(firmware_path));
             exit_code += dfuprog_virtual_cmd(command);
             manualFirmwareMessages.setText("The bootloader is present, but firmware launch failed.  I've attempted to reprogram it.");
             manualFirmwareMessages.exec();
