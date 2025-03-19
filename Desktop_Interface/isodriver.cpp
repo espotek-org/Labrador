@@ -6,7 +6,6 @@
 #include <math.h>
 #include "daqloadprompt.h"
 #include <iostream>
-#include <omp.h>
 
 #define PI 3.141592653589793  // Predefined value for pi
 static constexpr int kSpectrumCounterMax = 4;
