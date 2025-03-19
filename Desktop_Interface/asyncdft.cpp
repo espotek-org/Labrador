@@ -1,6 +1,7 @@
 #include "asyncdft.h"
 #include <iostream>
 #include <math.h>
+#include <omp.h>
 #include "isobuffer.h"
 #define DBG 0
 

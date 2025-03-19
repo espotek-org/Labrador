@@ -4,7 +4,6 @@
 #include <QVector>
 #include <mutex>
 #include <queue>
-#include <omp.h>
 #include <list>
 #include <fftw3.h>
 
