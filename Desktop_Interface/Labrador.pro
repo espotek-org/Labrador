@@ -237,6 +237,10 @@ macx:LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 macx:INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
 macx:DEPENDPATH += $$PWD/build_mac/libdfuprog/include
 
+macx: INCLUDEPATH += $$system(brew --prefix)/include
+macx: INCLUDEPATH += $$system(brew --prefix)/include/eigen3
+macx: LIBS += -L$$system(brew --prefix)/lib
+
 macx:QMAKE_LFLAGS += "-undefined dynamic_lookup"
 
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
@@ -250,6 +254,11 @@ QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 
 unix:SOURCES += unixusbdriver.cpp
 unix:HEADERS += unixusbdriver.h
+
+# For multithreading on Unix fftw
+unix:!macx: LIBS += -fopenmp
+macx: LIBS += -lomp
+unix: LIBS += -lfftw3_omp
 
 #############################################################
 ########       SHARED ANDROID/LINUX GCC FLAGS      #########
@@ -351,11 +360,3 @@ DISTFILES += \
     build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
     build_android/package_source/gradlew.bat \
     build_android/package_source/res/xml/device_filter.xml
-
-# Vincenzo added these to get multithreading on Unix fftw
-unix:!macx: LIBS += -fopenmp
-macx: LIBS += -lomp
-unix: LIBS += -lfftw3_omp
-macx: INCLUDEPATH += $$system(brew --prefix)/include
-macx: INCLUDEPATH += $$system(brew --prefix)/include/eigen3
-macx: LIBS += -L$$system(brew --prefix)/lib
