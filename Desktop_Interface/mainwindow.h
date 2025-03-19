@@ -308,6 +308,7 @@ private:
     QWidget* spectrumLayoutWidget = nullptr;
     QSpinBox* spectrumMinXSpinbox = nullptr;
     QSpinBox* spectrumMaxXSpinbox = nullptr;
+    QComboBox* windowingComboBox = nullptr;
 
     // Frequency response
     QWidget* freqRespLayout1Widget = nullptr;

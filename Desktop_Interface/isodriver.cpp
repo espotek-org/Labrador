@@ -9,6 +9,10 @@
 #include <omp.h>
 
 #define PI 3.141592653589793  // Predefined value for pi
+#define PI_2 2*PI
+#define PI_4 4*PI
+#define PI_6 6*PI
+#define PI_8 8*PI
 static constexpr int kSpectrumCounterMax = 4;
 
 isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
@@ -221,6 +225,33 @@ void isoDriver::digitalConvert(short *shortPtr, QVector<double> *doublePtr){
         data[i] = shortPtr[i] ? top : bot;
     }
     //cool_waveform = cool_waveform - AC_offset;
+}
+
+// Evaluate the windowing factor for a given window function, number of samples and at a given index
+double isoDriver::windowing_factor(int type, int N, int n)
+{
+    double factor = 1.0;
+    switch (type)
+    {
+    case 0: // Rectangular window
+        factor = 1.0;
+        break;
+    case 1: // Hann window or raised cosine
+        factor = 0.5 - 0.5*std::cos(PI_2*n/(N-1));
+        break;
+    case 2: // Hamming window
+        factor = 0.54 - 0.46*std::cos(PI_2*n/(N-1));
+        break;
+    case 3: // Blackman window
+        factor = 0.42 - 0.5*std::cos(PI_2*n/N) + 0.08*std::cos(PI_4*n/N);
+        break;
+    case 4: // Flat top window
+        factor = 0.21557895 - 0.41663158*std::cos(PI_2*n/N) + 0.277263158*std::cos(PI_4*n/N) - 0.083578947*std::cos(PI_6*n/N) + 0.006947368*std::cos(PI_8*n/N);
+        break;
+    default:
+        factor = 1.0;
+    }
+    return factor;
 }
 
 void isoDriver::fileStreamConvert(float *floatPtr, QVector<double> *doublePtr){
@@ -749,6 +780,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
     }
 
+    double wind_fact, wind_fact_sum = 0;
     if (CH1_mode == 1){
         analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
         for (int i=0; i < CH1.size(); i++)
@@ -764,6 +796,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
                 converted_dt_samples1[i] += m_offset_CH1;
+
+                wind_fact = windowing_factor(m_windowingType, internalBuffer375_CH1->async_dft->n_samples, i);
+                converted_dt_samples1[i] *= wind_fact;
+                wind_fact_sum += wind_fact;
             }
         }
         else if (freqResp)
@@ -800,6 +836,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples2[i] /= m_attenuation_CH1;
                 converted_dt_samples2[i] += m_offset_CH1;
+
+                wind_fact = windowing_factor(m_windowingType, internalBuffer375_CH2->async_dft->n_samples, i);
+                converted_dt_samples2[i] *= wind_fact;
+                wind_fact_sum += wind_fact;
             }
         }
         else if (freqResp)
@@ -827,6 +867,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
                 converted_dt_samples1[i] += m_offset_CH1;
+
+                wind_fact = windowing_factor(m_windowingType, internalBuffer750->async_dft->n_samples, i);
+                converted_dt_samples1[i] *= wind_fact;
+                wind_fact_sum += wind_fact;
             }
         }
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
@@ -860,9 +904,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 /*Creating DFT amplitudes*/
                 QVector<double> amplitude1;
                 if(CH1_mode == -1)
-                    amplitude1 = internalBuffer750->async_dft->getPowerSpectrum(converted_dt_samples1);
+                    amplitude1 = internalBuffer750->async_dft->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
                 else
-                    amplitude1 = internalBuffer375_CH1->async_dft->getPowerSpectrum(converted_dt_samples1);
+                    amplitude1 = internalBuffer375_CH1->async_dft->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
                 /*Getting array of frequencies for display purposes*/
                 QVector<double> f;
                 if(CH1_mode == -1)
@@ -879,22 +923,17 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 double max2 = -1;
 
                 if(CH2_mode) {
-                    QVector<double> amplitude2 = internalBuffer375_CH2->async_dft->getPowerSpectrum(converted_dt_samples2);
+                    QVector<double> amplitude2 = internalBuffer375_CH2->async_dft->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
                     max2 = internalBuffer375_CH2->async_dft->maximum;
-                    /*Normalization with respect to amplitude1*/
-                    amplitude2 = internalBuffer375_CH2->async_dft->normalizeDFT(max1, amplitude2);
                     axes->graph(1)->setData(f,amplitude2);
                 }
 
-                /*Decision for normalization & display purposes*/
-                if(CH1_mode == -1)
-                    amplitude1 = internalBuffer750->async_dft->normalizeDFT(max2, amplitude1);
-                else
-                    amplitude1 = internalBuffer375_CH1->async_dft->normalizeDFT(max2, amplitude1);
                 axes->graph(0)->setData(f, amplitude1);
+                axes->xAxis->setLabel("Frequency (Hz)");
+                axes->yAxis->setLabel("Relative Power (dBmV)");
                 axes->xAxis->setRange(m_spectrumMinX, m_spectrumMaxX);
-                /*Setting maximum/minimum y-axis 0%-100%*/
-                axes->yAxis->setRange(100,0);
+                /*Setting maximum/minimum y-axis -60dBmV to 90dBmV*/
+                axes->yAxis->setRange(90,-60);
             }  catch (std::exception) {
                 std::cout << "Cannot yet get correct value for DFT" << std::endl;
             }
@@ -1006,9 +1045,11 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             }
 
             // Plot gain response
+            axes->xAxis->setLabel("Frequency (Hz)");
             if(m_freqRespType == 0)
             {
                 axes->graph(0)->setData(m_freqRespFreq, m_freqRespGain);
+                axes->yAxis->setLabel("Gain (dB)");
                 axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
                 axes->yAxis->setRange(*std::min_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())-10, *std::max_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())+10);
             }
@@ -1016,6 +1057,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             else
             {
                 axes->graph(0)->setData(m_freqRespFreq, m_freqRespPhase);
+                axes->yAxis->setLabel("Phase (degree)");
                 axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
                 axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
             }
@@ -1023,9 +1065,13 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         } else {
             axes->graph(0)->setData(x,CH1);
             if(CH2_mode) axes->graph(1)->setData(x,CH2);
+            axes->xAxis->setLabel("Time (sec)");
+            axes->yAxis->setLabel("Voltage (V)");
             axes->xAxis->setRange(-display.window - display.delay, -display.delay);
             axes->yAxis->setRange(display.topRange, display.botRange);
         }
+        axes->xAxis->setLabelColor(Qt::white);
+        axes->yAxis->setLabelColor(Qt::white);
     }
 
     if(snapshotEnabled_CH1){
@@ -1872,6 +1918,11 @@ void isoDriver::setMinSpectrum(int minSpectrum)
 void isoDriver::setMaxSpectrum(int maxSpectrum)
 {
     m_spectrumMaxX = static_cast<double>(maxSpectrum);
+}
+
+void isoDriver::setWindowingType(int windowingType)
+{
+    m_windowingType = windowingType;
 }
 
 void isoDriver::setMinFreqResp(int minFreqResp)
