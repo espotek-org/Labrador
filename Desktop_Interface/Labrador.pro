@@ -355,8 +355,7 @@ DISTFILES += \
 # Vincenzo added these to get multithreading on Unix fftw
 unix:!macx: LIBS += -fopenmp
 macx: LIBS += -lomp
-unix: LIBS += -lfftw3f_omp
-unix: LIBS += -lfftw3_threads
+unix: LIBS += -lfftw3_omp
 macx: INCLUDEPATH += $$system(brew --prefix)/include
 macx: INCLUDEPATH += $$system(brew --prefix)/include/eigen3
 macx: LIBS += -L$$system(brew --prefix)/lib
