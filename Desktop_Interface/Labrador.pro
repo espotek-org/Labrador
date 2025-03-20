@@ -194,9 +194,7 @@ unix:!android:!macx{
     symlink.extra = ln -sf EspoTek-Labrador/Labrador ${INSTALL_ROOT}/usr/bin/labrador
 
     udevextra.path = /lib/udev/rules.d
-    !equals(DEB, 1){
-        udevextra.extra = udevadm control --reload-rules && udevadm trigger --subsystem-match=usb
-    }
+    udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
 
     equals(APPIMAGE, 1){
         target.path = /usr/bin
@@ -215,8 +213,8 @@ unix:!android:!macx{
 
     !equals(APPIMAGE, 1){
         INSTALLS += symlink
-        INSTALLS += udevextra
     }
+    INSTALLS += udevextra
 }
 
 

@@ -2,7 +2,7 @@
 
 set -e
 
-qmake DEB=1 CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-parse --short HEAD)
+qmake CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-parse --short HEAD)
 make -j$(nproc)
 rm -rf deb
 make INSTALL_ROOT=deb install; find deb/
