@@ -167,10 +167,10 @@ unix:!android:!macx{
 
     target.path = /usr/bin/EspoTek-Labrador
 
-    firmware.path = /usr/bin/EspoTek-Labrador/firmware
+    firmware.path = /usr/share/EspoTek/Labrador/firmware
     firmware.files += $$files(bin/firmware/labrafirm*)
 
-    waveforms.path = /usr/bin/EspoTek-Labrador/waveforms
+    waveforms.path = /usr/share/EspoTek/Labrador/waveforms
     waveforms.files += $$files(bin/waveforms/*)
 
     udev.path = /lib/udev/rules.d
