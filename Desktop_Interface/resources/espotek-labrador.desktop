@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=EspoTek Labrador
 Comment=Software Interface for Labrador Board
-Exec=/usr/bin/EspoTek-Labrador/Labrador 
+Exec=labrador
 Terminal=false
 Type=Application
 Categories=Education;Electronics;

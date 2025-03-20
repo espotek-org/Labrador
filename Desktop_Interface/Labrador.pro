@@ -165,7 +165,7 @@ unix:!android:!macx{
         }
     }
 
-    target.path = /usr/bin/EspoTek-Labrador
+    target.path = /usr/bin
 
     firmware.path = /usr/share/EspoTek/Labrador/firmware
     firmware.files += $$files(bin/firmware/labrafirm*)
@@ -182,25 +182,14 @@ unix:!android:!macx{
     icon256.files += resources/icon256/espotek-labrador.png
     icon256.path = /usr/share/icons/hicolor/256x256/apps/
 
-    equals(APPIMAGE, 1){
-        desktop.files += resources/appimage/espotek-labrador.desktop
-    }
-    !equals(APPIMAGE, 1){
-        desktop.files += resources/espotek-labrador.desktop
-    }
+    desktop.files += resources/espotek-labrador.desktop
     desktop.path = /usr/share/applications
 
     symlink.path = /usr/bin
-    symlink.extra = ln -sf EspoTek-Labrador/Labrador ${INSTALL_ROOT}/usr/bin/labrador
+    symlink.extra = ln -sf Labrador $(INSTALL_ROOT)/usr/bin/labrador
 
     udevextra.path = /lib/udev/rules.d
     udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
-
-    equals(APPIMAGE, 1){
-        target.path = /usr/bin
-        firmware.path = /usr/bin/firmware
-        waveforms.path = /usr/bin/waveforms
-    }
 
     INSTALLS += target
     INSTALLS += lib_deploy
@@ -210,10 +199,7 @@ unix:!android:!macx{
     INSTALLS += icon48
     INSTALLS += icon256
     INSTALLS += desktop
-
-    !equals(APPIMAGE, 1){
-        INSTALLS += symlink
-    }
+    INSTALLS += symlink
     INSTALLS += udevextra
 }
 
