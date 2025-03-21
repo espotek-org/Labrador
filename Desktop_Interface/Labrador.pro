@@ -126,67 +126,66 @@ win32{
 ###########################################################
 
 unix:!android:!macx{
+    isEmpty(PREFIX): PREFIX = /usr/local
     INCLUDEPATH += $$PWD/build_linux
     CONFIG += link_pkgconfig
     PKGCONFIG += libusb-1.0  ##make sure you have the libusb-1.0-0-dev package!
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
     PKGCONFIG += eigen3      ##make sure you have the libeigen3-dev package!
     contains(QT_ARCH, arm) {
-            message("Building for Raspberry Pi")
-            #libdfuprog include
-            unix:!android:!macx:LIBS += -L$$PWD/build_linux/libdfuprog/lib/arm -ldfuprog-0.9
-            unix:!android:!macx:INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-            unix:!android:!macx:DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-            QMAKE_CFLAGS += -fsigned-char
-            QMAKE_CXXFLAGS += -fsigned-char
-            DEFINES += "PLATFORM_RASPBERRY_PI"
-            #All ARM-Linux GCC treats char as unsigned by default???
-            lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/arm/libdfuprog-0.9.so
-            lib_deploy.path = /usr/lib
+        message("Building for Raspberry Pi")
+        #libdfuprog include
+        LIBS += -L$$PWD/build_linux/libdfuprog/lib/arm -ldfuprog-0.9
+        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
+        QMAKE_CFLAGS += -fsigned-char
+        QMAKE_CXXFLAGS += -fsigned-char
+        DEFINES += "PLATFORM_RASPBERRY_PI"
+        #All ARM-Linux GCC treats char as unsigned by default???
+        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/arm/libdfuprog-0.9.so
+        lib_deploy.path = $$PREFIX/lib
+
+    } else:contains(QT_ARCH, i386) {
+        message("Building for Linux (x86)")
+        #libdfuprog include
+        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
+        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
+        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x86/libdfuprog-0.9.so
+        lib_deploy.path = $$PREFIX/lib
 
     } else {
-        contains(QT_ARCH, i386) {
-            message("Building for Linux (x86)")
-            #libdfuprog include
-            unix:!android:!macx:LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
-            unix:!android:!macx:INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-            unix:!android:!macx:DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-            lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x86/libdfuprog-0.9.so
-            lib_deploy.path = /usr/lib
-
-        } else {
-            message("Building for Linux (x64)")
-            #libdfuprog include
-            unix:!android:!macx:LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
-            unix:!android:!macx:INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-            unix:!android:!macx:DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-    	    lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x64/libdfuprog-0.9.so
-            lib_deploy.path = /usr/lib
-        }
+        message("Building for Linux (x64)")
+        #libdfuprog include
+        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
+        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
+        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x64/libdfuprog-0.9.so
+        lib_deploy.path = $$PREFIX/lib
     }
 
-    target.path = /usr/bin
+    target.path = $$PREFIX/bin
 
-    firmware.path = /usr/share/EspoTek/Labrador/firmware
+    firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
     firmware.files += $$files(bin/firmware/labrafirm*)
 
-    waveforms.path = /usr/share/EspoTek/Labrador/waveforms
+    waveforms.path = $$PREFIX/share/EspoTek/Labrador/waveforms
     waveforms.files += $$files(bin/waveforms/*)
 
     udev.path = /lib/udev/rules.d
     udev.files = rules.d/69-labrador.rules
 
+    icon48.path = $$PREFIX/share/icons/hicolor/48x48/apps/
     icon48.files += resources/icon48/espotek-labrador.png
-    icon48.path = /usr/share/icons/hicolor/48x48/apps/
 
+    icon256.path = $$PREFIX/share/icons/hicolor/256x256/apps/
     icon256.files += resources/icon256/espotek-labrador.png
-    icon256.path = /usr/share/icons/hicolor/256x256/apps/
 
+    desktop.path = $$PREFIX/share/applications
     desktop.files += resources/espotek-labrador.desktop
-    desktop.path = /usr/share/applications
 
-    symlink.path = /usr/bin
-    symlink.extra = ln -sf Labrador $(INSTALL_ROOT)/usr/bin/labrador
+    symlink.path = $$PREFIX/bin
+    symlink.extra = ln -sf Labrador $(INSTALL_ROOT)$$PREFIX/bin/labrador
 
     udevextra.path = /lib/udev/rules.d
     udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
