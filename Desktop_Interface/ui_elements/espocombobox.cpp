@@ -1,4 +1,5 @@
 #include "espocombobox.h"
+#include <QStandardPaths>
 
 espoComboBox::espoComboBox(QWidget *parent) : QComboBox(parent)
 {
@@ -7,12 +8,13 @@ espoComboBox::espoComboBox(QWidget *parent) : QComboBox(parent)
 
 void espoComboBox::readWaveformList(void)
 {
-#ifdef PLATFORM_ANDROID
-    QString path("assets:");
+#if defined(PLATFORM_ANDROID)
+    QFile file("assets:/waveforms/_list.wfl");
+#elif defined(PLATFORM_LINUX)
+    QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, "waveforms/_list.wfl"));
 #else
-    QString path = QCoreApplication::applicationDirPath();
+    QFile file(QCoreApplication::applicationDirPath().append("/waveforms/_list.wfl"));
 #endif
-    QFile file(path.append("/waveforms/_list.wfl"));
 
     qDebug() << "opening" << file.fileName();
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))

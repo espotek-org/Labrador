@@ -37,6 +37,7 @@ cd labrador/Desktop_Interface
 qmake
 make
 sudo make install
+sudo ldconfig
 
 # Cleanup
 rm -rf labrador

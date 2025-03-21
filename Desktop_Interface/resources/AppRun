@@ -65,4 +65,6 @@ EOHelper
   rm "$HELPER"
 fi
 
+export XDG_DATA_DIRS="$HERE/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
 exec "$HERE/usr/bin/Labrador" "$@"
