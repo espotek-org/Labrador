@@ -3,7 +3,7 @@
 set -e
 
 rm -rf AppDir
-qmake CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$(git rev-parse --short HEAD)
+qmake CONFIG+=release PREFIX=/usr
 make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
 

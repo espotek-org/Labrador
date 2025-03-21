@@ -9,19 +9,17 @@
 #define DO_QUOTE(X) #X
 #define QUOTE(X) DO_QUOTE(X)
 
-#ifndef GIT_HASH_SHORT
-#define GIT_HASH_SHORT 0000000
-#endif
-
 namespace
 {
    constexpr uint32_t MAX_CONSOLE_BLOCK_COUNT = 512;
    constexpr char kDocumentationUrl[] = "https://github.com/espotek-org/Labrador/wiki";
    constexpr char kPinoutUrl[] = "https://github.com/espotek-org/Labrador/wiki/Pinout";
    constexpr char kAboutString[] = "<h4>EspoTek Labrador</h4>"
-                                   "Continuous Release<br>"\
-                                   "Git hash: <a href='https://github.com/espotek-org/Labrador/commits/" QUOTE(GIT_HASH_SHORT) "'>" QUOTE(GIT_HASH_SHORT) "</a><br>"\
-                                   "Website: <a href='http://espotek.com'>https://espotek.com</a><br>"\
+#ifdef GIT_HASH_SHORT
+                                   "Continuous Release<br>"
+                                   "Git hash: <a href='https://github.com/espotek-org/Labrador/commits/" QUOTE(GIT_HASH_SHORT) "'>" QUOTE(GIT_HASH_SHORT) "</a><br>"
+#endif
+                                   "Website: <a href='http://espotek.com'>https://espotek.com</a><br>"
                                    "Contact email: <a href='mailto:admin@espotek.com'>admin@espotek.com</a>";
    constexpr char kOrganisationName[] = "EspoTek";
    constexpr char kApplicationName[] = "Labrador";

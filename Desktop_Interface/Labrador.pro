@@ -18,6 +18,11 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 TARGET = Labrador
 TEMPLATE = app
 
+GIT_HASH_SHORT=$$system(git rev-parse --short HEAD)
+!isEmpty(GIT_HASH_SHORT) {
+    DEFINES += "GIT_HASH_SHORT=$${GIT_HASH_SHORT}"
+}
+
 QCP_VER = 1
 DEFINES += "QCP_VER=$${QCP_VER}"
 equals(QCP_VER,"2"){

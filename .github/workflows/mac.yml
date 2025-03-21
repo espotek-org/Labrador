@@ -20,8 +20,7 @@ jobs:
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
-          GIT_HASH_SHORT=$(git rev-parse --short HEAD)
-          qmake CONFIG+=release PREFIX=/usr DEFINES+=GIT_HASH_SHORT=$GIT_HASH_SHORT
+          qmake CONFIG+=release
           make -j$(sysctl -n hw.ncpu)
           mkdir -p bin/Labrador.app/Contents/MacOS/Resources
           mkdir -p bin/Labrador.app/Contents/Frameworks

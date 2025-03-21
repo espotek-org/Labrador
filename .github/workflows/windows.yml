@@ -58,8 +58,7 @@ jobs:
         working-directory: Desktop_Interface
         shell: cmd
         run: |
-          for /f "delims=" %%i in ('git rev-parse --short HEAD') do set GIT_HASH_SHORT=%%i
-          qmake CONFIG+=release DEFINES+=GIT_HASH_SHORT=%GIT_HASH_SHORT% INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
+          qmake CONFIG+=release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
           nmake
 
       # 6) Post-build steps: windeployqt, copy fftw DLL, etc.
