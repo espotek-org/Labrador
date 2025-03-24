@@ -44,6 +44,7 @@ uint8_t LIBRADORSHARED_EXPORT librador_get_device_firmware_variant();
 std::vector<double> * LIBRADORSHARED_EXPORT librador_get_analog_data(int channel, double timeWindow_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
 std::vector<double> * LIBRADORSHARED_EXPORT librador_get_analog_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
 std::vector<uint8_t> * LIBRADORSHARED_EXPORT librador_get_digital_data(int channel, double timeWindow_seconds, double sample_rate_hz, double delay_seconds);
+std::vector<uint8_t> * LIBRADORSHARED_EXPORT librador_get_digital_data_sincelast(int channel, double timeWindow_seconds, double sample_rate_hz, double delay_seconds);
 
 //TODO: flashFirmware();
 
