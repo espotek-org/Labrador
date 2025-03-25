@@ -49,6 +49,7 @@ If you're on Linux (including Raspberry Pi), then you can also build the softwar
 qmake
 make
 sudo make install
+sudo ldconfig
 ```
 Then, to launch, just type `labrador` into the terminal.
 
