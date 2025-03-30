@@ -1,4 +1,7 @@
 #include "espocombobox.h"
+#include <QCoreApplication>
+#include <QDebug>
+#include <QFile>
 #include <QStandardPaths>
 
 espoComboBox::espoComboBox(QWidget *parent) : QComboBox(parent)

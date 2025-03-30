@@ -1,11 +1,7 @@
 #ifndef ESPOCOMBOBOX_H
 #define ESPOCOMBOBOX_H
 
-#include <QWidget>
 #include <QComboBox>
-#include <QDebug>
-#include <QDir>
-#include <QFile>
 
 //espoComboBox is a combo box that reads its contents externally from the waveforms file.
 
