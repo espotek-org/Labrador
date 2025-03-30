@@ -6,18 +6,16 @@ rm -rf AppDir
 qmake CONFIG+=release PREFIX=/usr
 make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
+cp -r build_linux/apprun-hooks AppDir/
 
-wget -N -nv "https://github.com/probonopd/linuxdeployqt/releases/download/6/linuxdeployqt-6-x86_64.AppImage"
-chmod a+x linuxdeployqt-*.AppImage
-unset QTDIR; unset QT_PLUGIN_PATH ; unset LD_LIBRARY_PATH
-export VERSION=$(git rev-parse --short HEAD)
-./linuxdeployqt-*.AppImage AppDir/usr/share/applications/*.desktop -bundle-non-qt-libs -verbose=2 -no-strip -unsupported-allow-new-glibc
+ARCH="x86_64"
+wget -N -nv "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-${ARCH}.AppImage"
+wget -N -nv "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-${ARCH}.AppImage"
+wget -N -nv "https://github.com/darealshinji/linuxdeploy-plugin-checkrt/releases/download/r1/linuxdeploy-plugin-checkrt.sh"
+chmod a+x linuxdeploy-${ARCH}.AppImage linuxdeploy-plugin-qt-${ARCH}.AppImage linuxdeploy-plugin-checkrt.sh
 
-mkdir -p AppDir/usr/optional/libstdc++/ ; cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 ./AppDir/usr/optional/libstdc++/
-
-wget -N -nv https://github.com/EspoTek/linuxdeploy-plugin-checkrt/raw/refs/heads/master/exec.c
-cc -shared -O2 -fPIC exec.c -o AppDir/usr/optional/exec.so -Wl,--as-needed -static-libgcc -ldl -s
-
-./linuxdeployqt-*.AppImage --appimage-extract
-rm ./AppDir/AppRun ; cp ./resources/AppRun AppDir/ ; chmod a+x ./AppDir/AppRun
-PATH=./squashfs-root/usr/bin:$PATH ./squashfs-root/usr/bin/appimagetool -g ./AppDir/
+unset QTDIR
+unset QT_PLUGIN_PATH
+export LD_LIBRARY_PATH=$(realpath AppDir/usr/lib)
+export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
+./linuxdeploy-${ARCH}.AppImage --appdir=AppDir --plugin=qt --plugin=checkrt --output=appimage
