@@ -8,7 +8,13 @@ make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
 cp -r build_linux/apprun-hooks AppDir/
 
-ARCH="x86_64"
+case "$(uname -m)" in
+   x86_64*)         ARCH=x86_64 ;;
+   i?86*)           ARCH=i386 ;;
+   aarch64*|armv8*) ARCH=aarch64 ;;
+   arm*)            ARCH=armhf ;;
+   *) echo "Unknown/unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
 wget -N -nv "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-${ARCH}.AppImage"
 wget -N -nv "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-${ARCH}.AppImage"
 wget -N -nv "https://github.com/darealshinji/linuxdeploy-plugin-checkrt/releases/download/r1/linuxdeploy-plugin-checkrt.sh"
