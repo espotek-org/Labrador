@@ -7,10 +7,6 @@
 #include <vector>
 #include <algorithm>
 
-#ifndef LIBRADOR_LIBRARY
-    #include "platformspecific.h"
-#endif
-
 class GobindarDialog : public QWidget
 {
 public:

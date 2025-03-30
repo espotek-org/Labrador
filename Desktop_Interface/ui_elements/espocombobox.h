@@ -6,7 +6,6 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
-#include "platformspecific.h"
 
 //espoComboBox is a combo box that reads its contents externally from the waveforms file.
 

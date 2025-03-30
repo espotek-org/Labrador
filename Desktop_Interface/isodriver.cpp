@@ -2,7 +2,6 @@
 #include "isodriver.h"
 #include "isobuffer.h"
 #include "isobuffer_file.h"
-#include "platformspecific.h"
 #include <math.h>
 #include "daqloadprompt.h"
 #include <iostream>

@@ -18,7 +18,6 @@
 #include <math.h>
 #include "qcustomplot.h"
 
-#include "platformspecific.h"
 #include "qcustomplot.h"
 #include "ui_mainwindow.h"
 #include "scoperangeenterdialog.h"

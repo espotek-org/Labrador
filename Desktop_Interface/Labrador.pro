@@ -100,7 +100,7 @@ DEPENDPATH += $$PWD/ui_elements
 #########################################################
 
 win32{
-    INCLUDEPATH += $$PWD/build_win
+    DEFINES += PLATFORM_WINDOWS
     SOURCES += winusbdriver.cpp
     HEADERS += winusbdriver.h
 
@@ -123,7 +123,6 @@ win32{
     }
     INCLUDEPATH += $$PWD/build_win/libusbk/includes
     DEPENDPATH += $$PWD/build/win/libusbk/includes
-    DEFINES += PLATFORM_WINDOWS
 }
 
 #############################################################
@@ -131,8 +130,9 @@ win32{
 ###########################################################
 
 unix:!android:!macx{
+    DEFINES += PLATFORM_LINUX
+
     isEmpty(PREFIX): PREFIX = /usr/local
-    INCLUDEPATH += $$PWD/build_linux
     CONFIG += link_pkgconfig
     PKGCONFIG += libusb-1.0  ##make sure you have the libusb-1.0-0-dev package!
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
@@ -213,7 +213,7 @@ unix:!android:!macx{
 ################    MAC OSX BUILD ONLY    ##################
 ###########################################################
 
-macx:INCLUDEPATH += $$PWD/build_mac
+macx:DEFINES += PLATFORM_MAC
 
 #libusb dylib include
 macx:LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
@@ -276,6 +276,7 @@ android: QMAKE_CFLAGS_RELEASE -= -Os
 ###########################################################
 
 android:{
+
     QMAKE_CFLAGS += -fsigned-char
     QMAKE_CXXFLAGS += -fsigned-char
     #Android treats char as unsigned by default (why???)
@@ -290,7 +291,7 @@ android:{
     CONFIG += mobility
     MOBILITY =
 
-    INCLUDEPATH += $$PWD/build_android
+    DEFINES += PLATFORM_ANDROID
     SOURCES += androidusbdriver.cpp
     HEADERS += androidusbdriver.h
     INCLUDEPATH += $$PWD/build_android/libusb-242

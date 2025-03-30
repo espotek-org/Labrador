@@ -4,6 +4,14 @@
 #include <QDesktopServices>
 #include "espospinbox.h"
 
+#if defined(PLATFORM_WINDOWS)
+#include "winusbdriver.h"
+#elif defined(PLATFORM_ANDROID)
+#include "androidusbdriver.h"
+#else
+#include "unixusbdriver.h"
+#endif
+
 #include <algorithm>
 
 #define DO_QUOTE(X) #X
@@ -48,7 +56,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->psuDisplay->display("4.50");
 
-    ui->controller_iso->setDriver(new _PLATFORM_DEPENDENT_USB_OBJECT());
+#if defined(PLATFORM_WINDOWS)
+    ui->controller_iso->setDriver(new winUsbDriver());
+#elif defined(PLATFORM_ANDROID)
+    ui->controller_iso->setDriver(new androidUsbDriver());
+#else
+    ui->controller_iso->setDriver(new unixUsbDriver());
+#endif
     ui->controller_iso->setAxes(ui->scopeAxes);
 
     ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
@@ -1464,7 +1478,13 @@ void MainWindow::reinitUsbStage2(void){
     qDebug() << "ReinitUsb entering stage 2";
     delete(ui->controller_iso->driver);
     qDebug() << "Reinitialising USB driver!";
-    ui->controller_iso->driver = new _PLATFORM_DEPENDENT_USB_OBJECT();
+#if defined(PLATFORM_WINDOWS)
+    ui->controller_iso->driver = new winUsbDriver();
+#elif defined(PLATFORM_ANDROID)
+    ui->controller_iso->driver = new androidUsbDriver();
+#else
+    ui->controller_iso->driver = new unixUsbDriver();
+#endif
 
     //Reconnect the other objects.
     //ui->controller_iso->driver->setBufferPtr(ui->bufferDisplay);

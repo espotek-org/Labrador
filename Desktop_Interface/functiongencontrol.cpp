@@ -1,5 +1,4 @@
 #include "functiongencontrol.h"
-#include "platformspecific.h"
 #include <QStandardPaths>
 
 namespace functionGen {
