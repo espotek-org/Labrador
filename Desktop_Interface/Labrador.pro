@@ -35,8 +35,9 @@ include(ui_elements.pri)
 
 MOC_DIR = $$PWD/moc
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
+SOURCES += \
+    main.cpp \
+    mainwindow.cpp \
     functiongencontrol.cpp \
     isodriver.cpp \
     isobuffer.cpp \
@@ -51,7 +52,8 @@ SOURCES += main.cpp\
     i2cdecoder.cpp \
     asyncdft.cpp
 
-HEADERS  += mainwindow.h \
+HEADERS += \
+    mainwindow.h \
     functiongencontrol.h \
     xmega.h \
     isodriver.h \
@@ -69,19 +71,16 @@ HEADERS  += mainwindow.h \
     i2cdecoder.h \
     asyncdft.h
 
-android:{
-FORMS    += ui_files_mobile/mainwindow.ui \
+android: FORMS += \
+    ui_files_mobile/mainwindow.ui \
     ui_files_mobile/scoperangeenterdialog.ui \
     ui_files_desktop/daqform.ui \
     ui_files_desktop/daqloadprompt.ui
-}
-
-!android:{
-FORMS    += ui_files_desktop/mainwindow.ui \
+else: FORMS += \
+    ui_files_desktop/mainwindow.ui \
     ui_files_desktop/scoperangeenterdialog.ui \
     ui_files_desktop/daqform.ui \
     ui_files_desktop/daqloadprompt.ui
-}
 
 
 RESOURCES += \
