@@ -312,21 +312,6 @@ android:{
     LIBS += -L$$PWD/build_android/liblog/lib -llog
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
 
-
-
-    DISTFILES += \
-        build_android/package_source/AndroidManifest.xml \
-        build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
-        build_android/package_source/gradlew \
-        build_android/package_source/res/values/libs.xml \
-        build_android/package_source/build.gradle \
-        build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
-        build_android/package_source/gradlew.bat \
-        build_android/package_source/AndroidManifest.xml \
-        build_android/package_source/res/values/libs.xml \
-        build_android/package_source/build.gradle \
-        build_android/package_source/src/androidInterface.java
-
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
     for(abi, ANDROID_ABIS): message("qmake building for Android ($${abi}) platform")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
@@ -335,17 +320,11 @@ android:{
 
 DISTFILES += \
     build_android/package_source/AndroidManifest.xml \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
-    build_android/package_source/gradlew \
-    build_android/package_source/res/values/libs.xml \
     build_android/package_source/build.gradle \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
-    build_android/package_source/gradlew.bat \
-    build_android/package_source/AndroidManifest.xml \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
     build_android/package_source/gradlew \
-    build_android/package_source/res/values/libs.xml \
-    build_android/package_source/build.gradle \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
     build_android/package_source/gradlew.bat \
-    build_android/package_source/res/xml/device_filter.xml
+    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
+    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
+    build_android/package_source/res/values/libs.xml \
+    build_android/package_source/res/xml/device_filter.xml \
+    build_android/package_source/src/androidInterface.java
