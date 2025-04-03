@@ -130,38 +130,27 @@ unix:!android:!macx {
     message("Building for Linux ($${QT_ARCH})")
     DEFINES += PLATFORM_LINUX
 
-    isEmpty(PREFIX): PREFIX = /usr/local
+    contains(QT_ARCH, arm) | contains(QT_ARCH, arm64) {
+        #All ARM-Linux GCC treats char as unsigned by default???
+        QMAKE_CFLAGS += -fsigned-char
+        QMAKE_CXXFLAGS += -fsigned-char
+
+        DEFINES += "PLATFORM_RASPBERRY_PI"
+    }
+
     CONFIG += link_pkgconfig
     PKGCONFIG += libusb-1.0  ##make sure you have the libusb-1.0-0-dev package!
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
     PKGCONFIG += eigen3      ##make sure you have the libeigen3-dev package!
-    contains(QT_ARCH, arm) | contains(QT_ARCH, arm64) {
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        QMAKE_CFLAGS += -fsigned-char
-        QMAKE_CXXFLAGS += -fsigned-char
-        DEFINES += "PLATFORM_RASPBERRY_PI"
-        #All ARM-Linux GCC treats char as unsigned by default???
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
 
-    } else:contains(QT_ARCH, i386) {
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x86/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
-
-    } else {
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x64/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
-    }
-
+    isEmpty(PREFIX): PREFIX = /usr/local
     target.path = $$PREFIX/bin
+    lib_deploy.path = $$PREFIX/lib
+
+    #libdfuprog include
+    INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+    LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
+    lib_deploy.files += $$PWD/build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
     firmware.files += $$files(bin/firmware/labrafirm*)
