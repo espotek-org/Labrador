@@ -1,8 +1,6 @@
 @INCLUDEPATH += $$PWD/ui_elements
-@DEPENDPATH += $$PWD/ui_elements
 
 INCLUDEPATH += $$PWD/ui_elements/qcp$${QCP_VER}
-DEPENDPATH += $$PWD/ui_elements/qcp$${QCP_VER}
 
 
 SOURCES +=  ui_elements/buffercontrol.cpp \

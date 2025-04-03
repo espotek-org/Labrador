@@ -92,7 +92,6 @@ DESTDIR = bin
 RC_ICONS = appicon.ico
 
 INCLUDEPATH += $$PWD/ui_elements
-DEPENDPATH += $$PWD/ui_elements
 
 
 ###########################################################
@@ -121,7 +120,6 @@ win32 {
         DEFINES += "WINDOWS_64_BIT"
     }
     INCLUDEPATH += $$PWD/build_win/libusbk/includes
-    DEPENDPATH += $$PWD/build/win/libusbk/includes
 }
 
 #############################################################
@@ -141,7 +139,6 @@ unix:!android:!macx {
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
         QMAKE_CFLAGS += -fsigned-char
         QMAKE_CXXFLAGS += -fsigned-char
         DEFINES += "PLATFORM_RASPBERRY_PI"
@@ -153,7 +150,6 @@ unix:!android:!macx {
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
         lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x86/libdfuprog-0.9.so
         lib_deploy.path = $$PREFIX/lib
 
@@ -161,7 +157,6 @@ unix:!android:!macx {
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
         lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x64/libdfuprog-0.9.so
         lib_deploy.path = $$PREFIX/lib
     }
@@ -214,12 +209,10 @@ macx {
 
     #libusb dylib include
     INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
-    DEPENDPATH += $$PWD/build_mac/libusb/include/libusb-1.0
     LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
 
     #libdfuprog dylib include
     INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
-    DEPENDPATH += $$PWD/build_mac/libdfuprog/include
     LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
     INCLUDEPATH += $$system(brew --prefix)/include
@@ -289,7 +282,6 @@ android {
     SOURCES += androidusbdriver.cpp
     HEADERS += androidusbdriver.h
     INCLUDEPATH += $$PWD/build_android/libusb-242
-    DEPENDPATH += $$PWD/build_android/libusb-242
 
     ANDROID_PACKAGE_SOURCE_DIR  = $$PWD/build_android/package_source
     assets_deploy.files=$$files($$PWD/build_android/package_source/assets/*)
@@ -299,7 +291,6 @@ android {
     #libdfuprog include
     LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
     INCLUDEPATH += $$PWD/build_android/libdfuprog/include
-    DEPENDPATH += $$PWD/build_android/libdfuprog/include
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/libdfuprog-0.9.so
 
     #liblog include
