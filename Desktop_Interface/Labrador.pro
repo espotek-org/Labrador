@@ -99,21 +99,20 @@ DEPENDPATH += $$PWD/ui_elements
 ################    WINDOWS BUILD ONLY    ################
 #########################################################
 
-win32{
+win32 {
+    message("Building for Windows ($${QT_ARCH})")
     DEFINES += PLATFORM_WINDOWS
     SOURCES += winusbdriver.cpp
     HEADERS += winusbdriver.h
 
     #libusbk include
     contains(QT_ARCH, i386) {
-        message("Building for Windows (x86)")
         CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
         else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
         DEFINES += "WINDOWS_32_BIT"
         INCLUDEPATH += $$PWD/build_win/fftw/x86
         LIBS += -L$$PWD/build_win/fftw/x86 -llibfftw3-3
     } else {
-        message("Building for Windows (x64)")
         CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
         else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
         INCLUDEPATH += $$PWD/build_win/fftw/x64
@@ -129,7 +128,8 @@ win32{
 ################    GNU/LINUX BUILD ONLY    ################
 ###########################################################
 
-unix:!android:!macx{
+unix:!android:!macx {
+    message("Building for Linux ($${QT_ARCH})")
     DEFINES += PLATFORM_LINUX
 
     isEmpty(PREFIX): PREFIX = /usr/local
@@ -138,7 +138,6 @@ unix:!android:!macx{
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
     PKGCONFIG += eigen3      ##make sure you have the libeigen3-dev package!
     contains(QT_ARCH, arm) | contains(QT_ARCH, arm64) {
-        message("Building for Raspberry Pi ($${QT_ARCH})")
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
@@ -151,7 +150,6 @@ unix:!android:!macx{
         lib_deploy.path = $$PREFIX/lib
 
     } else:contains(QT_ARCH, i386) {
-        message("Building for Linux (x86)")
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
@@ -160,7 +158,6 @@ unix:!android:!macx{
         lib_deploy.path = $$PREFIX/lib
 
     } else {
-        message("Building for Linux (x64)")
         #libdfuprog include
         LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
         INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
@@ -207,34 +204,32 @@ unix:!android:!macx{
     INSTALLS += udevextra
 }
 
-
-
 #############################################################
 ################    MAC OSX BUILD ONLY    ##################
 ###########################################################
 
-macx:DEFINES += PLATFORM_MAC
+macx {
+    message("Building for Mac")
+    DEFINES += PLATFORM_MAC
 
-#libusb dylib include
-macx:LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
-macx:INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
-macx:DEPENDPATH += $$PWD/build_mac/libusb/include/libusb-1.0
+    #libusb dylib include
+    INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
+    DEPENDPATH += $$PWD/build_mac/libusb/include/libusb-1.0
+    LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
 
-#libdfuprog dylib include
-macx:LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
-macx:INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
-macx:DEPENDPATH += $$PWD/build_mac/libdfuprog/include
+    #libdfuprog dylib include
+    INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
+    DEPENDPATH += $$PWD/build_mac/libdfuprog/include
+    LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
-macx: INCLUDEPATH += $$system(brew --prefix)/include
-macx: INCLUDEPATH += $$system(brew --prefix)/include/eigen3
-macx: LIBS += -L$$system(brew --prefix)/lib
+    INCLUDEPATH += $$system(brew --prefix)/include
+    INCLUDEPATH += $$system(brew --prefix)/include/eigen3
+    LIBS += -L$$system(brew --prefix)/lib
 
-macx:QMAKE_LFLAGS += "-undefined dynamic_lookup"
+    QMAKE_LFLAGS += "-undefined dynamic_lookup"
+}
 
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
-
-
-
 
 #############################################################
 ########   SHARED UNIX-LIKE BUILDS (MAC + LINUX)   #########
@@ -275,11 +270,10 @@ android: QMAKE_CFLAGS_RELEASE -= -Os
 #################    ANDROID BUILD ONLY    #################
 ###########################################################
 
-android:{
-
+android {
+    #Android treats char as unsigned by default (why???)
     QMAKE_CFLAGS += -fsigned-char
     QMAKE_CXXFLAGS += -fsigned-char
-    #Android treats char as unsigned by default (why???)
 
     # Building .so files fails with -Wl,--no-undefined
     QMAKE_LFLAGS_APP     -= -Wl,--no-undefined
@@ -313,7 +307,7 @@ android:{
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
 
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
-    for(abi, ANDROID_ABIS): message("qmake building for Android ($${abi}) platform")
+    for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
 }
