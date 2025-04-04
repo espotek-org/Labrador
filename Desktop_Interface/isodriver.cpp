@@ -972,17 +972,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 else
                     f = internalBuffer375_CH1->async_dft->getFrequenciyWindow(internalBuffer375_CH1->m_samplesPerSecond);
 
-                /*Max amplitude for display purposes*/
-                double max1;
-                if(CH1_mode == -1)
-                    max1 = internalBuffer750->async_dft->maximum;
-                else
-                    max1 = internalBuffer375_CH1->async_dft->maximum;
-                double max2 = -1;
-
                 if(CH2_mode) {
                     QVector<double> amplitude2 = internalBuffer375_CH2->async_dft->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
-                    max2 = internalBuffer375_CH2->async_dft->maximum;
                     axes->graph(1)->setData(f,amplitude2);
                 }
 
