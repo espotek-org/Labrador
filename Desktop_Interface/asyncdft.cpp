@@ -92,7 +92,6 @@ QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wi
 
     /*Zero-padding for better resolution of DFT*/
     QVector<double> amplitude(n_samples/2+1,0);
-    maximum = -1;
 
     /*Executing FFTW plan*/
     fftw_execute(plan);
@@ -106,8 +105,6 @@ QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wi
     */
     for (int k = 0; k <= (n_samples+1)/2; ++k) {
          amplitude[k] = 60 + 10*std::log10(out_buffer[k][0]*out_buffer[k][0] + out_buffer[k][1]*out_buffer[k][1]) - 20*std::log10(wind_fact_sum);
-
-         maximum = (amplitude[k] > maximum ) ? amplitude[k] : maximum;
     }
 
     return amplitude;
@@ -135,23 +132,4 @@ std::unique_ptr<short[]> AsyncDFT::getWindow()
     }
 
     return readData;
-}
-
-QVector<double> AsyncDFT::normalizeDFT(double e_maximum, QVector<double> dft)
-{
-    double u_maximum;
-
-    /*Normalize with the greater maximum*/
-    if (this->maximum > e_maximum) {
-        u_maximum = this->maximum;
-    } else {
-        u_maximum = e_maximum;
-    }
-
-    for(int i=0; i < dft.size(); i++) {
-        dft[i] /= u_maximum;
-        dft[i] *= 100;
-    }
-
-    return dft;
 }

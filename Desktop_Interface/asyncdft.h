@@ -27,8 +27,6 @@ public:
     /*Return the window of samples*/
     std::unique_ptr<short[]> getWindow();
 
-    /*Normalize the DFT*/
-    QVector<double> normalizeDFT(double e_maximum, QVector<double> dft);
 private:
     /*Thread manager method*/
     void threadManager(); //threaded
@@ -36,9 +34,6 @@ private:
     /*Shifts left the window by 1*/
     void shift();
 
-public:
-    /*Maximum power value obtained from power spectrum*/
-    double maximum = -1;
 private:
     /*Time domain window*/
     std::list<double> window;
