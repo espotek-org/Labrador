@@ -13,8 +13,8 @@
 #define PI_8 8*PI
 static constexpr int kSpectrumCounterMax = 4;
 
-#define HORICURSORENABLED ((~spectrum & ~freqResp & horiCursorEnabled0) | (spectrum & horiCursorEnabled1) | (freqResp & horiCursorEnabled2))
-#define VERTCURSORENABLED ((~spectrum & ~freqResp & vertCursorEnabled0) | (spectrum & vertCursorEnabled1) | (freqResp & vertCursorEnabled2))
+#define HORICURSORENABLED ((!spectrum & !freqResp & horiCursorEnabled0) | (spectrum & horiCursorEnabled1) | (freqResp & horiCursorEnabled2))
+#define VERTCURSORENABLED ((!spectrum & !freqResp & vertCursorEnabled0) | (spectrum & vertCursorEnabled1) | (freqResp & vertCursorEnabled2))
 
 isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
 {
