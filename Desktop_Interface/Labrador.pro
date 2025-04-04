@@ -90,8 +90,6 @@ DESTDIR = bin
 
 RC_ICONS = appicon.ico
 
-INCLUDEPATH += $$PWD/ui_elements
-
 
 ###########################################################
 ################    WINDOWS BUILD ONLY    ################

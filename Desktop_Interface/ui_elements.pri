@@ -1,9 +1,8 @@
-@INCLUDEPATH += $$PWD/ui_elements
-
+INCLUDEPATH += $$PWD/ui_elements
 INCLUDEPATH += $$PWD/ui_elements/qcp$${QCP_VER}
 
-
-SOURCES +=  ui_elements/buffercontrol.cpp \
+SOURCES += \
+    ui_elements/buffercontrol.cpp \
     ui_elements/cursorenabler.cpp \
     ui_elements/deviceconnecteddisplay.cpp \
     ui_elements/espocombobox.cpp \
@@ -16,8 +15,8 @@ SOURCES +=  ui_elements/buffercontrol.cpp \
     ui_elements/voltagespinbox.cpp \
     ui_elements/swipeystack.cpp
 
-
-HEADERS +=     ui_elements/buffercontrol.h \
+HEADERS += \
+    ui_elements/buffercontrol.h \
     ui_elements/cursorenabler.h \
     ui_elements/deviceconnecteddisplay.h \
     ui_elements/espocombobox.h \
