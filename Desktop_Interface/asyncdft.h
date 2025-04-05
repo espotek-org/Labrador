@@ -14,7 +14,7 @@ public:
 
     /* Raise exception if not ready yet*/
     QVector<double> getPowerSpectrum_dBmV(QVector<double> input, double wind_fact_sum);
-    QVector<double> getFrequenciyWindow(int samplesPerSeconds);
+    QVector<double> getFrequencyWindow(int samplesPerSeconds);
 
     /*Add a sample to the time domain samples*/
     void addSample(short sample);

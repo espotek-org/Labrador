@@ -75,7 +75,7 @@ QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wi
     return amplitude;
 }
 
-QVector<double> AsyncDFT::getFrequenciyWindow(int samplesPerSeconds)
+QVector<double> AsyncDFT::getFrequencyWindow(int samplesPerSeconds)
 {
     double delta_freq = ((double)  samplesPerSeconds)/ ((double) n_samples);
     QVector<double> f(n_samples/2 + 1);

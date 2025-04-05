@@ -968,9 +968,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 /*Getting array of frequencies for display purposes*/
                 QVector<double> f;
                 if(CH1_mode == -1)
-                    f = internalBuffer750->async_dft->getFrequenciyWindow(internalBuffer750->m_samplesPerSecond);
+                    f = internalBuffer750->async_dft->getFrequencyWindow(internalBuffer750->m_samplesPerSecond);
                 else
-                    f = internalBuffer375_CH1->async_dft->getFrequenciyWindow(internalBuffer375_CH1->m_samplesPerSecond);
+                    f = internalBuffer375_CH1->async_dft->getFrequencyWindow(internalBuffer375_CH1->m_samplesPerSecond);
 
                 if(CH2_mode) {
                     QVector<double> amplitude2 = internalBuffer375_CH2->async_dft->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
