@@ -1,10 +1,8 @@
 #ifndef ASYNCDFT_H
 #define ASYNCDFT_H
-#include <thread>
 #include <QVector>
-#include <mutex>
-#include <queue>
 #include <list>
+#include <memory>
 #include <fftw3.h>
 
 class AsyncDFT
@@ -28,13 +26,6 @@ public:
     std::unique_ptr<short[]> getWindow();
 
 private:
-    /*Thread manager method*/
-    void threadManager(); //threaded
-
-    /*Shifts left the window by 1*/
-    void shift();
-
-private:
     /*Time domain window*/
     std::list<double> window;
     double in_buffer[n_samples];
@@ -45,10 +36,6 @@ private:
     /*FFTW3*/
     fftw_plan plan;
     fftw_complex *out_buffer;
-    std::mutex mtx_samples;
-    bool stopping = false;
-    std::thread manager;
-    std::queue<short> pending_samples;
 };
 
 #endif // ASYNCDFT_H

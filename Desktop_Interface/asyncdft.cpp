@@ -1,15 +1,10 @@
 #include "asyncdft.h"
-#include <iostream>
-#include <math.h>
+#include <cmath>
 #include <omp.h>
-#include "isobuffer.h"
-#define DBG 0
 
 
 AsyncDFT::AsyncDFT()
 {
-    /*Creating the main thread, which will manage everything*/
-    stopping = false;
     /*Data is not valid until we get n_samples into the window*/
     data_valid = false;
     /*Samples counter*/
@@ -18,43 +13,13 @@ AsyncDFT::AsyncDFT()
     /*FFTW3 inits*/
     fftw_init_threads();
     fftw_plan_with_nthreads(omp_get_max_threads() * 2);
-#if DBG
-    std::cout << "Starting with " << omp_get_max_threads() << "threads" << std::endl;
-#endif
     out_buffer = fftw_alloc_complex(n_samples);
     plan = fftw_plan_dft_r2c_1d(n_samples,in_buffer, out_buffer,0);
 }
 
 AsyncDFT::~AsyncDFT()
 {
-#if DBG
-    stopping = true;
-    mtx_samples.unlock();   //Unlock thread manager if blocked and waiting for more samples
-    while (!manager.joinable());
-    manager.join();
-    std::cout << "Joined manager thread [DESTRUCTOR]" << std::endl;
-#endif
 }
-
-void AsyncDFT::threadManager()
-{
-    while(stopping == false) {
-        /*Calculating DFT if there are new samples, otherwise DFT would be the same*/
-        if (samples_count >= n_samples) {
-            mtx_samples.lock();
-            if (!window.empty()) {
-                window.pop_front();
-            }
-            short tmp = pending_samples.front();
-            pending_samples.pop();
-            window.push_back(tmp);
-            /*Data is now valid*/
-            data_valid = true;
-            mtx_samples.unlock();
-        }
-    }
-}
-
 
 void AsyncDFT::addSample(short sample)
 {
