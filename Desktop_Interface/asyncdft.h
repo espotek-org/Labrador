@@ -29,10 +29,6 @@ private:
     /*Time domain window*/
     std::list<double> window;
     double in_buffer[n_samples];
-    /*Indicates if dft is available*/
-    bool data_valid;
-    /*Number of time domain samples accumulated*/
-    int samples_count;
     /*FFTW3*/
     fftw_plan plan;
     fftw_complex *out_buffer;

@@ -5,11 +5,6 @@
 
 AsyncDFT::AsyncDFT()
 {
-    /*Data is not valid until we get n_samples into the window*/
-    data_valid = false;
-    /*Samples counter*/
-    samples_count=0;
-    /*Initializing time domain window to 0s*/
     /*FFTW3 inits*/
     fftw_init_threads();
     fftw_plan_with_nthreads(omp_get_max_threads() * 2);
@@ -23,31 +18,21 @@ AsyncDFT::~AsyncDFT()
 
 void AsyncDFT::addSample(short sample)
 {
-    /*Adding to the waiting jobs the sample*/
-    if (samples_count >= n_samples) {
-        /*Shifting window by 1 by removing first element and adding an element to the end*/
+    if (window.size() == n_samples) {
         window.pop_front();
-        window.push_back(sample);
-        samples_count = n_samples;
-        data_valid = true;
-    } else {
-        /*Fill the window*/
-        window.push_back(sample);
     }
-    /*Updating the number of samples*/
-    samples_count++;
+    window.push_back(sample);
 }
 
 void AsyncDFT::clearWindow()
 {
     window.clear();
-    samples_count = 0;
 }
 
 QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wind_fact_sum)
 {
     /*Before doing anything, check if sliding DFT is computable*/
-    if (data_valid == false) {
+    if (window.size() < n_samples) {
         throw std::exception();
     }
 
