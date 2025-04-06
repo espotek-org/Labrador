@@ -769,11 +769,14 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         //qDebug() << "Now offset = " << offset;
     }
 
+    auto internalBuffer_CH1 = (CH1_mode == -1) ? internalBuffer750 : internalBuffer375_CH1;
+    auto internalBuffer_CH2 = internalBuffer375_CH2;
+
     double triggerDelay = 0;
     if (triggerEnabled)
     {
-		isoBuffer* internalBuffer_CH1 = (CH1_mode == -1) ? internalBuffer750 : internalBuffer375_CH1;
-        triggerDelay = (triggerMode < 2) ? internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window : internalBuffer375_CH2->getDelayedTriggerPoint(display->window) - display->window;
+        triggerDelay = (triggerMode < 2) ? internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window
+                                         : internalBuffer_CH2->getDelayedTriggerPoint(display->window) - display->window;
 
         if (triggerDelay < 0)
             triggerDelay = 0;
@@ -814,11 +817,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if (spectrum)
     {
-        if(CH1_mode == -1)
-            dt_samples1  = internalBuffer750->async_dft->getWindow();
-        else
-            dt_samples1  = internalBuffer375_CH1->async_dft->getWindow();
-        dt_samples2  = internalBuffer375_CH2->async_dft->getWindow();
+        dt_samples1 = internalBuffer_CH1->async_dft->getWindow();
+        dt_samples2 = internalBuffer_CH2->async_dft->getWindow();
         converted_dt_samples1.resize(dt_samples1.size());
         converted_dt_samples2.resize(dt_samples2.size());
     }
@@ -955,31 +955,16 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     } else{
         if (spectrum) { /*If frequency spectrum mode*/
             /*Getting array of frequencies for display purposes*/
-            QVector<double> f;
-            if (CH1_mode == -1) {
-                f = internalBuffer750->async_dft->getFrequencyWindow(internalBuffer750->m_samplesPerSecond);
-            } else {
-                f = internalBuffer375_CH1->async_dft->getFrequencyWindow(internalBuffer375_CH1->m_samplesPerSecond);
-            }
+            auto f = internalBuffer_CH1->async_dft->getFrequencyWindow(internalBuffer_CH1->m_samplesPerSecond);
 
             /*Creating DFT amplitudes*/
-            if (CH1_mode == -1) {
-                if (converted_dt_samples1.size() == internalBuffer750->async_dft->n_samples) {
-                    auto amplitude = internalBuffer750->async_dft->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
-                    axes->graph(0)->setData(f, amplitude);
-                }
-            } else {
-                if (converted_dt_samples1.size() == internalBuffer375_CH1->async_dft->n_samples) {
-                    auto amplitude = internalBuffer375_CH1->async_dft->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
-                    axes->graph(0)->setData(f, amplitude);
-                }
+            if (converted_dt_samples1.size() == internalBuffer_CH1->async_dft->n_samples) {
+                auto amplitude = internalBuffer_CH1->async_dft->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
+                axes->graph(0)->setData(f, amplitude);
             }
-
-            if (CH2_mode) {
-                if (converted_dt_samples2.size() == internalBuffer375_CH2->async_dft->n_samples) {
-                    auto amplitude = internalBuffer375_CH2->async_dft->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
-                    axes->graph(1)->setData(f, amplitude);
-                }
+            if (CH2_mode && converted_dt_samples2.size() == internalBuffer_CH2->async_dft->n_samples) {
+                auto amplitude = internalBuffer_CH2->async_dft->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
+                axes->graph(1)->setData(f, amplitude);
             }
 
             axes->xAxis->setLabel("Frequency (Hz)");
