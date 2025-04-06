@@ -203,6 +203,8 @@ private:
     double m_spectrumMinX = 0;
     double m_spectrumMaxX = 375000;
     int m_windowingType = 0;
+    QVector<double> m_windowFactors;
+    double m_windowFactorsSum;
     //Frequency response
     QVector<double> m_freqRespFreq;
     QVector<double> m_freqRespGain;

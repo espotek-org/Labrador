@@ -22,6 +22,9 @@ isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
     this->hide();
 
     m_asyncDFT = new AsyncDFT();
+    m_windowFactors.fill(1.0, m_asyncDFT->n_samples);
+    m_windowFactorsSum = m_asyncDFT->n_samples;
+
     internalBuffer375_CH1 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, m_asyncDFT->n_samples, this, 1);
     internalBuffer375_CH2 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, m_asyncDFT->n_samples, this, 2);
     internalBuffer750 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/10*21, m_asyncDFT->n_samples, this, 1);
@@ -818,7 +821,6 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
     }
 
-    double wind_fact, wind_fact_sum = 0;
     if (CH1_mode == 1){
         analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
         for (int i=0; i < CH1.size(); i++)
@@ -834,10 +836,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
                 converted_dt_samples1[i] += m_offset_CH1;
-
-                wind_fact = windowing_factor(m_windowingType, m_asyncDFT->n_samples, i);
-                converted_dt_samples1[i] *= wind_fact;
-                wind_fact_sum += wind_fact;
+                converted_dt_samples1[i] *= m_windowFactors[i];
             }
         }
         else if (freqResp)
@@ -874,10 +873,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples2[i] /= m_attenuation_CH1;
                 converted_dt_samples2[i] += m_offset_CH1;
-
-                wind_fact = windowing_factor(m_windowingType, m_asyncDFT->n_samples, i);
-                converted_dt_samples2[i] *= wind_fact;
-                wind_fact_sum += wind_fact;
+                converted_dt_samples2[i] *= m_windowFactors[i];
             }
         }
         else if (freqResp)
@@ -911,10 +907,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
                 converted_dt_samples1[i] += m_offset_CH1;
-
-                wind_fact = windowing_factor(m_windowingType, m_asyncDFT->n_samples, i);
-                converted_dt_samples1[i] *= wind_fact;
-                wind_fact_sum += wind_fact;
+                converted_dt_samples1[i] *= m_windowFactors[i];
             }
         }
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
@@ -949,11 +942,11 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
             /*Creating DFT amplitudes*/
             if (converted_dt_samples1.size() == m_asyncDFT->n_samples) {
-                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, wind_fact_sum);
+                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, m_windowFactorsSum);
                 axes->graph(0)->setData(f, amplitude);
             }
             if (CH2_mode && converted_dt_samples2.size() == m_asyncDFT->n_samples) {
-                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples2, wind_fact_sum);
+                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples2, m_windowFactorsSum);
                 axes->graph(1)->setData(f, amplitude);
             }
 
@@ -1948,6 +1941,14 @@ void isoDriver::setMaxSpectrum(double maxSpectrum)
 void isoDriver::setWindowingType(int windowingType)
 {
     m_windowingType = windowingType;
+
+    m_windowFactors.resize(m_asyncDFT->n_samples);
+    m_windowFactorsSum = 0;
+    for (int i = 0; i < m_windowFactors.size(); ++i) {
+        auto factor = windowing_factor(m_windowingType, m_windowFactors.size(), i);
+        m_windowFactors[i] = factor;
+        m_windowFactorsSum += factor;
+    }
 }
 
 void isoDriver::setMinFreqResp(double minFreqResp)
