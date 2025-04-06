@@ -59,8 +59,7 @@ void isoBuffer::insertIntoBuffer(short item)
         m_back = 0;
     }
 
-    if (m_asyncDftActive)
-        async_dft->addSample(item);
+    async_dft->addSample(item);
 
     /* Fill-in freqResp buffer */
     if(m_freqRespActive)
@@ -196,17 +195,6 @@ void isoBuffer::gainBuffer(int gain_log)
             m_buffer[i+m_bufferLen] >>= gain_log;
         }
     }
-}
-
-void isoBuffer::enableDftWrite(bool enable)
-{
-    if ((enable == true) && (m_asyncDftActive == false))
-    {
-        delete async_dft;
-        async_dft = new AsyncDFT();
-    }
-
-    m_asyncDftActive = enable;
 }
 
 void isoBuffer::enableFreqResp(bool enable, double freqValue)

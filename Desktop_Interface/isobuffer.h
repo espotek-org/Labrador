@@ -57,7 +57,6 @@ public:
 	void clearBuffer();
 	void gainBuffer(int gain_log);
 
-	void enableDftWrite(bool enable);
 	void enableFreqResp(bool enable, double freqValue);
 
 // Advanced buffer operations
@@ -139,7 +138,6 @@ private:
 	unsigned int m_currentColumn = 0;
     uint32_t m_lastTriggerDetlaT = 0;
 
-	bool m_asyncDftActive = false;
 	bool m_freqRespActive = false;
 
 	isoDriver* m_virtualParent;

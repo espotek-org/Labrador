@@ -726,10 +726,6 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             return;
     }
 
-    internalBuffer375_CH1->enableDftWrite(spectrum);
-    internalBuffer375_CH2->enableDftWrite(spectrum);
-    internalBuffer750->enableDftWrite(spectrum);
-
     internalBuffer375_CH1->enableFreqResp(freqResp, freqValue_CH1->value());
     internalBuffer375_CH2->enableFreqResp(freqResp, freqValue_CH1->value());
 
