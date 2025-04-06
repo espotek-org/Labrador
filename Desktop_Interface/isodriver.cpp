@@ -941,11 +941,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             auto f = m_asyncDFT->getFrequencyWindow(internalBuffer_CH1->m_samplesPerSecond);
 
             /*Creating DFT amplitudes*/
-            if (converted_dt_samples1.size() == m_asyncDFT->n_samples) {
-                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, m_windowFactorsSum);
-                axes->graph(0)->setData(f, amplitude);
-            }
-            if (CH2_mode && converted_dt_samples2.size() == m_asyncDFT->n_samples) {
+            auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, m_windowFactorsSum);
+            axes->graph(0)->setData(f, amplitude);
+            if (CH2_mode) {
                 auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples2, m_windowFactorsSum);
                 axes->graph(1)->setData(f, amplitude);
             }

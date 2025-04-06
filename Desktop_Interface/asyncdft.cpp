@@ -18,6 +18,11 @@ AsyncDFT::~AsyncDFT()
 
 QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wind_fact_sum)
 {
+    /*Before doing anything, check if sliding DFT is computable*/
+    if (input.size() < n_samples) {
+        return QVector<double>();
+    }
+
     for(int i = 0; i < n_samples; i++) {
         in_buffer[i] = input[i];
     }
