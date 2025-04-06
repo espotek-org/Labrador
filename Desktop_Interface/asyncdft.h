@@ -1,8 +1,6 @@
 #ifndef ASYNCDFT_H
 #define ASYNCDFT_H
 #include <QVector>
-#include <list>
-#include <memory>
 #include <fftw3.h>
 
 class AsyncDFT
@@ -23,11 +21,12 @@ public:
     void clearWindow();
 
     /*Return the window of samples*/
-    std::unique_ptr<short[]> getWindow();
+    QVector<short> getWindow();
 
 private:
     /*Time domain window*/
-    std::list<double> window;
+    QVector<short> window;
+    QVector<short>::iterator window_iter;
     double in_buffer[n_samples];
     /*FFTW3*/
     fftw_plan plan;

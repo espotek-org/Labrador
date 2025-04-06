@@ -808,8 +808,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         }
     }
     /*Convert data also for spectrum CH1 and CH2*/
-    std::unique_ptr<short[]> dt_samples1;
-    std::unique_ptr<short[]> dt_samples2;
+    QVector<short> dt_samples1, dt_samples2;
     QVector<double> converted_dt_samples1, converted_dt_samples2;
     QVector<double> x(GRAPH_SAMPLES), CH1(GRAPH_SAMPLES), CH2(GRAPH_SAMPLES);
 
@@ -843,7 +842,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
         if (spectrum)
         {
-            analogConvert(dt_samples1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
+            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
             for (int i=0; i < converted_dt_samples1.size(); i++)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
@@ -883,7 +882,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
         if (spectrum)
         {
-            analogConvert(dt_samples2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
+            analogConvert(dt_samples2.data(), &converted_dt_samples2, 128, AC_CH2, 2);
             for (int i=0; i < converted_dt_samples2.size(); i++)
             {
                 converted_dt_samples2[i] /= m_attenuation_CH1;
@@ -920,7 +919,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
         if (spectrum)
         {
-            analogConvert(dt_samples1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
+            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
             for (int i=0; i < converted_dt_samples1.size(); i++)
             {
                 converted_dt_samples1[i] /= m_attenuation_CH1;
