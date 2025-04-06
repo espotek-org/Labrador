@@ -40,7 +40,7 @@ void AsyncDFT::clearWindow()
 QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wind_fact_sum)
 {
     /*Before doing anything, check if sliding DFT is computable*/
-    if (window.size() < n_samples) {
+    if (input.size() < n_samples) {
         throw std::exception();
     }
 
@@ -82,7 +82,7 @@ QVector<double> AsyncDFT::getFrequencyWindow(int samplesPerSeconds)
 
 QVector<short> AsyncDFT::getWindow()
 {
-    QVector<short> readData(n_samples);
+    QVector<short> readData(window.size());
     std::copy(window.begin(), window_iter, std::copy(window_iter, window.end(), readData.begin()));
     return readData;
 }

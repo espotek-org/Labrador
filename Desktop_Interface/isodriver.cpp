@@ -819,11 +819,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         else
             dt_samples1  = internalBuffer375_CH1->async_dft->getWindow();
         dt_samples2  = internalBuffer375_CH2->async_dft->getWindow();
-        if(CH1_mode == -1)
-            converted_dt_samples1.resize(internalBuffer750->async_dft->n_samples);
-        else
-            converted_dt_samples1.resize(internalBuffer375_CH1->async_dft->n_samples);
-        converted_dt_samples2.resize(internalBuffer375_CH2->async_dft->n_samples);
+        converted_dt_samples1.resize(dt_samples1.size());
+        converted_dt_samples2.resize(dt_samples2.size());
     }
     else if (freqResp)
     {
