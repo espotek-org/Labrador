@@ -29,17 +29,19 @@ constexpr auto kTopMultimeter = 2048;
 constexpr double kTriggerSensitivityMultiplier = 4;
 }
 
-isoBuffer::isoBuffer(QWidget* parent, int bufferLen, isoDriver* caller, unsigned char channel_value)
+isoBuffer::isoBuffer(QWidget* parent, int bufferLen, int windowLen, isoDriver* caller, unsigned char channel_value)
     : QWidget(parent)
     , m_channel(channel_value)
     , m_bufferPtr(std::make_unique<short[]>(bufferLen*2))
     , m_bufferLen(bufferLen)
+    , m_window_capacity(windowLen)
     , m_samplesPerSecond(bufferLen/21.0/375*VALID_DATA_PER_375)
     , m_sampleRate_bit(bufferLen/21.0/375*VALID_DATA_PER_375*8)
     , m_virtualParent(caller)
 {
-    async_dft = new AsyncDFT();
     m_buffer = m_bufferPtr.get();
+    m_window.reserve(m_window_capacity);
+    m_window_iter = m_window.begin();
 }
 
 void isoBuffer::insertIntoBuffer(short item)
@@ -59,7 +61,15 @@ void isoBuffer::insertIntoBuffer(short item)
         m_back = 0;
     }
 
-    async_dft->addSample(item);
+    /* Fill-in time domain window */
+    if (m_window.size() < m_window_capacity) {
+        m_window.push_back(item);
+    } else {
+        *m_window_iter++ = item;
+        if (m_window_iter == m_window.end()) {
+            m_window_iter = m_window.begin();
+        }
+    }
 
     /* Fill-in freqResp buffer */
     if(m_freqRespActive)
@@ -167,6 +177,13 @@ std::unique_ptr<short[]> isoBuffer::readBuffer(double sampleWindow, int numSampl
     return readData;
 }
 
+std::vector<short> isoBuffer::readWindow()
+{
+    std::vector<short> readData(m_window.size());
+    std::copy(m_window.begin(), m_window_iter, std::copy(m_window_iter, m_window.end(), readData.begin()));
+    return readData;
+}
+
 void isoBuffer::clearBuffer()
 {
     for (uint32_t i = 0; i < m_bufferLen; i++)
@@ -177,6 +194,9 @@ void isoBuffer::clearBuffer()
 
     m_back = 0;
     m_insertedCount = 0;
+
+    m_window.clear();
+    m_window_iter = m_window.begin();
 }
 
 void isoBuffer::gainBuffer(int gain_log)

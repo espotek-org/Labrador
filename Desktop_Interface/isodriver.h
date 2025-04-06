@@ -13,6 +13,7 @@
 #include "uartstyledecoder.h"
 #include "espospinbox.h"
 
+class AsyncDFT;
 class isoBuffer;
 class isoBuffer_file;
 
@@ -198,6 +199,7 @@ private:
     //DAQ
     double daqLoad_startTime, daqLoad_endTime;
     //Spectrum
+    AsyncDFT *m_asyncDFT;
     double m_spectrumMinX = 0;
     double m_spectrumMaxX = 375000;
     int m_windowingType = 0;

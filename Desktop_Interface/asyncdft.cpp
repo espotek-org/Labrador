@@ -1,13 +1,10 @@
 #include "asyncdft.h"
-#include <algorithm>
 #include <cmath>
 #include <omp.h>
 
 
 AsyncDFT::AsyncDFT()
 {
-    window.reserve(n_samples);
-    window_iter = window.begin();
     /*FFTW3 inits*/
     fftw_init_threads();
     fftw_plan_with_nthreads(omp_get_max_threads() * 2);
@@ -17,24 +14,6 @@ AsyncDFT::AsyncDFT()
 
 AsyncDFT::~AsyncDFT()
 {
-}
-
-void AsyncDFT::addSample(short sample)
-{
-    if (window.size() < n_samples) {
-        window.push_back(sample);
-    } else {
-        *window_iter++ = sample;
-        if (window_iter == window.end()) {
-            window_iter = window.begin();
-        }
-    }
-}
-
-void AsyncDFT::clearWindow()
-{
-    window.clear();
-    window_iter = window.begin();
 }
 
 QVector<double> AsyncDFT::getPowerSpectrum_dBmV(QVector<double> input, double wind_fact_sum)
@@ -73,11 +52,4 @@ QVector<double> AsyncDFT::getFrequencyWindow(int samplesPerSeconds)
     }
 
     return f;
-}
-
-QVector<short> AsyncDFT::getWindow()
-{
-    QVector<short> readData(window.size());
-    std::copy(window.begin(), window_iter, std::copy(window_iter, window.end(), readData.begin()));
-    return readData;
 }
