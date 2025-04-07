@@ -778,70 +778,44 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
-    std::vector<short> readData375_CH1;
-    std::vector<short> readData375_CH2;
-    std::vector<short> readData750;
+    std::vector<short> readData_CH1;
+    std::vector<short> readData_CH2;
     float *readDataFile;
 
-    if (!spectrum && !freqResp) {
-        readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES,CH1_mode==2, display->delay + triggerDelay);
-        if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display->window,GRAPH_SAMPLES,CH2_mode==2, display->delay + triggerDelay);
-        if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(display->window,GRAPH_SAMPLES,false, display->delay + triggerDelay);
-        if(CH1_mode == -2) readDataFile = internalBufferFile->readBuffer(display->window,GRAPH_SAMPLES,false, display->delay);
-    } else {
-        if(spectrum)
-        {
-            /*Don't allow moving frequency spectrum right or left
-             * by overwriting display window and delay before reading
-             * the buffer each time.
-             * @TODO improve this limitation.
-            */
-            double const_displ_window = ((double)m_asyncDFT->n_samples)/(internalBuffer375_CH1->m_samplesPerSecond);
-            double const_displ_delay = 0;
-            readData375_CH1 = internalBuffer375_CH1->readBuffer(const_displ_window,GRAPH_SAMPLES,CH1_mode==2, const_displ_delay + triggerDelay);
-            if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(const_displ_window,GRAPH_SAMPLES,CH2_mode==2, const_displ_delay + triggerDelay);
-            if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(const_displ_window,GRAPH_SAMPLES,false, const_displ_delay + triggerDelay);
-        }
-        else
-        {
-            double freqResp_window = 1/freqValue_CH1->value();
-            readData375_CH1 = internalBuffer375_CH1->readBuffer(freqResp_window, internalBuffer375_CH1->freqResp_samples, CH1_mode==2, triggerDelay);
-            readData375_CH2 = internalBuffer375_CH2->readBuffer(freqResp_window, internalBuffer375_CH2->freqResp_samples, CH2_mode==2, triggerDelay);
-        }
-    }
-    /*Convert data also for spectrum CH1 and CH2*/
-    std::vector<short> dt_samples1, dt_samples2;
-    QVector<double> CH1, CH2;
-
     if (spectrum) {
-        dt_samples1 = internalBuffer_CH1->readWindow();
-        dt_samples2 = internalBuffer_CH2->readWindow();
-        CH1.resize(dt_samples1.size());
-        CH2.resize(dt_samples2.size());
+        readData_CH1 = internalBuffer_CH1->readWindow();
+        readData_CH2 = internalBuffer_CH2->readWindow();
     } else if (freqResp) {
-        CH1.resize(internalBuffer375_CH1->freqResp_samples);
-        CH2.resize(internalBuffer375_CH2->freqResp_samples);
+        double freqResp_window = 1/freqValue_CH1->value();
+        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, triggerDelay);
+        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, triggerDelay);
+    } else {
+        if (CH1_mode == -2)
+            readDataFile = internalBufferFile->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay);
+        else if (CH1_mode)
+            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2, display->delay + triggerDelay);
+        if (CH2_mode)
+            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, display->delay + triggerDelay);
+    }
+
+    QVector<double> CH1, CH2;
+    if (spectrum || freqResp) {
+        CH1.resize(readData_CH1.size());
+        CH2.resize(readData_CH2.size());
     } else {
         CH1.resize(GRAPH_SAMPLES);
         CH2.resize(GRAPH_SAMPLES);
     }
 
-    if (CH1_mode == 1){
-        analogConvert(readData375_CH1.data(), &CH1, 128, AC_CH1, 1);
-        for (int i = 0; i < CH1.size(); ++i) {
-            CH1[i] /= m_attenuation_CH1;
-            CH1[i] += m_offset_CH1;
-        }
-
+    if (CH1_mode == -1 || CH1_mode == 1) {
+        analogConvert(readData_CH1.data(), &CH1, 128, AC_CH1, 1);
         if (spectrum) {
-            analogConvert(dt_samples1.data(), &CH1, 128, AC_CH1, 1);
             for (int i = 0; i < CH1.size(); ++i) {
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
                 CH1[i] *= m_windowFactors[i];
             }
-        } else if (freqResp) {
-            analogConvert(readData375_CH1.data(), &CH1, 128, AC_CH1, 1);
+        } else {
             for (int i = 0; i < CH1.size(); ++i) {
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
@@ -851,27 +825,21 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
         xmax = (currentVmax > xmax) ? currentVmax : xmax;
         broadcastStats(0);
+    } else if (CH1_mode == 2) {
+        digitalConvert(readData_CH1.data(), &CH1);
+    } else if (CH1_mode == -2) {
+        fileStreamConvert(readDataFile, &CH1);
     }
-    /*After conversion of dt samples, sending them again to asyncDFT*/
 
-    if (CH1_mode == 2) digitalConvert(readData375_CH1.data(), &CH1);
-
-    if (CH2_mode == 1){
-        analogConvert(readData375_CH2.data(), &CH2, 128, AC_CH2, 2);
-        for (int i = 0; i < CH2.size(); ++i) {
-            CH2[i] /= m_attenuation_CH2;
-            CH2[i] += m_offset_CH2;
-        }
-
+    if (CH2_mode == 1) {
+        analogConvert(readData_CH2.data(), &CH2, 128, AC_CH2, 2);
         if (spectrum) {
-            analogConvert(dt_samples2.data(), &CH2, 128, AC_CH2, 2);
             for (int i = 0; i < CH2.size(); ++i) {
                 CH2[i] /= m_attenuation_CH1;
                 CH2[i] += m_offset_CH1;
                 CH2[i] *= m_windowFactors[i];
             }
-        } else if (freqResp) {
-            analogConvert(readData375_CH2.data(), &CH2, 128, AC_CH2, 2);
+        } else {
             for (int i = 0; i < CH2.size(); ++i) {
                 CH2[i] /= m_attenuation_CH1;
                 CH2[i] += m_offset_CH1;
@@ -881,32 +849,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         ymin = (currentVmin < ymin) ? currentVmin : ymin;
         ymax = (currentVmax > ymax) ? currentVmax : ymax;
         broadcastStats(1);
-    }
-    if (CH2_mode == 2) digitalConvert(readData375_CH2.data(), &CH2);
-
-    if(CH1_mode == -1) {
-        analogConvert(readData750.data(), &CH1, 128, AC_CH1, 1);
-        for (int i = 0; i < CH1.size(); ++i) {
-            CH1[i] /= m_attenuation_CH1;
-            CH1[i] += m_offset_CH1;
-        }
-
-        if (spectrum) {
-            analogConvert(dt_samples1.data(), &CH1, 128, AC_CH1, 1);
-            for (int i = 0; i < CH1.size(); ++i) {
-                CH1[i] /= m_attenuation_CH1;
-                CH1[i] += m_offset_CH1;
-                CH1[i] *= m_windowFactors[i];
-            }
-        }
-
-        xmin = (currentVmin < xmin) ? currentVmin : xmin;
-        xmax = (currentVmax > xmax) ? currentVmax : xmax;
-        broadcastStats(0);
-    }
-
-    if(CH1_mode == -2) {
-        fileStreamConvert(readDataFile, &CH1);
+    } else if (CH2_mode == 2) {
+        digitalConvert(readData_CH2.data(), &CH2);
     }
 
 
@@ -1132,10 +1076,10 @@ void isoDriver::multimeterAction(){
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
-    auto readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
+    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
 
-    QVector<double> CH1(readData375_CH1.size());
-    analogConvert(readData375_CH1.data(), &CH1, 2048, 0, 1);  //No AC coupling!
+    QVector<double> CH1(readData_CH1.size());
+    analogConvert(readData_CH1.data(), &CH1, 2048, 0, 1);  //No AC coupling!
 
     QVector<double> x(CH1.size());
     for (int i = 0; i < x.size(); ++i) {
