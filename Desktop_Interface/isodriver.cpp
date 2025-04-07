@@ -805,47 +805,40 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
     /*Convert data also for spectrum CH1 and CH2*/
     std::vector<short> dt_samples1, dt_samples2;
-    QVector<double> converted_dt_samples1, converted_dt_samples2;
-    QVector<double> x(GRAPH_SAMPLES), CH1(GRAPH_SAMPLES), CH2(GRAPH_SAMPLES);
+    QVector<double> CH1, CH2;
 
-    if (spectrum)
-    {
+    if (spectrum) {
         dt_samples1 = internalBuffer_CH1->readWindow();
         dt_samples2 = internalBuffer_CH2->readWindow();
-        converted_dt_samples1.resize(dt_samples1.size());
-        converted_dt_samples2.resize(dt_samples2.size());
-    }
-    else if (freqResp)
-    {
-        converted_dt_samples1.resize(internalBuffer375_CH1->freqResp_samples);
-        converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
+        CH1.resize(dt_samples1.size());
+        CH2.resize(dt_samples2.size());
+    } else if (freqResp) {
+        CH1.resize(internalBuffer375_CH1->freqResp_samples);
+        CH2.resize(internalBuffer375_CH2->freqResp_samples);
+    } else {
+        CH1.resize(GRAPH_SAMPLES);
+        CH2.resize(GRAPH_SAMPLES);
     }
 
     if (CH1_mode == 1){
         analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
-        for (int i=0; i < CH1.size(); i++)
-        {
+        for (int i = 0; i < CH1.size(); ++i) {
             CH1[i] /= m_attenuation_CH1;
             CH1[i] += m_offset_CH1;
         }
 
-        if (spectrum)
-        {
-            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
-                converted_dt_samples1[i] *= m_windowFactors[i];
+        if (spectrum) {
+            analogConvert(dt_samples1.data(), &CH1, 128, AC_CH1, 1);
+            for (int i = 0; i < CH1.size(); ++i) {
+                CH1[i] /= m_attenuation_CH1;
+                CH1[i] += m_offset_CH1;
+                CH1[i] *= m_windowFactors[i];
             }
-        }
-        else if (freqResp)
-        {
-            analogConvert(readData375_CH1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
+        } else if (freqResp) {
+            analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
+            for (int i = 0; i < CH1.size(); ++i) {
+                CH1[i] /= m_attenuation_CH1;
+                CH1[i] += m_offset_CH1;
             }
         }
 
@@ -859,32 +852,26 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if (CH2_mode == 1){
         analogConvert(readData375_CH2.get(), &CH2, 128, AC_CH2, 2);
-
-        for (int i=0; i < GRAPH_SAMPLES; i++)
-        {
+        for (int i = 0; i < CH2.size(); ++i) {
             CH2[i] /= m_attenuation_CH2;
             CH2[i] += m_offset_CH2;
         }
 
-        if (spectrum)
-        {
-            analogConvert(dt_samples2.data(), &converted_dt_samples2, 128, AC_CH2, 2);
-            for (int i=0; i < converted_dt_samples2.size(); i++)
-            {
-                converted_dt_samples2[i] /= m_attenuation_CH1;
-                converted_dt_samples2[i] += m_offset_CH1;
-                converted_dt_samples2[i] *= m_windowFactors[i];
+        if (spectrum) {
+            analogConvert(dt_samples2.data(), &CH2, 128, AC_CH2, 2);
+            for (int i = 0; i < CH2.size(); ++i) {
+                CH2[i] /= m_attenuation_CH1;
+                CH2[i] += m_offset_CH1;
+                CH2[i] *= m_windowFactors[i];
+            }
+        } else if (freqResp) {
+            analogConvert(readData375_CH2.get(), &CH2, 128, AC_CH2, 2);
+            for (int i = 0; i < CH2.size(); ++i) {
+                CH2[i] /= m_attenuation_CH1;
+                CH2[i] += m_offset_CH1;
             }
         }
-        else if (freqResp)
-        {
-            analogConvert(readData375_CH2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
-            for (int i=0; i < converted_dt_samples2.size(); i++)
-            {
-                converted_dt_samples2[i] /= m_attenuation_CH1;
-                converted_dt_samples2[i] += m_offset_CH1;
-            }
-        }
+
         ymin = (currentVmin < ymin) ? currentVmin : ymin;
         ymax = (currentVmax > ymax) ? currentVmax : ymax;
         broadcastStats(1);
@@ -893,23 +880,20 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if(CH1_mode == -1) {
         analogConvert(readData750.get(), &CH1, 128, AC_CH1, 1);
-
-        for (int i=0; i < GRAPH_SAMPLES; i++)
-        {
+        for (int i = 0; i < CH1.size(); ++i) {
             CH1[i] /= m_attenuation_CH1;
             CH1[i] += m_offset_CH1;
         }
 
-        if (spectrum)
-        {
-            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
-                converted_dt_samples1[i] *= m_windowFactors[i];
+        if (spectrum) {
+            analogConvert(dt_samples1.data(), &CH1, 128, AC_CH1, 1);
+            for (int i = 0; i < CH1.size(); ++i) {
+                CH1[i] /= m_attenuation_CH1;
+                CH1[i] += m_offset_CH1;
+                CH1[i] *= m_windowFactors[i];
             }
         }
+
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
         xmax = (currentVmax > xmax) ? currentVmax : xmax;
         broadcastStats(0);
@@ -920,7 +904,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
 
 
-    for (double i=0; i<GRAPH_SAMPLES; i++){
+    QVector<double> x(GRAPH_SAMPLES);
+    for (int i = 0; i < x.size(); ++i) {
         x[i] = -(display->window*i)/((double)(GRAPH_SAMPLES-1)) - display->delay;
         if (x[i]>0) {
             CH1[i] = 0;
@@ -941,10 +926,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             auto f = m_asyncDFT->getFrequencyWindow(internalBuffer_CH1->m_samplesPerSecond);
 
             /*Creating DFT amplitudes*/
-            auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, m_windowFactorsSum);
+            auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(CH1, m_windowFactorsSum);
             axes->graph(0)->setData(f, amplitude);
             if (CH2_mode) {
-                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples2, m_windowFactorsSum);
+                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(CH2, m_windowFactorsSum);
                 axes->graph(1)->setData(f, amplitude);
             }
 
@@ -958,7 +943,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             if(!paused_CH1)
             {
                 // Using least squares, fit a sinusoid to measured samples
-                int nof_elements = converted_dt_samples1.size();
+                int nof_elements = CH1.size();
                 double delta = 2 * PI / (nof_elements - 1);
                 double amp1, amp2, gain, gain_avg_db, phase1, phase2, phase_diff, phase_avg, norm_rms1, norm_rms2;
                 static double gain_sum = 0, phase_sum = 0;
@@ -970,8 +955,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                     A(i, 0) = 1;
                     A(i, 1) = std::sin(i*delta);
                     A(i, 2) = std::cos(i*delta);
-                    b1(i) = converted_dt_samples1[i];
-                    b2(i) = converted_dt_samples2[i];
+                    b1(i) = CH1[i];
+                    b2(i) = CH2[i];
                 }
 
                 // Solve the least squares solution Ax=b (using QR decomposition)
@@ -1143,10 +1128,11 @@ void isoDriver::multimeterAction(){
 
     readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES, false, display->delay + triggerDelay);
 
-    QVector<double> x(GRAPH_SAMPLES), CH1(GRAPH_SAMPLES);
+    QVector<double> CH1(GRAPH_SAMPLES);
     analogConvert(readData375_CH1.get(), &CH1, 2048, 0, 1);  //No AC coupling!
 
-    for (double i=0; i<GRAPH_SAMPLES; i++){
+    QVector<double> x(GRAPH_SAMPLES);
+    for (int i = 0; i < x.size(); ++i) {
         x[i] = -(display->window*i)/((double)(GRAPH_SAMPLES-1)) - display->delay;
         if (x[i]>0) {
             CH1[i] = 0;
