@@ -5,7 +5,15 @@ on:
 
 jobs:
   build-appimage:
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: x86_64
+          - os: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,7 +32,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: appimage
+          name: appimage-${{ matrix.arch }}
           path: Desktop_Interface/EspoTek_Labrador*.AppImage
           compression-level: 0
           if-no-files-found: error

@@ -1,5 +1,8 @@
 #include "functiongencontrol.h"
-#include "platformspecific.h"
+
+#include <QCoreApplication>
+#include <QDebug>
+#include <QFile>
 #include <QStandardPaths>
 
 namespace functionGen {

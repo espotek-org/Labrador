@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<DOCUMENT Type="Advanced Installer" CreateVersion="13.7" version="15.7" Modules="professional" RootPath="." Language="en" Id="{7605A8A2-F0D4-4C69-90ED-47AB2D86C1AF}">
+  <COMPONENT cid="caphyon.advinst.msicomp.ProjectOptionsComponent">
+    <ROW Name="HiddenItems" Value="AppXProductDetailsComponent;AppXDependenciesComponent;AppXAppDetailsComponent;AppXVisualAssetsComponent;AppXCapabilitiesComponent;AppXAppDeclarationsComponent;AppXUriRulesComponent;MsiJavaComponent;MsiDriverPackagesComponent;UserAccountsComponent;ScheduledTasksComponent;SqlConnectionComponent;AutorunComponent;FirewallExceptionComponent;GameUxComponent;MsiDirectEditorComponent;SharePointSlnComponent;SilverlightSlnComponent;MultipleInstancesComponent;SccmComponent;ActSyncAppComponent;FixupComponent"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiPropsComponent">
+    <ROW Property="AI_BITMAP_DISPLAY_MODE" Value="0"/>
+    <ROW Property="AI_FINDEXE_TITLE" Value="Select the installation package for [|ProductName]" ValueLocId="AI.Property.FindExeTitle"/>
+    <ROW Property="ALLUSERS" Value="1"/>
+    <ROW Property="ARPCOMMENTS" Value="This installer database contains the logic and data required to install [|ProductName]." ValueLocId="*"/>
+    <ROW Property="ARPCONTACT" Value="admin@espotek.com"/>
+    <ROW Property="ARPNOREPAIR" MultiBuildValue="DefaultBuild:1"/>
+    <ROW Property="ARPPRODUCTICON" Value="Labrador.exe" Type="8"/>
+    <ROW Property="ARPURLINFOABOUT" Value="espotek.com"/>
+    <ROW Property="Manufacturer" Value="EspoTek"/>
+    <ROW Property="ProductCode" Value="1033:{FAB73761-1B68-4E1F-B427-D3E4E0F569B5} " Type="16"/>
+    <ROW Property="ProductLanguage" Value="1033"/>
+    <ROW Property="ProductName" Value="Labrador"/>
+    <ROW Property="ProductVersion" Value="1.0.0" Type="32"/>
+    <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND;AI_SETUPEXEPATH;SETUPEXEDIR"/>
+    <ROW Property="UpgradeCode" Value="{2FDD61FA-6454-40AA-BC77-684A153C4EAD}"/>
+    <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
+    <ROW Property="WindowsType9XDisplay" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT40" MultiBuildValue="DefaultBuild:Windows NT 4.0" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT40Display" MultiBuildValue="DefaultBuild:Windows NT 4.0" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT50" MultiBuildValue="DefaultBuild:Windows 2000" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT50Display" MultiBuildValue="DefaultBuild:Windows 2000" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT5X" MultiBuildValue="DefaultBuild:Windows XP/2003 RTM, Windows XP/2003 SP1, Windows XP SP2 x86" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT5XDisplay" MultiBuildValue="DefaultBuild:Windows XP/2003 RTM, Windows XP/2003 SP1, Windows XP SP2 x86" ValueLocId="-"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiDirsComponent">
+    <ROW Directory="AI_Bin32_Dir" Directory_Parent="APPDIR" DefaultDir="32-bit"/>
+    <ROW Directory="AI_Sh32_Dir" Directory_Parent="SHORTCUTDIR" DefaultDir="32-bit"/>
+    <ROW Directory="APPDIR" Directory_Parent="TARGETDIR" DefaultDir="APPDIR:." IsPseudoRoot="1"/>
+    <ROW Directory="SHORTCUTDIR" Directory_Parent="TARGETDIR" DefaultDir="SHORTC~1|SHORTCUTDIR" IsPseudoRoot="1"/>
+    <ROW Directory="TARGETDIR" DefaultDir="SourceDir"/>
+    <ROW Directory="firmware_1_Dir" Directory_Parent="APPDIR" DefaultDir="firmware"/>
+    <ROW Directory="firmware_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="firmware"/>
+    <ROW Directory="iconengines_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="ICONEN~1|iconengines"/>
+    <ROW Directory="iconengines_Dir" Directory_Parent="APPDIR" DefaultDir="ICONEN~1|iconengines"/>
+    <ROW Directory="imageformats_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="IMAGEF~1|imageformats"/>
+    <ROW Directory="imageformats_Dir" Directory_Parent="APPDIR" DefaultDir="IMAGEF~1|imageformats"/>
+    <ROW Directory="platforms_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="PLATFO~1|platforms"/>
+    <ROW Directory="platforms_Dir" Directory_Parent="APPDIR" DefaultDir="PLATFO~1|platforms"/>
+    <ROW Directory="printsupport_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="PRINTS~1|printsupport"/>
+    <ROW Directory="printsupport_Dir" Directory_Parent="APPDIR" DefaultDir="PRINTS~1|printsupport"/>
+    <ROW Directory="styles_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="styles"/>
+    <ROW Directory="styles_Dir" Directory_Parent="APPDIR" DefaultDir="styles"/>
+    <ROW Directory="translations_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="TRANSL~1|translations"/>
+    <ROW Directory="translations_Dir" Directory_Parent="APPDIR" DefaultDir="TRANSL~1|translations"/>
+    <ROW Directory="waveforms_1_Dir" Directory_Parent="AI_Bin32_Dir" DefaultDir="WAVEFO~1|waveforms"/>
+    <ROW Directory="waveforms_Dir" Directory_Parent="APPDIR" DefaultDir="WAVEFO~1|waveforms"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCompsComponent">
+    <ROW Component="AI_ExePath" ComponentId="{CED2FE51-CB11-4F88-813B-894507C1ED27}" Directory_="APPDIR" Attributes="260" KeyPath="AI_ExePath"/>
+    <ROW Component="B35B3203FEB4CFFA576A27CB835D3E6" ComponentId="{00A4B40A-87F2-4B7A-92F0-551931D9B318}" Directory_="APPDIR" Attributes="260" KeyPath="B35B3203FEB4CFFA576A27CB835D3E6" Options="2"/>
+    <ROW Component="D36C9FE0826D4D2B9C2DDCCE2C83E860" ComponentId="{03696A80-19E5-4DD2-8115-8FE0A716AC0B}" Directory_="APPDIR" Attributes="260" KeyPath="D36C9FE0826D4D2B9C2DDCCE2C83E860" Options="2"/>
+    <ROW Component="DC.tlw" ComponentId="{6AB2FA4C-B100-4F6B-B24F-532F61EDC57B}" Directory_="waveforms_Dir" Attributes="0" KeyPath="DC.tlw" Type="0"/>
+    <ROW Component="DC.tlw_1" ComponentId="{5160514D-990F-4B97-835A-B48B2A2EC7AD}" Directory_="waveforms_1_Dir" Attributes="0" KeyPath="DC.tlw_1" Type="0"/>
+    <ROW Component="Labrador.exe" ComponentId="{BB480720-125A-4928-9415-437B7CF4246A}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="Labrador.exe"/>
+    <ROW Component="Labrador.exe_1" ComponentId="{46FC0063-9DC2-4E32-A7F7-63B0607B4799}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="Labrador.exe_1"/>
+    <ROW Component="ProductInformation" ComponentId="{CC4842CE-1300-4935-B118-8A382B8451F4}" Directory_="APPDIR" Attributes="4" KeyPath="Version"/>
+    <ROW Component="Qt5Core.dll" ComponentId="{4BD70018-B046-4CE8-BDD7-AB9D0F7E0815}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="Qt5Core.dll"/>
+    <ROW Component="Qt5Core.dll_1" ComponentId="{9FAD6699-A1CD-4B32-865F-01E2F61D017E}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="Qt5Core.dll_1"/>
+    <ROW Component="Qt5Gui.dll" ComponentId="{95E5559D-E30C-43AB-B98E-BA1EA1074615}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="Qt5Gui.dll"/>
+    <ROW Component="Qt5Gui.dll_1" ComponentId="{83042172-4906-48A5-9864-DEDA8DF5E390}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="Qt5Gui.dll_1"/>
+    <ROW Component="Qt5PrintSupport.dll" ComponentId="{E70F256F-DC72-4CAA-B8B5-F01B30C69C6B}" Directory_="APPDIR" Attributes="256" KeyPath="Qt5PrintSupport.dll"/>
+    <ROW Component="Qt5PrintSupport.dll_1" ComponentId="{1C90C457-FD43-4CC1-BA32-4054944F0167}" Directory_="AI_Bin32_Dir" Attributes="0" KeyPath="Qt5PrintSupport.dll_1"/>
+    <ROW Component="Qt5Svg.dll" ComponentId="{E7A1AEA1-02AB-4A18-8D79-AF02FBA90DE5}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="Qt5Svg.dll"/>
+    <ROW Component="Qt5Svg.dll_1" ComponentId="{CB5E5C84-8AD6-4168-B4A7-3BB37C937780}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="Qt5Svg.dll_1"/>
+    <ROW Component="Qt5Widgets.dll" ComponentId="{9B8D45BF-5B68-4FA2-B0E1-05E9833779C7}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="Qt5Widgets.dll"/>
+    <ROW Component="Qt5Widgets.dll_1" ComponentId="{4BAE5C21-EAFD-4728-B8DC-8A52834A4DB9}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="Qt5Widgets.dll_1"/>
+    <ROW Component="SHORTCUTDIR" ComponentId="{61E84CAC-9C81-4CBF-8034-00D4526F02C7}" Directory_="SHORTCUTDIR" Attributes="0"/>
+    <ROW Component="bit" ComponentId="{77BCADFA-29F2-43AD-857E-C4AEC07E5F69}" Directory_="AI_Sh32_Dir" Attributes="0" Condition="NOT VersionNT64"/>
+    <ROW Component="d3dcompiler_47.dll" ComponentId="{6D444814-4587-410C-83BA-E0A32A1380A2}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="d3dcompiler_47.dll"/>
+    <ROW Component="d3dcompiler_47.dll_1" ComponentId="{6F93F30E-7EE3-4E5C-902F-764EED9CD37D}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="d3dcompiler_47.dll_1"/>
+    <ROW Component="dfuprogrammer.exe" ComponentId="{6AF898D5-F6FE-4461-9314-1B68F30F29DF}" Directory_="firmware_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="dfuprogrammer.exe"/>
+    <ROW Component="dfuprogrammer.exe_1" ComponentId="{7C040F6A-8953-4815-99AB-D7FBD6A30CAD}" Directory_="firmware_1_Dir" Attributes="0" KeyPath="dfuprogrammer.exe_1"/>
+    <ROW Component="flash.bat" ComponentId="{74EAA6E3-5CD1-4861-8EA2-E6B7AEB3EE85}" Directory_="firmware_1_Dir" Attributes="0" KeyPath="flash.bat" Type="0"/>
+    <ROW Component="flash.bat_1" ComponentId="{DFAB802D-A71D-4046-AAC7-A062E30AB772}" Directory_="firmware_Dir" Attributes="0" KeyPath="flash.bat_1" Type="0"/>
+    <ROW Component="libEGL.dll" ComponentId="{462537F9-4714-4819-B0F8-F3B3594F1C8C}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="libEGL.dll"/>
+    <ROW Component="libEGL.dll_1" ComponentId="{113E6218-9C0B-4C0D-8A1A-1241D7073AB4}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="libEGL.dll_1"/>
+    <ROW Component="libGLESV2.dll" ComponentId="{018B4845-EB73-406E-98E8-703570EB695F}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="libGLESV2.dll"/>
+    <ROW Component="libGLESV2.dll_1" ComponentId="{5CD7BFA7-313C-4A37-AA70-D9E18D6C0262}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="libGLESV2.dll_1"/>
+    <ROW Component="libfftw33.dll" ComponentId="{68C66F03-8E9A-46BD-9193-89F711E5E8F6}" Directory_="AI_Bin32_Dir" Attributes="0" KeyPath="libfftw33.dll"/>
+    <ROW Component="libfftw33.dll_1" ComponentId="{AE30DCC7-71F2-4B91-9E34-F67E0ABEBC02}" Directory_="APPDIR" Attributes="256" KeyPath="libfftw33.dll_1"/>
+    <ROW Component="libusbK.dll" ComponentId="{497A40BB-0316-4F85-A5D4-BDA914BA9D24}" Directory_="APPDIR" Attributes="256" KeyPath="libusbK.dll"/>
+    <ROW Component="libusbK.dll_1" ComponentId="{CCB59671-4D82-488E-B8AC-8FE794153674}" Directory_="AI_Bin32_Dir" Attributes="0" KeyPath="libusbK.dll_1"/>
+    <ROW Component="opengl32sw.dll" ComponentId="{4C55F045-540C-40E1-AD20-DD74CDE340E5}" Directory_="APPDIR" Attributes="256" Condition="VersionNT64" KeyPath="opengl32sw.dll"/>
+    <ROW Component="opengl32sw.dll_1" ComponentId="{83519B80-34F3-41C7-B34B-F4BE9FB5EA2C}" Directory_="AI_Bin32_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="opengl32sw.dll_1"/>
+    <ROW Component="qgif.dll" ComponentId="{40AF7DDE-B468-4760-92CE-5F0688F3BF2D}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qgif.dll"/>
+    <ROW Component="qgif.dll_1" ComponentId="{4F6E26CC-7302-4DCC-B166-0F19181C3AD4}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qgif.dll_1"/>
+    <ROW Component="qicns.dll" ComponentId="{3ECA2F73-A01A-4D20-BF04-85B92BD0DEAA}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qicns.dll"/>
+    <ROW Component="qicns.dll_1" ComponentId="{D18E4515-D196-4CAD-BD68-636D5E60E759}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qicns.dll_1"/>
+    <ROW Component="qico.dll" ComponentId="{46689A41-DFB4-431C-B3C8-A793CAC2177D}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qico.dll"/>
+    <ROW Component="qico.dll_1" ComponentId="{86CA2EF7-3A57-494A-8CE9-F887122BB4C0}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qico.dll_1"/>
+    <ROW Component="qjpeg.dll" ComponentId="{F0D2667A-6308-4E2F-96A2-7DA189A39033}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qjpeg.dll"/>
+    <ROW Component="qjpeg.dll_1" ComponentId="{E80CA450-DC4A-4275-B862-7CB530371679}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qjpeg.dll_1"/>
+    <ROW Component="qsvg.dll" ComponentId="{63FF2EF7-5FE0-43DF-9E44-9A3C38F5189A}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qsvg.dll"/>
+    <ROW Component="qsvg.dll_1" ComponentId="{E4073AF6-E107-4C9C-B644-7D7B26A47D8B}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qsvg.dll_1"/>
+    <ROW Component="qsvgicon.dll" ComponentId="{09EB8986-B53D-458E-8389-2C7B860A5C57}" Directory_="iconengines_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qsvgicon.dll"/>
+    <ROW Component="qsvgicon.dll_1" ComponentId="{964E9845-3ED7-48C3-B5B8-680E95F61DCA}" Directory_="iconengines_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qsvgicon.dll_1"/>
+    <ROW Component="qt_ar.qm" ComponentId="{06B486D5-3C65-42CF-95ED-1FBED4BAE5ED}" Directory_="translations_Dir" Attributes="0" KeyPath="qt_ar.qm" Type="0"/>
+    <ROW Component="qt_ar.qm_1" ComponentId="{48D75EE6-44AF-4177-8788-D6B733D0DF78}" Directory_="translations_1_Dir" Attributes="0" KeyPath="qt_ar.qm_1" Type="0"/>
+    <ROW Component="qtga.dll" ComponentId="{0AF05667-E7E4-4A93-97EF-F23AC2ACB67C}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qtga.dll"/>
+    <ROW Component="qtga.dll_1" ComponentId="{28976056-8CA5-48DF-9A1F-BE0673A48A45}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qtga.dll_1"/>
+    <ROW Component="qtiff.dll" ComponentId="{FB317812-509C-4ADE-97E4-3938276BDAD7}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qtiff.dll"/>
+    <ROW Component="qtiff.dll_1" ComponentId="{79D529A2-44B7-422C-A063-36311348D701}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qtiff.dll_1"/>
+    <ROW Component="qwbmp.dll" ComponentId="{1F0AD261-099C-4B89-ADB9-EC1A7D48EDCE}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qwbmp.dll"/>
+    <ROW Component="qwbmp.dll_1" ComponentId="{86EDF041-3417-4B26-8F43-8A5D0FF93898}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qwbmp.dll_1"/>
+    <ROW Component="qwebp.dll" ComponentId="{3EAE2C89-4091-4F87-B3AF-443C8FA4472A}" Directory_="imageformats_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qwebp.dll"/>
+    <ROW Component="qwebp.dll_1" ComponentId="{0E6D9A5B-0D27-4589-927A-5C1350670A82}" Directory_="imageformats_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qwebp.dll_1"/>
+    <ROW Component="qwindows.dll" ComponentId="{B01BD1EC-E098-4472-A14C-60D2DCC0800B}" Directory_="platforms_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qwindows.dll"/>
+    <ROW Component="qwindows.dll_1" ComponentId="{2C9804D8-B6F0-4563-90B8-AA8779CF33B1}" Directory_="platforms_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qwindows.dll_1"/>
+    <ROW Component="qwindowsvistastyle.dll" ComponentId="{C268AF13-634A-4308-9BD2-E7CFEF777937}" Directory_="styles_Dir" Attributes="256" Condition="VersionNT64" KeyPath="qwindowsvistastyle.dll"/>
+    <ROW Component="qwindowsvistastyle.dll_1" ComponentId="{5BF26F27-B701-4B50-A7BB-E81999FDED45}" Directory_="styles_1_Dir" Attributes="0" Condition="NOT VersionNT64" KeyPath="qwindowsvistastyle.dll_1"/>
+    <ROW Component="windowsprintersupport.dll" ComponentId="{83D70292-A90E-4DCC-9317-31C394B42636}" Directory_="printsupport_Dir" Attributes="256" KeyPath="windowsprintersupport.dll"/>
+    <ROW Component="windowsprintersupport.dll_1" ComponentId="{6DBB01F2-433E-4013-97BE-363349DA8936}" Directory_="printsupport_1_Dir" Attributes="0" KeyPath="windowsprintersupport.dll_1"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiFeatsComponent">
+    <ROW Feature="AI32BitFiles" Title="32-bit" Description="32-bit Executables and Libraries" Display="5" Level="1" Directory_="APPDIR" Attributes="0" Components="Labrador.exe_1 Qt5Core.dll_1 Qt5Gui.dll_1 Qt5Svg.dll_1 Qt5Widgets.dll_1 bit d3dcompiler_47.dll_1 dfuprogrammer.exe libEGL.dll_1 libGLESV2.dll_1 opengl32sw.dll_1 qgif.dll_1 qicns.dll_1 qico.dll_1 qjpeg.dll_1 qsvg.dll_1 qsvgicon.dll_1 qtga.dll_1 qtiff.dll_1 qwbmp.dll_1 qwebp.dll_1 qwindows.dll_1 qwindowsvistastyle.dll_1"/>
+    <ROW Feature="AI64BitFiles" Title="64-bit" Description="64-bit Executables and Libraries" Display="3" Level="1" Directory_="APPDIR" Attributes="0" Components="Labrador.exe Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll SHORTCUTDIR d3dcompiler_47.dll libEGL.dll libGLESV2.dll opengl32sw.dll qgif.dll qicns.dll qico.dll qjpeg.dll qsvg.dll qsvgicon.dll qtga.dll qtiff.dll qwbmp.dll qwebp.dll qwindows.dll qwindowsvistastyle.dll"/>
+    <ROW Feature="B35B3203FEB4CFFA576A27CB835D3E6" Title="Visual C++ Redistributable for Visual Studio 2017 x86" Description="Visual C++ Redistributable for Visual Studio 2017 x86" Display="13" Level="1" Attributes="0" Components="B35B3203FEB4CFFA576A27CB835D3E6"/>
+    <ROW Feature="D36C9FE0826D4D2B9C2DDCCE2C83E860" Title="Visual C++ Redistributable for Visual Studio 2017 x64" Description="Visual C++ Redistributable for Visual Studio 2017 x64" Display="11" Level="1" Attributes="0" Components="D36C9FE0826D4D2B9C2DDCCE2C83E860"/>
+    <ROW Feature="MainFeature" Title="MainFeature" Description="Description" Display="1" Level="1" Directory_="APPDIR" Attributes="0" Components="AI_ExePath DC.tlw DC.tlw_1 ProductInformation Qt5PrintSupport.dll Qt5PrintSupport.dll_1 dfuprogrammer.exe_1 flash.bat flash.bat_1 libfftw33.dll libfftw33.dll_1 libusbK.dll libusbK.dll_1 qt_ar.qm qt_ar.qm_1 windowsprintersupport.dll windowsprintersupport.dll_1"/>
+    <ATTRIBUTE name="CurrentFeature" value="MainFeature"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiFilesComponent">
+    <ROW File="DC.tlw" Component_="DC.tlw" FileName="DC.tlw" Attributes="0" SourcePath="bin64\waveforms\DC.tlw" SelfReg="false" NextFile="Sawtooth.tlw"/>
+    <ROW File="DC.tlw_1" Component_="DC.tlw_1" FileName="DC.tlw" Attributes="0" SourcePath="bin32\waveforms\DC.tlw" SelfReg="false" NextFile="Sawtooth.tlw_1"/>
+    <ROW File="Labrador.exe" Component_="Labrador.exe" FileName="Labrador.exe" Attributes="0" SourcePath="bin64\Labrador.exe" SelfReg="false" NextFile="libEGL.dll" DigSign="true"/>
+    <ROW File="Labrador.exe_1" Component_="Labrador.exe_1" FileName="Labrador.exe" Attributes="0" SourcePath="bin32\Labrador.exe" SelfReg="false" NextFile="libEGL.dll_1" DigSign="true"/>
+    <ROW File="Qt5Core.dll" Component_="Qt5Core.dll" FileName="Qt5Core.dll" Attributes="0" SourcePath="bin64\Qt5Core.dll" SelfReg="false" NextFile="Qt5Gui.dll"/>
+    <ROW File="Qt5Core.dll_1" Component_="Qt5Core.dll_1" FileName="Qt5Core.dll" Attributes="0" SourcePath="bin32\Qt5Core.dll" SelfReg="false" NextFile="Qt5Gui.dll_1"/>
+    <ROW File="Qt5Gui.dll" Component_="Qt5Gui.dll" FileName="Qt5Gui.dll" Attributes="0" SourcePath="bin64\Qt5Gui.dll" SelfReg="false" NextFile="Qt5Svg.dll"/>
+    <ROW File="Qt5Gui.dll_1" Component_="Qt5Gui.dll_1" FileName="Qt5Gui.dll" Attributes="0" SourcePath="bin32\Qt5Gui.dll" SelfReg="false" NextFile="Qt5Svg.dll_1"/>
+    <ROW File="Qt5PrintSupport.dll" Component_="Qt5PrintSupport.dll" FileName="QT5PRI~1.DLL|Qt5PrintSupport.dll" Attributes="0" SourcePath="bin64\Qt5PrintSupport.dll" SelfReg="false" NextFile="windowsprintersupport.dll"/>
+    <ROW File="Qt5PrintSupport.dll_1" Component_="Qt5PrintSupport.dll_1" FileName="QT5PRI~1.DLL|Qt5PrintSupport.dll" Attributes="0" SourcePath="bin32\Qt5PrintSupport.dll" SelfReg="false" NextFile="libfftw33.dll"/>
+    <ROW File="Qt5Svg.dll" Component_="Qt5Svg.dll" FileName="Qt5Svg.dll" Attributes="0" SourcePath="bin64\Qt5Svg.dll" SelfReg="false" NextFile="Qt5Widgets.dll"/>
+    <ROW File="Qt5Svg.dll_1" Component_="Qt5Svg.dll_1" FileName="Qt5Svg.dll" Attributes="0" SourcePath="bin32\Qt5Svg.dll" SelfReg="false" NextFile="Qt5Widgets.dll_1"/>
+    <ROW File="Qt5Widgets.dll" Component_="Qt5Widgets.dll" FileName="QT5WID~1.DLL|Qt5Widgets.dll" Attributes="0" SourcePath="bin64\Qt5Widgets.dll" SelfReg="false" NextFile="qsvgicon.dll"/>
+    <ROW File="Qt5Widgets.dll_1" Component_="Qt5Widgets.dll_1" FileName="QT5WID~1.DLL|Qt5Widgets.dll" Attributes="0" SourcePath="bin32\Qt5Widgets.dll" SelfReg="false" NextFile="dfuprogrammer.exe"/>
+    <ROW File="Sawtooth.tlw" Component_="DC.tlw" FileName="Sawtooth.tlw" Attributes="0" SourcePath="bin64\waveforms\Sawtooth.tlw" SelfReg="false" NextFile="Sin.tlw"/>
+    <ROW File="Sawtooth.tlw_1" Component_="DC.tlw_1" FileName="Sawtooth.tlw" Attributes="0" SourcePath="bin32\waveforms\Sawtooth.tlw" SelfReg="false" NextFile="Sin.tlw_1"/>
+    <ROW File="Sin.tlw" Component_="DC.tlw" FileName="Sin.tlw" Attributes="0" SourcePath="bin64\waveforms\Sin.tlw" SelfReg="false" NextFile="Square.tlw"/>
+    <ROW File="Sin.tlw_1" Component_="DC.tlw_1" FileName="Sin.tlw" Attributes="0" SourcePath="bin32\waveforms\Sin.tlw" SelfReg="false" NextFile="Square.tlw_1"/>
+    <ROW File="Square.tlw" Component_="DC.tlw" FileName="Square.tlw" Attributes="0" SourcePath="bin64\waveforms\Square.tlw" SelfReg="false" NextFile="Triangle.tlw"/>
+    <ROW File="Square.tlw_1" Component_="DC.tlw_1" FileName="Square.tlw" Attributes="0" SourcePath="bin32\waveforms\Square.tlw" SelfReg="false" NextFile="Triangle.tlw_1"/>
+    <ROW File="Triangle.tlw" Component_="DC.tlw" FileName="Triangle.tlw" Attributes="0" SourcePath="bin64\waveforms\Triangle.tlw" SelfReg="false" NextFile="_list.wfl"/>
+    <ROW File="Triangle.tlw_1" Component_="DC.tlw_1" FileName="Triangle.tlw" Attributes="0" SourcePath="bin32\waveforms\Triangle.tlw" SelfReg="false" NextFile="_list.wfl_1"/>
+    <ROW File="_list.wfl" Component_="DC.tlw" FileName="_list.wfl" Attributes="0" SourcePath="bin64\waveforms\_list.wfl" SelfReg="false" NextFile="qt_ar.qm"/>
+    <ROW File="_list.wfl_1" Component_="DC.tlw_1" FileName="_list.wfl" Attributes="0" SourcePath="bin32\waveforms\_list.wfl" SelfReg="false" NextFile="Qt5PrintSupport.dll"/>
+    <ROW File="d3dcompiler_47.dll" Component_="d3dcompiler_47.dll" FileName="D3DCOM~1.DLL|d3dcompiler_47.dll" Attributes="0" SourcePath="bin64\d3dcompiler_47.dll" SelfReg="false" NextFile="Labrador.exe"/>
+    <ROW File="d3dcompiler_47.dll_1" Component_="d3dcompiler_47.dll_1" FileName="D3DCOM~1.DLL|d3dcompiler_47.dll" Attributes="0" SourcePath="bin32\d3dcompiler_47.dll" SelfReg="false" NextFile="Labrador.exe_1"/>
+    <ROW File="dfuprogrammer.exe" Component_="dfuprogrammer.exe" FileName="DFU-PR~1.EXE|dfu-programmer.exe" Attributes="0" SourcePath="bin32\firmware\dfu-programmer.exe" SelfReg="false" NextFile="qsvgicon.dll_1" DigSign="true"/>
+    <ROW File="dfuprogrammer.exe_1" Component_="dfuprogrammer.exe_1" FileName="DFU-PR~1.EXE|dfu-programmer.exe" Attributes="0" SourcePath="bin64\firmware\dfu-programmer.exe" SelfReg="false" NextFile="flash.bat" DigSign="true"/>
+    <ROW File="flash.bat" Component_="flash.bat" FileName="flash.bat" Attributes="0" SourcePath="bin64\firmware\flash.bat" SelfReg="false" NextFile="labrafirm_0001_01.hex"/>
+    <ROW File="flash.bat_1" Component_="flash.bat_1" FileName="flash.bat" Attributes="0" SourcePath="bin32\firmware\flash.bat" SelfReg="false" NextFile="labrafirm_0001_01.hex_1"/>
+    <ROW File="labrafirm_0001_01.hex" Component_="flash.bat" FileName="LABRAF~1.HEX|labrafirm_0001_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0001_01.hex" SelfReg="false" NextFile="labrafirm_0003_01.hex"/>
+    <ROW File="labrafirm_0001_01.hex_1" Component_="flash.bat_1" FileName="LABRAF~1.HEX|labrafirm_0001_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0001_01.hex" SelfReg="false" NextFile="labrafirm_0003_01.hex_1"/>
+    <ROW File="labrafirm_0003_01.hex" Component_="flash.bat" FileName="LABRAF~2.HEX|labrafirm_0003_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0003_01.hex" SelfReg="false" NextFile="labrafirm_0003_02.hex"/>
+    <ROW File="labrafirm_0003_01.hex_1" Component_="flash.bat_1" FileName="LABRAF~2.HEX|labrafirm_0003_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0003_01.hex" SelfReg="false" NextFile="labrafirm_0003_02.hex_1"/>
+    <ROW File="labrafirm_0003_02.hex" Component_="flash.bat" FileName="LABRAF~3.HEX|labrafirm_0003_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0003_02.hex" SelfReg="false" NextFile="labrafirm_0004_01.hex"/>
+    <ROW File="labrafirm_0003_02.hex_1" Component_="flash.bat_1" FileName="LABRAF~3.HEX|labrafirm_0003_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0003_02.hex" SelfReg="false" NextFile="labrafirm_0004_01.hex_1"/>
+    <ROW File="labrafirm_0004_01.hex" Component_="flash.bat" FileName="LABRAF~4.HEX|labrafirm_0004_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0004_01.hex" SelfReg="false" NextFile="labrafirm_0004_02.hex"/>
+    <ROW File="labrafirm_0004_01.hex_1" Component_="flash.bat_1" FileName="LABRAF~4.HEX|labrafirm_0004_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0004_01.hex" SelfReg="false" NextFile="labrafirm_0004_02.hex_1"/>
+    <ROW File="labrafirm_0004_02.hex" Component_="flash.bat" FileName="LABRAF~5.HEX|labrafirm_0004_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0004_02.hex" SelfReg="false" NextFile="labrafirm_0005_01.hex"/>
+    <ROW File="labrafirm_0004_02.hex_1" Component_="flash.bat_1" FileName="LABRAF~5.HEX|labrafirm_0004_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0004_02.hex" SelfReg="false" NextFile="labrafirm_0005_01.hex_1"/>
+    <ROW File="labrafirm_0005_01.hex" Component_="flash.bat" FileName="LABRAF~6.HEX|labrafirm_0005_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0005_01.hex" SelfReg="false" NextFile="labrafirm_0005_02.hex"/>
+    <ROW File="labrafirm_0005_01.hex_1" Component_="flash.bat_1" FileName="LABRAF~6.HEX|labrafirm_0005_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0005_01.hex" SelfReg="false" NextFile="labrafirm_0005_02.hex_1"/>
+    <ROW File="labrafirm_0005_02.hex" Component_="flash.bat" FileName="LABRAF~7.HEX|labrafirm_0005_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0005_02.hex" SelfReg="false" NextFile="labrafirm_0006_01.hex"/>
+    <ROW File="labrafirm_0005_02.hex_1" Component_="flash.bat_1" FileName="LABRAF~7.HEX|labrafirm_0005_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0005_02.hex" SelfReg="false" NextFile="labrafirm_0006_01.hex_1"/>
+    <ROW File="labrafirm_0006_01.hex" Component_="flash.bat" FileName="LABRAF~8.HEX|labrafirm_0006_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0006_01.hex" SelfReg="false" NextFile="labrafirm_0006_02.hex"/>
+    <ROW File="labrafirm_0006_01.hex_1" Component_="flash.bat_1" FileName="LABRAF~8.HEX|labrafirm_0006_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0006_01.hex" SelfReg="false" NextFile="labrafirm_0006_02.hex_1"/>
+    <ROW File="labrafirm_0006_02.hex" Component_="flash.bat" FileName="LABRAF~9.HEX|labrafirm_0006_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0006_02.hex" SelfReg="false" NextFile="wipe.bat"/>
+    <ROW File="labrafirm_0006_02.hex_1" Component_="flash.bat_1" FileName="LABRAF~9.HEX|labrafirm_0006_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0006_02.hex" SelfReg="false" NextFile="wipe.bat_1"/>
+    <ROW File="labrafirm_0007_01.hex" Component_="flash.bat" FileName="LABRA~10.HEX|labrafirm_0007_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0007_01.hex" SelfReg="false" NextFile="labrafirm_0007_02.hex"/>
+    <ROW File="labrafirm_0007_01.hex_1" Component_="flash.bat_1" FileName="LABRA~10.HEX|labrafirm_0007_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0007_01.hex" SelfReg="false" NextFile="labrafirm_0007_02.hex_1"/>
+    <ROW File="labrafirm_0007_02.hex" Component_="flash.bat" FileName="LABRA~11.HEX|labrafirm_0007_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0007_02.hex" SelfReg="false" NextFile="labrafirm_0007_01.hex_1"/>
+    <ROW File="labrafirm_0007_02.hex_1" Component_="flash.bat_1" FileName="LABRA~11.HEX|labrafirm_0007_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0007_02.hex" SelfReg="false" NextFile="qt_tr.qm"/>
+    <ROW File="libEGL.dll" Component_="libEGL.dll" FileName="libEGL.dll" Attributes="0" SourcePath="bin64\libEGL.dll" SelfReg="false" NextFile="libGLESV2.dll"/>
+    <ROW File="libEGL.dll_1" Component_="libEGL.dll_1" FileName="libEGL.dll" Attributes="0" SourcePath="bin32\libEGL.dll" SelfReg="false" NextFile="libGLESV2.dll_1"/>
+    <ROW File="libGLESV2.dll" Component_="libGLESV2.dll" FileName="LIBGLE~1.DLL|libGLESV2.dll" Attributes="0" SourcePath="bin64\libGLESV2.dll" SelfReg="false" NextFile="opengl32sw.dll"/>
+    <ROW File="libGLESV2.dll_1" Component_="libGLESV2.dll_1" FileName="LIBGLE~1.DLL|libGLESV2.dll" Attributes="0" SourcePath="bin32\libGLESV2.dll" SelfReg="false" NextFile="opengl32sw.dll_1"/>
+    <ROW File="libfftw33.dll" Component_="libfftw33.dll" FileName="LIBFFT~1.DLL|libfftw3-3.dll" Attributes="0" SourcePath="bin32\libfftw3-3.dll" SelfReg="false" NextFile="libfftw33.dll_1"/>
+    <ROW File="libfftw33.dll_1" Component_="libfftw33.dll_1" FileName="LIBFFT~1.DLL|libfftw3-3.dll" Attributes="0" SourcePath="bin64\libfftw3-3.dll" SelfReg="false" NextFile="labrafirm_0007_01.hex"/>
+    <ROW File="libusbK.dll" Component_="libusbK.dll" FileName="libusbK.dll" Attributes="0" SourcePath="bin64\libusbK.dll" SelfReg="false" NextFile="libusbK.dll_1"/>
+    <ROW File="libusbK.dll_1" Component_="libusbK.dll_1" FileName="libusbK.dll" Attributes="0" SourcePath="bin32\libusbK.dll" SelfReg="false" NextFile="dfuprogrammer.exe_1"/>
+    <ROW File="opengl32sw.dll" Component_="opengl32sw.dll" FileName="OPENGL~1.DLL|opengl32sw.dll" Attributes="0" SourcePath="bin64\opengl32sw.dll" SelfReg="false" NextFile="Qt5Core.dll"/>
+    <ROW File="opengl32sw.dll_1" Component_="opengl32sw.dll_1" FileName="OPENGL~1.DLL|opengl32sw.dll" Attributes="0" SourcePath="bin32\opengl32sw.dll" SelfReg="false" NextFile="Qt5Core.dll_1"/>
+    <ROW File="qgif.dll" Component_="qgif.dll" FileName="qgif.dll" Attributes="0" SourcePath="bin64\imageformats\qgif.dll" SelfReg="false" NextFile="qicns.dll"/>
+    <ROW File="qgif.dll_1" Component_="qgif.dll_1" FileName="qgif.dll" Attributes="0" SourcePath="bin32\imageformats\qgif.dll" SelfReg="false" NextFile="qicns.dll_1"/>
+    <ROW File="qicns.dll" Component_="qicns.dll" FileName="qicns.dll" Attributes="0" SourcePath="bin64\imageformats\qicns.dll" SelfReg="false" NextFile="qico.dll"/>
+    <ROW File="qicns.dll_1" Component_="qicns.dll_1" FileName="qicns.dll" Attributes="0" SourcePath="bin32\imageformats\qicns.dll" SelfReg="false" NextFile="qico.dll_1"/>
+    <ROW File="qico.dll" Component_="qico.dll" FileName="qico.dll" Attributes="0" SourcePath="bin64\imageformats\qico.dll" SelfReg="false" NextFile="qjpeg.dll"/>
+    <ROW File="qico.dll_1" Component_="qico.dll_1" FileName="qico.dll" Attributes="0" SourcePath="bin32\imageformats\qico.dll" SelfReg="false" NextFile="qjpeg.dll_1"/>
+    <ROW File="qjpeg.dll" Component_="qjpeg.dll" FileName="qjpeg.dll" Attributes="0" SourcePath="bin64\imageformats\qjpeg.dll" SelfReg="false" NextFile="qsvg.dll"/>
+    <ROW File="qjpeg.dll_1" Component_="qjpeg.dll_1" FileName="qjpeg.dll" Attributes="0" SourcePath="bin32\imageformats\qjpeg.dll" SelfReg="false" NextFile="qsvg.dll_1"/>
+    <ROW File="qsvg.dll" Component_="qsvg.dll" FileName="qsvg.dll" Attributes="0" SourcePath="bin64\imageformats\qsvg.dll" SelfReg="false" NextFile="qtga.dll"/>
+    <ROW File="qsvg.dll_1" Component_="qsvg.dll_1" FileName="qsvg.dll" Attributes="0" SourcePath="bin32\imageformats\qsvg.dll" SelfReg="false" NextFile="qtga.dll_1"/>
+    <ROW File="qsvgicon.dll" Component_="qsvgicon.dll" FileName="qsvgicon.dll" Attributes="0" SourcePath="bin64\iconengines\qsvgicon.dll" SelfReg="false" NextFile="qgif.dll"/>
+    <ROW File="qsvgicon.dll_1" Component_="qsvgicon.dll_1" FileName="qsvgicon.dll" Attributes="0" SourcePath="bin32\iconengines\qsvgicon.dll" SelfReg="false" NextFile="qgif.dll_1"/>
+    <ROW File="qt_ar.qm" Component_="qt_ar.qm" FileName="qt_ar.qm" Attributes="0" SourcePath="bin64\translations\qt_ar.qm" SelfReg="false" NextFile="qt_bg.qm"/>
+    <ROW File="qt_ar.qm_1" Component_="qt_ar.qm_1" FileName="qt_ar.qm" Attributes="0" SourcePath="bin32\translations\qt_ar.qm" SelfReg="false" NextFile="qt_bg.qm_1"/>
+    <ROW File="qt_bg.qm" Component_="qt_ar.qm" FileName="qt_bg.qm" Attributes="0" SourcePath="bin64\translations\qt_bg.qm" SelfReg="false" NextFile="qt_ca.qm"/>
+    <ROW File="qt_bg.qm_1" Component_="qt_ar.qm_1" FileName="qt_bg.qm" Attributes="0" SourcePath="bin32\translations\qt_bg.qm" SelfReg="false" NextFile="qt_ca.qm_1"/>
+    <ROW File="qt_ca.qm" Component_="qt_ar.qm" FileName="qt_ca.qm" Attributes="0" SourcePath="bin64\translations\qt_ca.qm" SelfReg="false" NextFile="qt_cs.qm"/>
+    <ROW File="qt_ca.qm_1" Component_="qt_ar.qm_1" FileName="qt_ca.qm" Attributes="0" SourcePath="bin32\translations\qt_ca.qm" SelfReg="false" NextFile="qt_cs.qm_1"/>
+    <ROW File="qt_cs.qm" Component_="qt_ar.qm" FileName="qt_cs.qm" Attributes="0" SourcePath="bin64\translations\qt_cs.qm" SelfReg="false" NextFile="qt_da.qm"/>
+    <ROW File="qt_cs.qm_1" Component_="qt_ar.qm_1" FileName="qt_cs.qm" Attributes="0" SourcePath="bin32\translations\qt_cs.qm" SelfReg="false" NextFile="qt_da.qm_1"/>
+    <ROW File="qt_da.qm" Component_="qt_ar.qm" FileName="qt_da.qm" Attributes="0" SourcePath="bin64\translations\qt_da.qm" SelfReg="false" NextFile="qt_de.qm"/>
+    <ROW File="qt_da.qm_1" Component_="qt_ar.qm_1" FileName="qt_da.qm" Attributes="0" SourcePath="bin32\translations\qt_da.qm" SelfReg="false" NextFile="qt_de.qm_1"/>
+    <ROW File="qt_de.qm" Component_="qt_ar.qm" FileName="qt_de.qm" Attributes="0" SourcePath="bin64\translations\qt_de.qm" SelfReg="false" NextFile="qt_en.qm"/>
+    <ROW File="qt_de.qm_1" Component_="qt_ar.qm_1" FileName="qt_de.qm" Attributes="0" SourcePath="bin32\translations\qt_de.qm" SelfReg="false" NextFile="qt_en.qm_1"/>
+    <ROW File="qt_en.qm" Component_="qt_ar.qm" FileName="qt_en.qm" Attributes="0" SourcePath="bin64\translations\qt_en.qm" SelfReg="false" NextFile="qt_es.qm"/>
+    <ROW File="qt_en.qm_1" Component_="qt_ar.qm_1" FileName="qt_en.qm" Attributes="0" SourcePath="bin32\translations\qt_en.qm" SelfReg="false" NextFile="qt_es.qm_1"/>
+    <ROW File="qt_es.qm" Component_="qt_ar.qm" FileName="qt_es.qm" Attributes="0" SourcePath="bin64\translations\qt_es.qm" SelfReg="false" NextFile="qt_fi.qm"/>
+    <ROW File="qt_es.qm_1" Component_="qt_ar.qm_1" FileName="qt_es.qm" Attributes="0" SourcePath="bin32\translations\qt_es.qm" SelfReg="false" NextFile="qt_fi.qm_1"/>
+    <ROW File="qt_fi.qm" Component_="qt_ar.qm" FileName="qt_fi.qm" Attributes="0" SourcePath="bin64\translations\qt_fi.qm" SelfReg="false" NextFile="qt_fr.qm"/>
+    <ROW File="qt_fi.qm_1" Component_="qt_ar.qm_1" FileName="qt_fi.qm" Attributes="0" SourcePath="bin32\translations\qt_fi.qm" SelfReg="false" NextFile="qt_fr.qm_1"/>
+    <ROW File="qt_fr.qm" Component_="qt_ar.qm" FileName="qt_fr.qm" Attributes="0" SourcePath="bin64\translations\qt_fr.qm" SelfReg="false" NextFile="qt_gd.qm"/>
+    <ROW File="qt_fr.qm_1" Component_="qt_ar.qm_1" FileName="qt_fr.qm" Attributes="0" SourcePath="bin32\translations\qt_fr.qm" SelfReg="false" NextFile="qt_gd.qm_1"/>
+    <ROW File="qt_gd.qm" Component_="qt_ar.qm" FileName="qt_gd.qm" Attributes="0" SourcePath="bin64\translations\qt_gd.qm" SelfReg="false" NextFile="qt_he.qm"/>
+    <ROW File="qt_gd.qm_1" Component_="qt_ar.qm_1" FileName="qt_gd.qm" Attributes="0" SourcePath="bin32\translations\qt_gd.qm" SelfReg="false" NextFile="qt_he.qm_1"/>
+    <ROW File="qt_he.qm" Component_="qt_ar.qm" FileName="qt_he.qm" Attributes="0" SourcePath="bin64\translations\qt_he.qm" SelfReg="false" NextFile="qt_hu.qm"/>
+    <ROW File="qt_he.qm_1" Component_="qt_ar.qm_1" FileName="qt_he.qm" Attributes="0" SourcePath="bin32\translations\qt_he.qm" SelfReg="false" NextFile="qt_hu.qm_1"/>
+    <ROW File="qt_hu.qm" Component_="qt_ar.qm" FileName="qt_hu.qm" Attributes="0" SourcePath="bin64\translations\qt_hu.qm" SelfReg="false" NextFile="qt_it.qm"/>
+    <ROW File="qt_hu.qm_1" Component_="qt_ar.qm_1" FileName="qt_hu.qm" Attributes="0" SourcePath="bin32\translations\qt_hu.qm" SelfReg="false" NextFile="qt_it.qm_1"/>
+    <ROW File="qt_it.qm" Component_="qt_ar.qm" FileName="qt_it.qm" Attributes="0" SourcePath="bin64\translations\qt_it.qm" SelfReg="false" NextFile="qt_ja.qm"/>
+    <ROW File="qt_it.qm_1" Component_="qt_ar.qm_1" FileName="qt_it.qm" Attributes="0" SourcePath="bin32\translations\qt_it.qm" SelfReg="false" NextFile="qt_ja.qm_1"/>
+    <ROW File="qt_ja.qm" Component_="qt_ar.qm" FileName="qt_ja.qm" Attributes="0" SourcePath="bin64\translations\qt_ja.qm" SelfReg="false" NextFile="qt_ko.qm"/>
+    <ROW File="qt_ja.qm_1" Component_="qt_ar.qm_1" FileName="qt_ja.qm" Attributes="0" SourcePath="bin32\translations\qt_ja.qm" SelfReg="false" NextFile="qt_ko.qm_1"/>
+    <ROW File="qt_ko.qm" Component_="qt_ar.qm" FileName="qt_ko.qm" Attributes="0" SourcePath="bin64\translations\qt_ko.qm" SelfReg="false" NextFile="qt_lv.qm"/>
+    <ROW File="qt_ko.qm_1" Component_="qt_ar.qm_1" FileName="qt_ko.qm" Attributes="0" SourcePath="bin32\translations\qt_ko.qm" SelfReg="false" NextFile="qt_lv.qm_1"/>
+    <ROW File="qt_lv.qm" Component_="qt_ar.qm" FileName="qt_lv.qm" Attributes="0" SourcePath="bin64\translations\qt_lv.qm" SelfReg="false" NextFile="qt_pl.qm"/>
+    <ROW File="qt_lv.qm_1" Component_="qt_ar.qm_1" FileName="qt_lv.qm" Attributes="0" SourcePath="bin32\translations\qt_lv.qm" SelfReg="false" NextFile="qt_pl.qm_1"/>
+    <ROW File="qt_pl.qm" Component_="qt_ar.qm" FileName="qt_pl.qm" Attributes="0" SourcePath="bin64\translations\qt_pl.qm" SelfReg="false" NextFile="qt_ru.qm"/>
+    <ROW File="qt_pl.qm_1" Component_="qt_ar.qm_1" FileName="qt_pl.qm" Attributes="0" SourcePath="bin32\translations\qt_pl.qm" SelfReg="false" NextFile="qt_ru.qm_1"/>
+    <ROW File="qt_ru.qm" Component_="qt_ar.qm" FileName="qt_ru.qm" Attributes="0" SourcePath="bin64\translations\qt_ru.qm" SelfReg="false" NextFile="qt_sk.qm"/>
+    <ROW File="qt_ru.qm_1" Component_="qt_ar.qm_1" FileName="qt_ru.qm" Attributes="0" SourcePath="bin32\translations\qt_ru.qm" SelfReg="false" NextFile="qt_sk.qm_1"/>
+    <ROW File="qt_sk.qm" Component_="qt_ar.qm" FileName="qt_sk.qm" Attributes="0" SourcePath="bin64\translations\qt_sk.qm" SelfReg="false" NextFile="qt_uk.qm"/>
+    <ROW File="qt_sk.qm_1" Component_="qt_ar.qm_1" FileName="qt_sk.qm" Attributes="0" SourcePath="bin32\translations\qt_sk.qm" SelfReg="false" NextFile="qt_uk.qm_1"/>
+    <ROW File="qt_tr.qm" Component_="qt_ar.qm" FileName="qt_tr.qm" Attributes="0" SourcePath="bin64\translations\qt_tr.qm" SelfReg="false" NextFile="qt_zh_TW.qm"/>
+    <ROW File="qt_tr.qm_1" Component_="qt_ar.qm_1" FileName="qt_tr.qm" Attributes="0" SourcePath="bin32\translations\qt_tr.qm" SelfReg="false" NextFile="qt_zh_TW.qm_1"/>
+    <ROW File="qt_uk.qm" Component_="qt_ar.qm" FileName="qt_uk.qm" Attributes="0" SourcePath="bin64\translations\qt_uk.qm" SelfReg="false" NextFile="flash.bat_1"/>
+    <ROW File="qt_uk.qm_1" Component_="qt_ar.qm_1" FileName="qt_uk.qm" Attributes="0" SourcePath="bin32\translations\qt_uk.qm" SelfReg="false" NextFile="DC.tlw_1"/>
+    <ROW File="qt_zh_TW.qm" Component_="qt_ar.qm" FileName="qt_zh_TW.qm" Attributes="0" SourcePath="bin64\translations\qt_zh_TW.qm" SelfReg="false" NextFile="qt_tr.qm_1"/>
+    <ROW File="qt_zh_TW.qm_1" Component_="qt_ar.qm_1" FileName="qt_zh_TW.qm" Attributes="0" SourcePath="bin32\translations\qt_zh_TW.qm" SelfReg="false"/>
+    <ROW File="qtga.dll" Component_="qtga.dll" FileName="qtga.dll" Attributes="0" SourcePath="bin64\imageformats\qtga.dll" SelfReg="false" NextFile="qtiff.dll"/>
+    <ROW File="qtga.dll_1" Component_="qtga.dll_1" FileName="qtga.dll" Attributes="0" SourcePath="bin32\imageformats\qtga.dll" SelfReg="false" NextFile="qtiff.dll_1"/>
+    <ROW File="qtiff.dll" Component_="qtiff.dll" FileName="qtiff.dll" Attributes="0" SourcePath="bin64\imageformats\qtiff.dll" SelfReg="false" NextFile="qwbmp.dll"/>
+    <ROW File="qtiff.dll_1" Component_="qtiff.dll_1" FileName="qtiff.dll" Attributes="0" SourcePath="bin32\imageformats\qtiff.dll" SelfReg="false" NextFile="qwbmp.dll_1"/>
+    <ROW File="qwbmp.dll" Component_="qwbmp.dll" FileName="qwbmp.dll" Attributes="0" SourcePath="bin64\imageformats\qwbmp.dll" SelfReg="false" NextFile="qwebp.dll"/>
+    <ROW File="qwbmp.dll_1" Component_="qwbmp.dll_1" FileName="qwbmp.dll" Attributes="0" SourcePath="bin32\imageformats\qwbmp.dll" SelfReg="false" NextFile="qwebp.dll_1"/>
+    <ROW File="qwebp.dll" Component_="qwebp.dll" FileName="qwebp.dll" Attributes="0" SourcePath="bin64\imageformats\qwebp.dll" SelfReg="false" NextFile="qwindows.dll"/>
+    <ROW File="qwebp.dll_1" Component_="qwebp.dll_1" FileName="qwebp.dll" Attributes="0" SourcePath="bin32\imageformats\qwebp.dll" SelfReg="false" NextFile="qwindows.dll_1"/>
+    <ROW File="qwindows.dll" Component_="qwindows.dll" FileName="qwindows.dll" Attributes="0" SourcePath="bin64\platforms\qwindows.dll" SelfReg="false" NextFile="qwindowsvistastyle.dll"/>
+    <ROW File="qwindows.dll_1" Component_="qwindows.dll_1" FileName="qwindows.dll" Attributes="0" SourcePath="bin32\platforms\qwindows.dll" SelfReg="false" NextFile="qwindowsvistastyle.dll_1"/>
+    <ROW File="qwindowsvistastyle.dll" Component_="qwindowsvistastyle.dll" FileName="QWINDO~1.DLL|qwindowsvistastyle.dll" Attributes="0" SourcePath="bin64\styles\qwindowsvistastyle.dll" SelfReg="false" NextFile="d3dcompiler_47.dll_1"/>
+    <ROW File="qwindowsvistastyle.dll_1" Component_="qwindowsvistastyle.dll_1" FileName="QWINDO~1.DLL|qwindowsvistastyle.dll" Attributes="0" SourcePath="bin32\styles\qwindowsvistastyle.dll" SelfReg="false" NextFile="libusbK.dll"/>
+    <ROW File="windowsprintersupport.dll" Component_="windowsprintersupport.dll" FileName="WINDOW~1.DLL|windowsprintersupport.dll" Attributes="0" SourcePath="bin64\printsupport\windowsprintersupport.dll" SelfReg="false" NextFile="windowsprintersupport.dll_1"/>
+    <ROW File="windowsprintersupport.dll_1" Component_="windowsprintersupport.dll_1" FileName="WINDOW~1.DLL|windowsprintersupport.dll" Attributes="0" SourcePath="bin32\printsupport\windowsprintersupport.dll" SelfReg="false" NextFile="Qt5PrintSupport.dll_1"/>
+    <ROW File="wipe.bat" Component_="flash.bat" FileName="wipe.bat" Attributes="0" SourcePath="bin64\firmware\wipe.bat" SelfReg="false" NextFile="DC.tlw"/>
+    <ROW File="wipe.bat_1" Component_="flash.bat_1" FileName="wipe.bat" Attributes="0" SourcePath="bin32\firmware\wipe.bat" SelfReg="false" NextFile="qt_ar.qm_1"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.BuildComponent">
+    <ROW BuildKey="DefaultBuild" BuildName="DefaultBuild" BuildOrder="1" BuildType="0" Languages="en" InstallationType="4" CabsLocation="1" PackageType="1" FilesInsideExe="true" ExtractionFolder="[AppDataFolder][|Manufacturer]\[|ProductName] [|ProductVersion]\install" ExtUI="true" UseLargeSchema="true" ExeName="Labrador_Installer" MsiPackageType="AI_ALL"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.DictionaryComponent">
+    <ROW Path="&lt;AI_DICTS&gt;ui.ail"/>
+    <ROW Path="&lt;AI_DICTS&gt;ui_en.ail"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.FragmentComponent">
+    <ROW Fragment="CommonUI.aip" Path="&lt;AI_FRAGS&gt;CommonUI.aip"/>
+    <ROW Fragment="FolderDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\FolderDlg.aip"/>
+    <ROW Fragment="MaintenanceTypeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\MaintenanceTypeDlg.aip"/>
+    <ROW Fragment="MaintenanceWelcomeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\MaintenanceWelcomeDlg.aip"/>
+    <ROW Fragment="PreparePrereqDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\PreparePrereqDlg.aip"/>
+    <ROW Fragment="PrerequisitesDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\PrerequisitesDlg.aip"/>
+    <ROW Fragment="ProgressPrereqDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\ProgressPrereqDlg.aip"/>
+    <ROW Fragment="SequenceDialogs.aip" Path="&lt;AI_THEMES&gt;classic\fragments\SequenceDialogs.aip"/>
+    <ROW Fragment="Sequences.aip" Path="&lt;AI_FRAGS&gt;Sequences.aip"/>
+    <ROW Fragment="StaticUIStrings.aip" Path="&lt;AI_FRAGS&gt;StaticUIStrings.aip"/>
+    <ROW Fragment="UI.aip" Path="&lt;AI_THEMES&gt;classic\fragments\UI.aip"/>
+    <ROW Fragment="Validation.aip" Path="&lt;AI_FRAGS&gt;Validation.aip"/>
+    <ROW Fragment="VerifyRemoveDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\VerifyRemoveDlg.aip"/>
+    <ROW Fragment="VerifyRepairDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\VerifyRepairDlg.aip"/>
+    <ROW Fragment="WelcomeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\WelcomeDlg.aip"/>
+    <ROW Fragment="WelcomePrereqDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\WelcomePrereqDlg.aip"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiActionTextComponent">
+    <ROW Action="AI_DeleteLzma" Description="Deleting files extracted from archive" DescriptionLocId="ActionText.Description.AI_DeleteLzma" TemplateLocId="-"/>
+    <ROW Action="AI_DeleteRLzma" Description="Deleting files extracted from archive" DescriptionLocId="ActionText.Description.AI_DeleteLzma" TemplateLocId="-"/>
+    <ROW Action="AI_DownloadPrereq" Description="Downloading prerequisite software" DescriptionLocId="ActionText.Description.AI_DownloadPrereq" Template="Downloading [1]{[2] completed}" TemplateLocId="ActionText.Template.AI_DownloadPrereq"/>
+    <ROW Action="AI_ExtractFiles" Description="Extracting files from archive" DescriptionLocId="ActionText.Description.AI_ExtractLzma" TemplateLocId="-"/>
+    <ROW Action="AI_ExtractLzma" Description="Extracting files from archive" DescriptionLocId="ActionText.Description.AI_ExtractLzma" TemplateLocId="-"/>
+    <ROW Action="AI_ExtractPrereq" Description="Extracting prerequisite software" DescriptionLocId="ActionText.Description.AI_ExtractPrereq" Template="Extracting [1]{[2] completed}" TemplateLocId="ActionText.Template.AI_ExtractPrereq"/>
+    <ROW Action="AI_InstallPostPrerequisite" Description="Installing prerequisite software" DescriptionLocId="ActionText.Description.AI_InstallPrerequisite" Template="Installing [1]{[2] completed}" TemplateLocId="ActionText.Template.AI_InstallPrerequisite"/>
+    <ROW Action="AI_InstallPrerequisite" Description="Installing prerequisite software" DescriptionLocId="ActionText.Description.AI_InstallPrerequisite" Template="Installing [1]{[2] completed}" TemplateLocId="ActionText.Template.AI_InstallPrerequisite"/>
+    <ROW Action="AI_VerifyPrereq" Description="Verifying prerequisites" DescriptionLocId="ActionText.Description.AI_VerifyPrereq" Template="[1] was not installed correctly." TemplateLocId="ActionText.Template.AI_VerifyPrereq"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiAppSearchComponent">
+    <ROW Property="AI_SETUPEXEPATH" Signature_="AI_EXE_PATH_CU" Builds="DefaultBuild"/>
+    <ROW Property="AI_SETUPEXEPATH" Signature_="AI_EXE_PATH_LM" Builds="DefaultBuild"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiBinaryComponent">
+    <ROW Name="Prereq.dll" SourcePath="&lt;AI_CUSTACTS&gt;Prereq.dll"/>
+    <ROW Name="aicustact.dll" SourcePath="&lt;AI_CUSTACTS&gt;aicustact.dll"/>
+    <ROW Name="lzmaextractor.dll" SourcePath="&lt;AI_CUSTACTS&gt;lzmaextractor.dll"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiConditionComponent">
+    <ROW Feature_="AI64BitFiles" Level="0" Condition="NOT VersionNT64"/>
+    <ROW Feature_="AI32BitFiles" Level="0" Condition="VersionNT64"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiControlEventComponent">
+    <ROW Dialog_="WelcomeDlg" Control_="Next" Event="NewDialog" Argument="FolderDlg" Condition="AI_INSTALL" Ordering="1"/>
+    <ROW Dialog_="FolderDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_INSTALL" Ordering="201"/>
+    <ROW Dialog_="FolderDlg" Control_="Back" Event="NewDialog" Argument="WelcomeDlg" Condition="AI_INSTALL" Ordering="1"/>
+    <ROW Dialog_="MaintenanceWelcomeDlg" Control_="Next" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT" Ordering="99"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_MAINT" Ordering="198"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="CustomizeDlg" Condition="AI_MAINT" Ordering="202"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_INSTALL" Ordering="197"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="FolderDlg" Condition="AI_INSTALL" Ordering="201"/>
+    <ROW Dialog_="CustomizeDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_MAINT" Ordering="101"/>
+    <ROW Dialog_="CustomizeDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="ChangeButton" Event="NewDialog" Argument="CustomizeDlg" Condition="AI_MAINT" Ordering="501"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceWelcomeDlg" Condition="AI_MAINT" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="RemoveButton" Event="NewDialog" Argument="VerifyRemoveDlg" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="601"/>
+    <ROW Dialog_="VerifyRemoveDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="RepairButton" Event="NewDialog" Argument="VerifyRepairDlg" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="601"/>
+    <ROW Dialog_="VerifyRepairDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="1"/>
+    <ROW Dialog_="VerifyRepairDlg" Control_="Repair" Event="EndDialog" Argument="Return" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="399" Options="1"/>
+    <ROW Dialog_="VerifyRemoveDlg" Control_="Remove" Event="EndDialog" Argument="Return" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="299" Options="1"/>
+    <ROW Dialog_="PatchWelcomeDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_PATCH" Ordering="201"/>
+    <ROW Dialog_="ResumeDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_RESUME" Ordering="299"/>
+    <ROW Dialog_="WelcomePrereqDlg" Control_="Next" Event="NewDialog" Argument="PrerequisitesDlg" Condition="AI_BOOTSTRAPPER" Ordering="1"/>
+    <ROW Dialog_="PrerequisitesDlg" Control_="Next" Event="EndDialog" Argument="Return" Condition="AI_BOOTSTRAPPER" Ordering="1"/>
+    <ROW Dialog_="PrerequisitesDlg" Control_="Back" Event="NewDialog" Argument="WelcomePrereqDlg" Condition="AI_BOOTSTRAPPER" Ordering="1"/>
+    <ROW Dialog_="ExitDialog" Control_="Finish" Event="DoAction" Argument="AI_CleanPrereq" Condition="1" Ordering="301"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_PATCH" Ordering="199"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="PatchWelcomeDlg" Condition="AI_PATCH" Ordering="203"/>
+    <ROW Dialog_="FatalError" Control_="Finish" Event="DoAction" Argument="AI_CleanPrereq" Condition="1" Ordering="102"/>
+    <ROW Dialog_="UserExit" Control_="Finish" Event="DoAction" Argument="AI_CleanPrereq" Condition="1" Ordering="101"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCreateFolderComponent">
+    <ROW Directory_="AI_Sh32_Dir" Component_="bit" ManualDelete="false"/>
+    <ROW Directory_="SHORTCUTDIR" Component_="SHORTCUTDIR" ManualDelete="false"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCustActComponent">
+    <ROW Action="AI_AppSearchEx" Type="1" Source="Prereq.dll" Target="DoAppSearchEx"/>
+    <ROW Action="AI_BACKUP_AI_SETUPEXEPATH" Type="51" Source="AI_SETUPEXEPATH_ORIGINAL" Target="[AI_SETUPEXEPATH]"/>
+    <ROW Action="AI_CleanPrereq" Type="65" Source="Prereq.dll" Target="CleanPrereq" WithoutSeq="true"/>
+    <ROW Action="AI_DATA_SETTER" Type="51" Source="AI_ExtractFiles" Target="[AI_SETUPEXEPATH]"/>
+    <ROW Action="AI_DOWNGRADE" Type="19" Target="4010"/>
+    <ROW Action="AI_DeleteCadLzma" Type="51" Source="AI_DeleteLzma" Target="[AI_SETUPEXEPATH]"/>
+    <ROW Action="AI_DeleteLzma" Type="1025" Source="lzmaextractor.dll" Target="DeleteLZMAFiles"/>
+    <ROW Action="AI_DeleteRCadLzma" Type="51" Source="AI_DeleteRLzma" Target="[AI_SETUPEXEPATH]"/>
+    <ROW Action="AI_DeleteRLzma" Type="1281" Source="lzmaextractor.dll" Target="DeleteLZMAFiles"/>
+    <ROW Action="AI_DownloadPrereq" Type="1" Source="Prereq.dll" Target="DownloadPrereq"/>
+    <ROW Action="AI_DpiContentScale" Type="1" Source="aicustact.dll" Target="DpiContentScale"/>
+    <ROW Action="AI_EnableDebugLog" Type="321" Source="aicustact.dll" Target="EnableDebugLog"/>
+    <ROW Action="AI_EstimateExtractFiles" Type="1" Source="Prereq.dll" Target="EstimateExtractFiles"/>
+    <ROW Action="AI_ExtractCadLzma" Type="51" Source="AI_ExtractLzma" Target="[AI_SETUPEXEPATH]"/>
+    <ROW Action="AI_ExtractFiles" Type="1025" Source="Prereq.dll" Target="ExtractSourceFiles" AdditionalSeq="AI_DATA_SETTER"/>
+    <ROW Action="AI_ExtractLzma" Type="1025" Source="lzmaextractor.dll" Target="ExtractLZMAFiles"/>
+    <ROW Action="AI_ExtractPrereq" Type="65" Source="Prereq.dll" Target="ExtractPrereq"/>
+    <ROW Action="AI_FindExeLzma" Type="1" Source="lzmaextractor.dll" Target="FindEXE"/>
+    <ROW Action="AI_InstallModeCheck" Type="1" Source="aicustact.dll" Target="UpdateInstallMode" WithoutSeq="true"/>
+    <ROW Action="AI_InstallPostPrerequisite" Type="1" Source="Prereq.dll" Target="InstallPostPrereq"/>
+    <ROW Action="AI_InstallPrerequisite" Type="65" Source="Prereq.dll" Target="InstallPrereq"/>
+    <ROW Action="AI_PREPARE_UPGRADE" Type="65" Source="aicustact.dll" Target="PrepareUpgrade"/>
+    <ROW Action="AI_REDIRECT_32BIT_FOLDER" Type="51" Source="AI_Bin32_Dir" Target="[APPDIR]"/>
+    <ROW Action="AI_REDIRECT_32BIT_SH_FOLDER" Type="51" Source="AI_Sh32_Dir" Target="[SHORTCUTDIR]"/>
+    <ROW Action="AI_RESTORE_AI_SETUPEXEPATH" Type="51" Source="AI_SETUPEXEPATH" Target="[AI_SETUPEXEPATH_ORIGINAL]"/>
+    <ROW Action="AI_RESTORE_LOCATION" Type="65" Source="aicustact.dll" Target="RestoreLocation"/>
+    <ROW Action="AI_ResolveKnownFolders" Type="1" Source="aicustact.dll" Target="AI_ResolveKnownFolders"/>
+    <ROW Action="AI_SETPROGRAMFILES" Type="51" Source="AI_ProgramFiles" Target="[ProgramFilesFolder]"/>
+    <ROW Action="AI_SETPROGRAMFILES64" Type="51" Source="AI_ProgramFiles" Target="[ProgramFiles64Folder]"/>
+    <ROW Action="AI_SHOW_LOG" Type="65" Source="aicustact.dll" Target="LaunchLogFile" WithoutSeq="true"/>
+    <ROW Action="AI_STORE_LOCATION" Type="51" Source="ARPINSTALLLOCATION" Target="[APPDIR]"/>
+    <ROW Action="AI_VerifyPrereq" Type="1" Source="Prereq.dll" Target="VerifyPrereq"/>
+    <ROW Action="SET_APPDIR" Type="307" Source="APPDIR" Target="[ProgramFilesFolder][Manufacturer]\[ProductName]" MultiBuildTarget="DefaultBuild:[AI_ProgramFiles][Manufacturer]\[ProductName]"/>
+    <ROW Action="SET_SHORTCUTDIR" Type="307" Source="SHORTCUTDIR" Target="[ProgramMenuFolder][ProductName]"/>
+    <ROW Action="SET_TARGETDIR_TO_APPDIR" Type="51" Source="TARGETDIR" Target="[APPDIR]"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiIconsComponent">
+    <ROW Name="Labrador.exe" SourcePath="bin32\Labrador.exe" Index="0"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiInstExSeqComponent">
+    <ROW Action="AI_DOWNGRADE" Condition="AI_NEWERPRODUCTFOUND AND (UILevel &lt;&gt; 5)" Sequence="210"/>
+    <ROW Action="AI_RESTORE_LOCATION" Condition="APPDIR=&quot;&quot;" Sequence="747"/>
+    <ROW Action="AI_STORE_LOCATION" Condition="(Not Installed) OR REINSTALL" Sequence="1501"/>
+    <ROW Action="AI_PREPARE_UPGRADE" Condition="AI_UPGRADE=&quot;No&quot; AND (Not Installed)" Sequence="1399"/>
+    <ROW Action="AI_ResolveKnownFolders" Sequence="52"/>
+    <ROW Action="AI_EnableDebugLog" Sequence="51"/>
+    <ROW Action="AI_REDIRECT_32BIT_FOLDER" Condition="NOT VersionNT64 AND NOT AI_Disable32BitRedirection" Sequence="798"/>
+    <ROW Action="AI_REDIRECT_32BIT_SH_FOLDER" Condition="NOT VersionNT64 AND NOT AI_Disable32BitRedirection" Sequence="799"/>
+    <ROW Action="AI_SETPROGRAMFILES64" Condition="VersionNT64" Sequence="748"/>
+    <ROW Action="AI_SETPROGRAMFILES" Condition="NOT VersionNT64" Sequence="749"/>
+    <ROW Action="AI_AppSearchEx" Sequence="102"/>
+    <ROW Action="AI_VerifyPrereq" Sequence="1101"/>
+    <ROW Action="AI_BACKUP_AI_SETUPEXEPATH" Sequence="99" Builds="DefaultBuild"/>
+    <ROW Action="AI_RESTORE_AI_SETUPEXEPATH" Condition="AI_SETUPEXEPATH_ORIGINAL" Sequence="101" Builds="DefaultBuild"/>
+    <ROW Action="AI_DeleteCadLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="199" Builds="DefaultBuild"/>
+    <ROW Action="AI_DeleteRCadLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="198" Builds="DefaultBuild"/>
+    <ROW Action="AI_ExtractCadLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="197" Builds="DefaultBuild"/>
+    <ROW Action="AI_FindExeLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="196" Builds="DefaultBuild"/>
+    <ROW Action="AI_ExtractLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="1549" Builds="DefaultBuild"/>
+    <ROW Action="AI_DeleteRLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="1548" Builds="DefaultBuild"/>
+    <ROW Action="AI_DeleteLzma" Condition="SETUPEXEDIR=&quot;&quot; AND Installed AND (REMOVE&lt;&gt;&quot;ALL&quot;) AND (AI_INSTALL_MODE&lt;&gt;&quot;Remove&quot;) AND (NOT PATCH)" Sequence="6599" Builds="DefaultBuild"/>
+    <ROW Action="AI_ExtractFiles" Sequence="3998" Builds="DefaultBuild"/>
+    <ROW Action="AI_DATA_SETTER" Sequence="3997"/>
+    <ROW Action="AI_EstimateExtractFiles" Sequence="3999" Builds="DefaultBuild"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiInstallUISequenceComponent">
+    <ROW Action="AI_RESTORE_LOCATION" Condition="APPDIR=&quot;&quot;" Sequence="747"/>
+    <ROW Action="AI_ResolveKnownFolders" Sequence="53"/>
+    <ROW Action="AI_DpiContentScale" Sequence="52"/>
+    <ROW Action="AI_EnableDebugLog" Sequence="51"/>
+    <ROW Action="AI_SETPROGRAMFILES64" Condition="VersionNT64" Sequence="748"/>
+    <ROW Action="AI_SETPROGRAMFILES" Condition="NOT VersionNT64" Sequence="749"/>
+    <ROW Action="AI_AppSearchEx" Sequence="102"/>
+    <ROW Action="AI_DownloadPrereq" Sequence="1297"/>
+    <ROW Action="AI_ExtractPrereq" Sequence="1298"/>
+    <ROW Action="AI_InstallPrerequisite" Sequence="1299"/>
+    <ROW Action="AI_InstallPostPrerequisite" Sequence="1301"/>
+    <ROW Action="AI_BACKUP_AI_SETUPEXEPATH" Sequence="99"/>
+    <ROW Action="AI_RESTORE_AI_SETUPEXEPATH" Condition="AI_SETUPEXEPATH_ORIGINAL" Sequence="101"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiLaunchConditionsComponent">
+    <ROW Condition="(VersionNT &lt;&gt; 400)" Description="[ProductName] cannot be installed on [WindowsTypeNT40Display]." DescriptionLocId="AI.LaunchCondition.NoNT40" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="(VersionNT &lt;&gt; 500)" Description="[ProductName] cannot be installed on [WindowsTypeNT50Display]." DescriptionLocId="AI.LaunchCondition.NoNT50" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="(VersionNT64 OR ((VersionNT &lt;&gt; 501) OR (ServicePackLevel = 3))) AND ((VersionNT &lt;&gt; 502) OR (ServicePackLevel = 2))" Description="[ProductName] cannot be installed on [WindowsTypeNT5XDisplay]." DescriptionLocId="AI.LaunchCondition.NoNT5X" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="SETUPEXEDIR OR (REMOVE=&quot;ALL&quot;)" Description="This package can only be run from a bootstrapper." DescriptionLocId="AI.LaunchCondition.RequireBootstrapper" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="VersionNT" Description="[ProductName] cannot be installed on [WindowsType9XDisplay]." DescriptionLocId="AI.LaunchCondition.No9X" IsPredefined="true" Builds="DefaultBuild"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiRegLocatorComponent">
+    <ROW Signature_="AI_EXE_PATH_CU" Root="1" Key="Software\Caphyon\Advanced Installer\LZMA\[ProductCode]\[ProductVersion]" Name="AI_ExePath" Type="2"/>
+    <ROW Signature_="AI_EXE_PATH_LM" Root="2" Key="Software\Caphyon\Advanced Installer\LZMA\[ProductCode]\[ProductVersion]" Name="AI_ExePath" Type="2"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiRegsComponent">
+    <ROW Registry="AI_ExePath" Root="-1" Key="Software\Caphyon\Advanced Installer\LZMA\[ProductCode]\[ProductVersion]" Name="AI_ExePath" Value="[AI_SETUPEXEPATH]" Component_="AI_ExePath"/>
+    <ROW Registry="B35B3203FEB4CFFA576A27CB835D3E6" Root="-1" Key="Software\Caphyon\Advanced Installer\Prereqs\[ProductCode]\[ProductVersion]" Name="B35B3203FEB4CFFA576A27CB835D3E6" Value="1" Component_="B35B3203FEB4CFFA576A27CB835D3E6"/>
+    <ROW Registry="D36C9FE0826D4D2B9C2DDCCE2C83E860" Root="-1" Key="Software\Caphyon\Advanced Installer\Prereqs\[ProductCode]\[ProductVersion]" Name="D36C9FE0826D4D2B9C2DDCCE2C83E860" Value="1" Component_="D36C9FE0826D4D2B9C2DDCCE2C83E860"/>
+    <ROW Registry="Path" Root="-1" Key="Software\[Manufacturer]\[ProductName]" Name="Path" Value="[APPDIR]" Component_="ProductInformation"/>
+    <ROW Registry="Version" Root="-1" Key="Software\[Manufacturer]\[ProductName]" Name="Version" Value="[ProductVersion]" Component_="ProductInformation"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiShortsComponent">
+    <ROW Shortcut="Labrador.exe" Directory_="AI_Sh32_Dir" Name="ESPOTE~1|EspoTek Labrador" Component_="Labrador.exe_1" Target="[#Labrador.exe_1]" Hotkey="0" IconIndex="0" ShowCmd="1"/>
+    <ROW Shortcut="Labrador.exe_1" Directory_="SHORTCUTDIR" Name="ESPOTE~1|EspoTek Labrador" Component_="Labrador.exe" Target="[#Labrador.exe]" Hotkey="0" IconIndex="0" ShowCmd="1"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiThemeComponent">
+    <ATTRIBUTE name="UsedTheme" value="classic"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiUpgradeComponent">
+    <ROW UpgradeCode="[|UpgradeCode]" VersionMin="0.0.1" VersionMax="100.100.100" Attributes="769" ActionProperty="OLDPRODUCTS"/>
+    <ROW UpgradeCode="[|UpgradeCode]" VersionMin="100.100.100" Attributes="2" ActionProperty="AI_NEWERPRODUCTFOUND"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.PreReqComponent">
+    <ROW PrereqKey="B35B3203FEB4CFFA576A27CB835D3E6" DisplayName="Visual C++ Redistributable for Visual Studio 2017 x86" VersionMin="14.16" SetupFileUrl="Prerequisites\Visual C++ Redistributable for Visual Studio 2017\vc_redist.x86.exe" Location="0" ExactSize="0" WinNTVersions="Windows Vista RTM x86, Windows Vista SP1 x86, Windows Server 2008 RTM x86, Windows 7 RTM x86" WinNT64Versions="Windows Vista RTM x64, Windows Vista SP1 x64, Windows Server 2008 RTM x64, Windows 7 RTM x64, Windows Server 2008 R2 RTM x64" Operator="0" NoUiComLine="/q /norestart" Options="f" TargetName="Visual C++ Redistributable for Visual Studio 2017\vc_redist.x86.exe" Feature="B35B3203FEB4CFFA576A27CB835D3E6"/>
+    <ROW PrereqKey="D36C9FE0826D4D2B9C2DDCCE2C83E860" DisplayName="Visual C++ Redistributable for Visual Studio 2017 x64" VersionMin="14.16" SetupFileUrl="Prerequisites\Visual C++ Redistributable for Visual Studio 2017\vc_redist.x64.exe" Location="0" ExactSize="0" WinNTVersions="Windows 9x/ME/NT/2000/XP/Vista/Windows 7/Windows 8 x86/Windows 8.1 x86/Windows 10 x86" WinNT64Versions="Windows Vista RTM x64, Windows Vista SP1 x64, Windows Server 2008 RTM x64, Windows 7 RTM x64, Windows Server 2008 R2 RTM x64" Operator="1" Options="xf" TargetName="Visual C++ Redistributable for Visual Studio 2017\vc_redist.x64.exe" Feature="D36C9FE0826D4D2B9C2DDCCE2C83E860"/>
+    <ROW PrereqKey="ZipSFX" DisplayName="EspoTek Labrador Driver (Bootloader)" VersionMin="1.4.1.2100" SetupFileUrl="driver\Bootloader_Install.exe" Location="0" ExactSize="0" Operator="1" Options="yi" TargetName="Bootloader_Install.exe"/>
+    <ROW PrereqKey="ZipSFX_1" DisplayName="EspoTek Labrador Driver (Primary)" VersionMin="1.4.1.2100" SetupFileUrl="driver\Driver_Install.exe" Location="0" ExactSize="0" Operator="1" Options="yi" TargetName="Driver_Install.exe"/>
+    <ROW PrereqKey="ZipSFX_2" DisplayName="EspoTek Labrador Driver (Misconfigured Batch Feb 2020)" VersionMin="1.4.1.2100" SetupFileUrl="driver\Gobindar_Install.exe" Location="0" ExactSize="0" Operator="1" Options="yi" TargetName="Gobindar_Install.exe"/>
+    <ATTRIBUTE name="PrereqsOrder" value="ZipSFX ZipSFX_1 ZipSFX_2 D36C9FE0826D4D2B9C2DDCCE2C83E860 B35B3203FEB4CFFA576A27CB835D3E6"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.PreReqSearchComponent">
+    <ROW SearchKey="B35B3203FEB4CFFA576A27CB835D3E6Syst" Prereq="B35B3203FEB4CFFA576A27CB835D3E6" SearchType="0" SearchString="[SystemFolder]vcruntime140.dll" VerMin="14.16.27012" Order="2" Property="PreReqSearch_2_B35B3203FEB4CFFA576A"/>
+    <ROW SearchKey="B35B3203FEB4CFFA576A27CB835D3E6Vers" Prereq="B35B3203FEB4CFFA576A27CB835D3E6" SearchType="2" SearchString="HKLM\SOFTWARE\Microsoft\DevDiv\VC\Servicing\14.0\RuntimeMinimum\Version" VerMin="14.16.27012" Order="1" Property="PreReqSearch_B35B3203FEB4CFFA576A27"/>
+    <ROW SearchKey="D36C9FE0826D4D2B9C2DDCCE2C83E860Ver" Prereq="D36C9FE0826D4D2B9C2DDCCE2C83E860" SearchType="2" SearchString="HKLM\SOFTWARE\Microsoft\DevDiv\VC\Servicing\14.0\RuntimeMinimum\Version" VerMin="14.16.27012" Order="1" Property="PreReqSearch_D36C9FE0826D4D2B9C2DDC" Platform="1"/>
+    <ROW SearchKey="SystemFolderfile.dll" Prereq="ZipSFX" SearchType="0" SearchString="[SystemFolder]file.dll" VerMin="1.0" Order="1" Property="PreReqSearch"/>
+    <ROW SearchKey="SystemFolderfile.dll_1" Prereq="ZipSFX_1" SearchType="0" SearchString="[SystemFolder]file.dll" VerMin="1.0" Order="1" Property="PreReqSearch_1"/>
+    <ROW SearchKey="SystemFolderfile.dll_2" Prereq="ZipSFX_2" SearchType="0" SearchString="[SystemFolder]file.dll" VerMin="1.0" Order="1" Property="PreReqSearch_2"/>
+  </COMPONENT>
+</DOCUMENT>

@@ -1,7 +1,4 @@
 #include "unixusbdriver.h"
-#ifndef LIBRADOR_LIBRARY
-    #include "platformspecific.h"
-#endif
 #include <QApplication>
 #include <QMessageBox>
 #include <QStandardPaths>

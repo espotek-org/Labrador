@@ -4,6 +4,14 @@
 #include <QDesktopServices>
 #include "espospinbox.h"
 
+#if defined(PLATFORM_WINDOWS)
+#include "winusbdriver.h"
+#elif defined(PLATFORM_ANDROID)
+#include "androidusbdriver.h"
+#else
+#include "unixusbdriver.h"
+#endif
+
 #include <algorithm>
 
 #define DO_QUOTE(X) #X
@@ -48,7 +56,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->psuDisplay->display("4.50");
 
-    ui->controller_iso->setDriver(new _PLATFORM_DEPENDENT_USB_OBJECT());
+#if defined(PLATFORM_WINDOWS)
+    ui->controller_iso->setDriver(new winUsbDriver());
+#elif defined(PLATFORM_ANDROID)
+    ui->controller_iso->setDriver(new androidUsbDriver());
+#else
+    ui->controller_iso->setDriver(new unixUsbDriver());
+#endif
     ui->controller_iso->setAxes(ui->scopeAxes);
 
     ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
@@ -1236,32 +1250,32 @@ void MainWindow::ctrlArrowDownTriggered(){
 
 void MainWindow::cycleDelayRight(){
     qDebug() << "RIGHT";
-    ui->controller_iso->display.delay -= ui->controller_iso->display.window/10;
-    if(ui->controller_iso->display.delay < 0) ui->controller_iso->display.delay = 0;
-    ui->controller_iso->delayUpdated(ui->controller_iso->display.delay);
+    ui->controller_iso->display->delay -= ui->controller_iso->display->window/10;
+    if(ui->controller_iso->display->delay < 0) ui->controller_iso->display->delay = 0;
+    ui->controller_iso->delayUpdated(ui->controller_iso->display->delay);
 }
 
 void MainWindow::cycleDelayLeft(){
     qDebug() << "LEFT";
     double mws = ui->controller_iso->fileModeEnabled ? ui->controller_iso->daq_maxWindowSize : ((double)MAX_WINDOW_SIZE);
-    ui->controller_iso->display.delay += ui->controller_iso->display.window/10;
-    if(ui->controller_iso->display.delay > (mws - ui->controller_iso->display.window)) ui->controller_iso->display.delay = (mws - ui->controller_iso->display.window);
-    ui->controller_iso->delayUpdated(ui->controller_iso->display.delay);
+    ui->controller_iso->display->delay += ui->controller_iso->display->window/10;
+    if(ui->controller_iso->display->delay > (mws - ui->controller_iso->display->window)) ui->controller_iso->display->delay = (mws - ui->controller_iso->display->window);
+    ui->controller_iso->delayUpdated(ui->controller_iso->display->delay);
 }
 
 void MainWindow::cycleDelayRight_large(){
     qDebug() << "RIGHT";
-    ui->controller_iso->display.delay -= ui->controller_iso->display.window/2;
-    if(ui->controller_iso->display.delay < 0) ui->controller_iso->display.delay = 0;
-    ui->controller_iso->delayUpdated(ui->controller_iso->display.delay);
+    ui->controller_iso->display->delay -= ui->controller_iso->display->window/2;
+    if(ui->controller_iso->display->delay < 0) ui->controller_iso->display->delay = 0;
+    ui->controller_iso->delayUpdated(ui->controller_iso->display->delay);
 }
 
 void MainWindow::cycleDelayLeft_large(){
     qDebug() << "LEFT";
     double mws = ui->controller_iso->fileModeEnabled ? ui->controller_iso->daq_maxWindowSize : ((double)MAX_WINDOW_SIZE);
-    ui->controller_iso->display.delay += ui->controller_iso->display.window/2;
-    if(ui->controller_iso->display.delay > (mws - ui->controller_iso->display.window)) ui->controller_iso->display.delay = (mws - ui->controller_iso->display.window);
-    ui->controller_iso->delayUpdated(ui->controller_iso->display.delay);
+    ui->controller_iso->display->delay += ui->controller_iso->display->window/2;
+    if(ui->controller_iso->display->delay > (mws - ui->controller_iso->display->window)) ui->controller_iso->display->delay = (mws - ui->controller_iso->display->window);
+    ui->controller_iso->delayUpdated(ui->controller_iso->display->delay);
 }
 
 void MainWindow::enableLabradorDebugging(bool enabled){
@@ -1344,27 +1358,27 @@ void MainWindow::on_actionSnap_to_Cursors_triggered()
 {
     double xLeft, xRight, yBot, yTop;
 
-    yTop = std::max(ui->controller_iso->display.y1, ui->controller_iso->display.y0);
-    yBot = std::min(ui->controller_iso->display.y1, ui->controller_iso->display.y0);
+    yTop = std::max(ui->controller_iso->display->y1, ui->controller_iso->display->y0);
+    yBot = std::min(ui->controller_iso->display->y1, ui->controller_iso->display->y0);
 
-    xRight = std::max(ui->controller_iso->display.x1, ui->controller_iso->display.x0);
-    xLeft = std::min(ui->controller_iso->display.x1, ui->controller_iso->display.x0);
+    xRight = std::max(ui->controller_iso->display->x1, ui->controller_iso->display->x0);
+    xLeft = std::min(ui->controller_iso->display->x1, ui->controller_iso->display->x0);
 
     if((yBot-yTop) != 0){
-        ui->controller_iso->display.topRange = yTop;
-        ui->controller_iso->display.botRange = yBot;
+        ui->controller_iso->display->topRange = yTop;
+        ui->controller_iso->display->botRange = yBot;
     }
 
     if((xLeft - xRight) != 0){
-        ui->controller_iso->display.delay = - xRight;
-        ui->controller_iso->display.window = xRight - xLeft;
+        ui->controller_iso->display->delay = - xRight;
+        ui->controller_iso->display->window = xRight - xLeft;
     }
 }
 
 void MainWindow::on_actionEnter_Manually_triggered()
 {
-    ui->controller_iso->display.delay = 0;
-    scopeRangeEnterDialog dialog(this, ui->controller_iso->display.topRange, ui->controller_iso->display.botRange, ui->controller_iso->display.window, ui->controller_iso->display.delay);
+    ui->controller_iso->display->delay = 0;
+    scopeRangeEnterDialog dialog(this, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
     dialog.setModal(true);
     connect(&dialog, SIGNAL(yTopUpdated(double)), ui->controller_iso, SLOT(setTopRange(double)));
     connect(&dialog, SIGNAL(yBotUpdated(double)), ui->controller_iso, SLOT(setBotRange(double)));
@@ -1464,7 +1478,13 @@ void MainWindow::reinitUsbStage2(void){
     qDebug() << "ReinitUsb entering stage 2";
     delete(ui->controller_iso->driver);
     qDebug() << "Reinitialising USB driver!";
-    ui->controller_iso->driver = new _PLATFORM_DEPENDENT_USB_OBJECT();
+#if defined(PLATFORM_WINDOWS)
+    ui->controller_iso->driver = new winUsbDriver();
+#elif defined(PLATFORM_ANDROID)
+    ui->controller_iso->driver = new androidUsbDriver();
+#else
+    ui->controller_iso->driver = new unixUsbDriver();
+#endif
 
     //Reconnect the other objects.
     //ui->controller_iso->driver->setBufferPtr(ui->bufferDisplay);
@@ -2471,7 +2491,7 @@ void MainWindow::on_actionShow_Range_Dialog_on_Main_Page_triggered(bool checked)
 #ifndef PLATFORM_ANDROID
     if (scopeRangeSwitch == nullptr)
     {
-        scopeRangeSwitch = new scopeRangeEnterDialog(nullptr, false, ui->controller_iso->display.topRange, ui->controller_iso->display.botRange, ui->controller_iso->display.window, ui->controller_iso->display.delay);
+        scopeRangeSwitch = new scopeRangeEnterDialog(nullptr, false, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
         scopeRangeSwitch->setWindowFlags(Qt::Widget);
         ui->verticalLayout_5->insertWidget(2, scopeRangeSwitch);
         connect(scopeRangeSwitch, SIGNAL(yTopUpdated(double)), ui->controller_iso, SLOT(setTopRange(double)));
@@ -2671,6 +2691,15 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         ui->actionFrequency_Response->setChecked(false);
     }
     ui->scopeGroup_CH2->setDisabled(false);
+    ui->controller_iso->display = checked ? ui->controller_iso->display1: ui->controller_iso->display0;
+
+    if(checked){
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled1);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled1);
+    }else{
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+    }
 
     if (checked == true)
         MAX_WINDOW_SIZE = 1<<17;
@@ -2696,6 +2725,15 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
     ui->scopeGroup_CH1->setCheckable(!checked);
     ui->scopeGroup_CH2->setCheckable(!checked);
     ui->scopeGroup_CH2->setDisabled(checked);
+    ui->controller_iso->display = checked ? ui->controller_iso->display2: ui->controller_iso->display0;
+
+    if(checked){
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
+    }else{
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+    }
 }
 
 std::vector<uint8_t> MainWindow::uartEncode(const QString& text, UartParity parity)

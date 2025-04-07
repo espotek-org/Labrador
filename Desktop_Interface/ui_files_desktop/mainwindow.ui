@@ -1386,9 +1386,6 @@
           <layout class="QVBoxLayout" name="verticalLayout_7">
            <item>
             <widget class="QCheckBox" name="pause_LA">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
              <property name="text">
               <string>Pause</string>
              </property>

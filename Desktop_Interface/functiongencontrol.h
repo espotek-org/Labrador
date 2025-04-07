@@ -5,11 +5,7 @@
 
 #include <QWidget>
 #include <QLabel>
-#include <QDebug>
-#include <QDir>
-#include <QFile>
 #include "xmega.h"
-#include <QCoreApplication>
 
 //functionGenControl is a centralised object to control all of the high-level function gen commands for both channels.
 

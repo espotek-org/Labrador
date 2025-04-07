@@ -1,5 +1,4 @@
 #include "cursorenabler.h"
-#include "platformspecific.h"
 
 cursorEnabler::cursorEnabler(QWidget *parent) : QLabel(parent)
 {
@@ -11,9 +10,9 @@ cursorEnabler::cursorEnabler(QWidget *parent) : QLabel(parent)
 
 void cursorEnabler::setTurnedOn(bool enabled){
     m_turnedOn = enabled;
-    #ifdef PLATFORM_ANDROID
-        this->m_turnedOn = false;
-    #endif
+#ifdef PLATFORM_ANDROID
+    this->m_turnedOn = false;
+#endif
 }
 
 void cursorEnabler::clickDetected(QMouseEvent* event){

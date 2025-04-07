@@ -35,8 +35,9 @@ include(ui_elements.pri)
 
 MOC_DIR = $$PWD/moc
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
+SOURCES += \
+    main.cpp \
+    mainwindow.cpp \
     functiongencontrol.cpp \
     isodriver.cpp \
     isobuffer.cpp \
@@ -51,7 +52,8 @@ SOURCES += main.cpp\
     i2cdecoder.cpp \
     asyncdft.cpp
 
-HEADERS  += mainwindow.h \
+HEADERS += \
+    mainwindow.h \
     functiongencontrol.h \
     xmega.h \
     isodriver.h \
@@ -69,19 +71,16 @@ HEADERS  += mainwindow.h \
     i2cdecoder.h \
     asyncdft.h
 
-android:{
-FORMS    += ui_files_mobile/mainwindow.ui \
+android: FORMS += \
+    ui_files_mobile/mainwindow.ui \
     ui_files_mobile/scoperangeenterdialog.ui \
     ui_files_desktop/daqform.ui \
     ui_files_desktop/daqloadprompt.ui
-}
-
-!android:{
-FORMS    += ui_files_desktop/mainwindow.ui \
+else: FORMS += \
+    ui_files_desktop/mainwindow.ui \
     ui_files_desktop/scoperangeenterdialog.ui \
     ui_files_desktop/daqform.ui \
     ui_files_desktop/daqloadprompt.ui
-}
 
 
 RESOURCES += \
@@ -91,29 +90,25 @@ DESTDIR = bin
 
 RC_ICONS = appicon.ico
 
-INCLUDEPATH += $$PWD/ui_elements
-DEPENDPATH += $$PWD/ui_elements
-
 
 ###########################################################
 ################    WINDOWS BUILD ONLY    ################
 #########################################################
 
-win32{
-    INCLUDEPATH += $$PWD/build_win
+win32 {
+    message("Building for Windows ($${QT_ARCH})")
+    DEFINES += PLATFORM_WINDOWS
     SOURCES += winusbdriver.cpp
     HEADERS += winusbdriver.h
 
     #libusbk include
     contains(QT_ARCH, i386) {
-        message("Building for Windows (x86)")
         CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
         else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
         DEFINES += "WINDOWS_32_BIT"
         INCLUDEPATH += $$PWD/build_win/fftw/x86
         LIBS += -L$$PWD/build_win/fftw/x86 -llibfftw3-3
     } else {
-        message("Building for Windows (x64)")
         CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
         else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
         INCLUDEPATH += $$PWD/build_win/fftw/x64
@@ -122,54 +117,37 @@ win32{
         DEFINES += "WINDOWS_64_BIT"
     }
     INCLUDEPATH += $$PWD/build_win/libusbk/includes
-    DEPENDPATH += $$PWD/build/win/libusbk/includes
-    DEFINES += PLATFORM_WINDOWS
 }
 
 #############################################################
 ################    GNU/LINUX BUILD ONLY    ################
 ###########################################################
 
-unix:!android:!macx{
-    isEmpty(PREFIX): PREFIX = /usr/local
-    INCLUDEPATH += $$PWD/build_linux
+unix:!android:!macx {
+    message("Building for Linux ($${QT_ARCH})")
+    DEFINES += PLATFORM_LINUX
+
+    contains(QT_ARCH, arm) | contains(QT_ARCH, arm64) {
+        #All ARM-Linux GCC treats char as unsigned by default???
+        QMAKE_CFLAGS += -fsigned-char
+        QMAKE_CXXFLAGS += -fsigned-char
+
+        DEFINES += "PLATFORM_RASPBERRY_PI"
+    }
+
     CONFIG += link_pkgconfig
     PKGCONFIG += libusb-1.0  ##make sure you have the libusb-1.0-0-dev package!
     PKGCONFIG += fftw3       ##make sure you have the libfftw3-dev package!
     PKGCONFIG += eigen3      ##make sure you have the libeigen3-dev package!
-    contains(QT_ARCH, arm) {
-        message("Building for Raspberry Pi")
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/arm -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-        QMAKE_CFLAGS += -fsigned-char
-        QMAKE_CXXFLAGS += -fsigned-char
-        DEFINES += "PLATFORM_RASPBERRY_PI"
-        #All ARM-Linux GCC treats char as unsigned by default???
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/arm/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
 
-    } else:contains(QT_ARCH, i386) {
-        message("Building for Linux (x86)")
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x86 -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x86/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
-
-    } else {
-        message("Building for Linux (x64)")
-        #libdfuprog include
-        LIBS += -L$$PWD/build_linux/libdfuprog/lib/x64 -ldfuprog-0.9
-        INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
-        DEPENDPATH += $$PWD/build_linux/libdfuprog/include
-        lib_deploy.files = $$PWD/build_linux/libdfuprog/lib/x64/libdfuprog-0.9.so
-        lib_deploy.path = $$PREFIX/lib
-    }
-
+    isEmpty(PREFIX): PREFIX = /usr/local
     target.path = $$PREFIX/bin
+    lib_deploy.path = $$PREFIX/lib
+
+    #libdfuprog include
+    INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+    LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
+    lib_deploy.files += $$PWD/build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
     firmware.files += $$files(bin/firmware/labrafirm*)
@@ -207,34 +185,30 @@ unix:!android:!macx{
     INSTALLS += udevextra
 }
 
-
-
 #############################################################
 ################    MAC OSX BUILD ONLY    ##################
 ###########################################################
 
-macx:INCLUDEPATH += $$PWD/build_mac
+macx {
+    message("Building for Mac")
+    DEFINES += PLATFORM_MAC
 
-#libusb dylib include
-macx:LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
-macx:INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
-macx:DEPENDPATH += $$PWD/build_mac/libusb/include/libusb-1.0
+    #libusb dylib include
+    INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
+    LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
 
-#libdfuprog dylib include
-macx:LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
-macx:INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
-macx:DEPENDPATH += $$PWD/build_mac/libdfuprog/include
+    #libdfuprog dylib include
+    INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
+    LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
-macx: INCLUDEPATH += $$system(brew --prefix)/include
-macx: INCLUDEPATH += $$system(brew --prefix)/include/eigen3
-macx: LIBS += -L$$system(brew --prefix)/lib
+    INCLUDEPATH += $$system(brew --prefix)/include
+    INCLUDEPATH += $$system(brew --prefix)/include/eigen3
+    LIBS += -L$$system(brew --prefix)/lib
 
-macx:QMAKE_LFLAGS += "-undefined dynamic_lookup"
+    QMAKE_LFLAGS += "-undefined dynamic_lookup"
+}
 
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
-
-
-
 
 #############################################################
 ########   SHARED UNIX-LIKE BUILDS (MAC + LINUX)   #########
@@ -275,10 +249,10 @@ android: QMAKE_CFLAGS_RELEASE -= -Os
 #################    ANDROID BUILD ONLY    #################
 ###########################################################
 
-android:{
+android {
+    #Android treats char as unsigned by default (why???)
     QMAKE_CFLAGS += -fsigned-char
     QMAKE_CXXFLAGS += -fsigned-char
-    #Android treats char as unsigned by default (why???)
 
     # Building .so files fails with -Wl,--no-undefined
     QMAKE_LFLAGS_APP     -= -Wl,--no-undefined
@@ -290,11 +264,10 @@ android:{
     CONFIG += mobility
     MOBILITY =
 
-    INCLUDEPATH += $$PWD/build_android
+    DEFINES += PLATFORM_ANDROID
     SOURCES += androidusbdriver.cpp
     HEADERS += androidusbdriver.h
     INCLUDEPATH += $$PWD/build_android/libusb-242
-    DEPENDPATH += $$PWD/build_android/libusb-242
 
     ANDROID_PACKAGE_SOURCE_DIR  = $$PWD/build_android/package_source
     assets_deploy.files=$$files($$PWD/build_android/package_source/assets/*)
@@ -304,47 +277,25 @@ android:{
     #libdfuprog include
     LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
     INCLUDEPATH += $$PWD/build_android/libdfuprog/include
-    DEPENDPATH += $$PWD/build_android/libdfuprog/include
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/libdfuprog-0.9.so
 
     #liblog include
     LIBS += -L$$PWD/build_android/liblog/lib -llog
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
 
-
-
-    DISTFILES += \
-        build_android/package_source/AndroidManifest.xml \
-        build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
-        build_android/package_source/gradlew \
-        build_android/package_source/res/values/libs.xml \
-        build_android/package_source/build.gradle \
-        build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
-        build_android/package_source/gradlew.bat \
-        build_android/package_source/AndroidManifest.xml \
-        build_android/package_source/res/values/libs.xml \
-        build_android/package_source/build.gradle \
-        build_android/package_source/src/androidInterface.java
-
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
-    for(abi, ANDROID_ABIS): message("qmake building for Android ($${abi}) platform")
+    for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
 }
 
 DISTFILES += \
     build_android/package_source/AndroidManifest.xml \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
-    build_android/package_source/gradlew \
-    build_android/package_source/res/values/libs.xml \
     build_android/package_source/build.gradle \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
-    build_android/package_source/gradlew.bat \
-    build_android/package_source/AndroidManifest.xml \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
     build_android/package_source/gradlew \
-    build_android/package_source/res/values/libs.xml \
-    build_android/package_source/build.gradle \
-    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
     build_android/package_source/gradlew.bat \
-    build_android/package_source/res/xml/device_filter.xml
+    build_android/package_source/gradle/wrapper/gradle-wrapper.jar \
+    build_android/package_source/gradle/wrapper/gradle-wrapper.properties \
+    build_android/package_source/res/values/libs.xml \
+    build_android/package_source/res/xml/device_filter.xml \
+    build_android/package_source/src/androidInterface.java

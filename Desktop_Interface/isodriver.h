@@ -13,6 +13,7 @@
 #include "uartstyledecoder.h"
 #include "espospinbox.h"
 
+class AsyncDFT;
 class isoBuffer;
 class isoBuffer_file;
 
@@ -30,15 +31,15 @@ class DisplayControl : public QObject
 {
     Q_OBJECT
 public:
-
+    explicit DisplayControl(double left, double right, double top, double bottom);
     double delay = 0;
-    double window = 0.01;
+    double window = 0;
     double y0 = 0;
     double y1 = 0;
     double x0 = 0;
     double x1 = 0;
-    double topRange = 2.5;
-    double botRange = -0.5;
+    double topRange = 0;
+    double botRange = 0;
 
     void setVoltageRange (QWheelEvent* event, bool isProperlyPaused, double maxWindowSize, QCustomPlot* axes);
 
@@ -80,7 +81,10 @@ public:
     int baudRate_CH2 = 9600;
     double currentVmean;
     //Display Control Vars (Variables that control how the buffers are displayed)
-    DisplayControl display;
+    DisplayControl *display0 = new DisplayControl(-0.1, 0, 2.5, -0.5);
+    DisplayControl *display1 = new DisplayControl(0, 375000, 90, -60);
+    DisplayControl *display2 = new DisplayControl(0, 62500, 90, -90);
+    DisplayControl *display = display0;
     //Generic Functions
     void setDriver(genericUsbDriver *newDriver);
     void setAxes(QCustomPlot *newAxes);
@@ -93,6 +97,12 @@ public:
     bool spectrum = false;
     bool freqResp = false;
     espoSpinBox *freqValue_CH1 = NULL;
+    bool horiCursorEnabled0 = false; // TODO: move into DisplayControl
+    bool horiCursorEnabled1 = false; // TODO: move into DisplayControl
+    bool horiCursorEnabled2 = false; // TODO: move into DisplayControl
+    bool vertCursorEnabled0 = false; // TODO: move into DisplayControl
+    bool vertCursorEnabled1 = false; // TODO: move into DisplayControl
+    bool vertCursorEnabled2 = false; // TODO: move into DisplayControl
 private:
     //Those bloody bools that just Enable/Disable a single property
     bool paused_CH1 = false;
@@ -101,8 +111,6 @@ private:
     bool autoGainEnabled = true;
     bool placingHoriAxes = false; // TODO: move into DisplayControl
     bool placingVertAxes = false; // TODO: move into DisplayControl
-    bool horiCursorEnabled = false; // TODO: move into DisplayControl
-    bool vertCursorEnabled = false; // TODO: move into DisplayControl
     bool triggerEnabled = false;
     bool singleShotEnabled = false;
     bool multimeterShow = true;
@@ -150,13 +158,11 @@ private:
     float *readDataFile;
     char *isoTemp = NULL;
     short *isoTemp_short = NULL;
-    siprint *v0;
-    siprint *v1;
-    siprint *dv;
-    siprint *t0;
-    siprint *t1;
-    siprint *dt;
-    siprint *f;
+    siprint *v0, *v1, *dv;
+    siprint *db0, *db1, *ddb;
+    siprint *dbmv0, *dbmv1, *ddbmv;
+    siprint *t0, *t1, *dt, *f;
+    siprint *f0, *f1, *df;
     //Scope/MM++ related variables
     double currentVmax;
     double currentVmin;
@@ -193,9 +199,12 @@ private:
     //DAQ
     double daqLoad_startTime, daqLoad_endTime;
     //Spectrum
+    AsyncDFT *m_asyncDFT;
     double m_spectrumMinX = 0;
     double m_spectrumMaxX = 375000;
     int m_windowingType = 0;
+    QVector<double> m_windowFactors;
+    double m_windowFactorsSum;
     //Frequency response
     QVector<double> m_freqRespFreq;
     QVector<double> m_freqRespGain;

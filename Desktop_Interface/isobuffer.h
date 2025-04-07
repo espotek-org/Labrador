@@ -2,7 +2,9 @@
 #define ISOBUFFER_H
 
 // TODO: Move headers used only in implementation to isobuffer.cpp
+#include <list>
 #include <memory>
+#include <vector>
 
 #include <QWidget>
 #include <QString>
@@ -16,7 +18,6 @@
 #include "xmega.h"
 #include "desktop_settings.h"
 #include "genericusbdriver.h"
-#include "asyncdft.h"
 
 class isoDriver;
 class uartStyleDecoder;
@@ -48,7 +49,7 @@ class isoBuffer : public QWidget
 {
 	Q_OBJECT
 public:
-	isoBuffer(QWidget* parent = 0, int bufferLen = 0, isoDriver* caller = 0, unsigned char channel_value = 0);
+	isoBuffer(QWidget* parent = 0, int bufferLen = 0, int windowLen = 0, isoDriver* caller = 0, unsigned char channel_value = 0);
 	~isoBuffer() = default;
 
 //	Basic buffer operations
@@ -57,7 +58,6 @@ public:
 	void clearBuffer();
 	void gainBuffer(int gain_log);
 
-	void enableDftWrite(bool enable);
 	void enableFreqResp(bool enable, double freqValue);
 
 // Advanced buffer operations
@@ -69,6 +69,7 @@ public:
 	void writeBuffer_short(short* data, int len);
 
 	std::unique_ptr<short[]> readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset);
+    std::vector<short> readWindow();
 //	file I/O
 private:
 	void outputSampleToFile(double averageSample);
@@ -108,6 +109,13 @@ public:
 	uint32_t m_insertedCount = 0;
 	uint32_t m_bufferLen;
 
+private:
+    // Time domain samples for spectrum view
+    std::vector<short> m_window;
+    std::vector<short>::size_type m_window_capacity;
+    std::vector<short>::iterator m_window_iter;
+
+public:
 	std::list<short> freqResp_buffer;
 	uint32_t freqResp_count = 0;
 	uint32_t freqResp_samples = 0;
@@ -125,8 +133,6 @@ public:
 //	UARTS decoding
 	uartStyleDecoder* m_decoder = NULL;
 	bool m_isDecoding = true;
-//DFT
-    AsyncDFT* async_dft;
 private:
 //	File I/O
 	bool m_fileIOEnabled = false;
@@ -139,7 +145,6 @@ private:
 	unsigned int m_currentColumn = 0;
     uint32_t m_lastTriggerDetlaT = 0;
 
-	bool m_asyncDftActive = false;
 	bool m_freqRespActive = false;
 
 	isoDriver* m_virtualParent;
