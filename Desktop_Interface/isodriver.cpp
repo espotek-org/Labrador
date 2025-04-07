@@ -777,6 +777,12 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
+
+    std::vector<short> readData375_CH1;
+    std::vector<short> readData375_CH2;
+    std::vector<short> readData750;
+    float *readDataFile;
+
     if (!spectrum && !freqResp) {
         readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES,CH1_mode==2, display->delay + triggerDelay);
         if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display->window,GRAPH_SAMPLES,CH2_mode==2, display->delay + triggerDelay);
@@ -821,7 +827,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
 
     if (CH1_mode == 1){
-        analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
+        analogConvert(readData375_CH1.data(), &CH1, 128, AC_CH1, 1);
         for (int i = 0; i < CH1.size(); ++i) {
             CH1[i] /= m_attenuation_CH1;
             CH1[i] += m_offset_CH1;
@@ -835,7 +841,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 CH1[i] *= m_windowFactors[i];
             }
         } else if (freqResp) {
-            analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
+            analogConvert(readData375_CH1.data(), &CH1, 128, AC_CH1, 1);
             for (int i = 0; i < CH1.size(); ++i) {
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
@@ -848,10 +854,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
     /*After conversion of dt samples, sending them again to asyncDFT*/
 
-    if (CH1_mode == 2) digitalConvert(readData375_CH1.get(), &CH1);
+    if (CH1_mode == 2) digitalConvert(readData375_CH1.data(), &CH1);
 
     if (CH2_mode == 1){
-        analogConvert(readData375_CH2.get(), &CH2, 128, AC_CH2, 2);
+        analogConvert(readData375_CH2.data(), &CH2, 128, AC_CH2, 2);
         for (int i = 0; i < CH2.size(); ++i) {
             CH2[i] /= m_attenuation_CH2;
             CH2[i] += m_offset_CH2;
@@ -865,7 +871,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 CH2[i] *= m_windowFactors[i];
             }
         } else if (freqResp) {
-            analogConvert(readData375_CH2.get(), &CH2, 128, AC_CH2, 2);
+            analogConvert(readData375_CH2.data(), &CH2, 128, AC_CH2, 2);
             for (int i = 0; i < CH2.size(); ++i) {
                 CH2[i] /= m_attenuation_CH1;
                 CH2[i] += m_offset_CH1;
@@ -876,10 +882,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         ymax = (currentVmax > ymax) ? currentVmax : ymax;
         broadcastStats(1);
     }
-    if (CH2_mode == 2) digitalConvert(readData375_CH2.get(), &CH2);
+    if (CH2_mode == 2) digitalConvert(readData375_CH2.data(), &CH2);
 
     if(CH1_mode == -1) {
-        analogConvert(readData750.get(), &CH1, 128, AC_CH1, 1);
+        analogConvert(readData750.data(), &CH1, 128, AC_CH1, 1);
         for (int i = 0; i < CH1.size(); ++i) {
             CH1[i] /= m_attenuation_CH1;
             CH1[i] += m_offset_CH1;
@@ -1126,12 +1132,12 @@ void isoDriver::multimeterAction(){
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
-    readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES, false, display->delay + triggerDelay);
+    auto readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
 
-    QVector<double> CH1(GRAPH_SAMPLES);
-    analogConvert(readData375_CH1.get(), &CH1, 2048, 0, 1);  //No AC coupling!
+    QVector<double> CH1(readData375_CH1.size());
+    analogConvert(readData375_CH1.data(), &CH1, 2048, 0, 1);  //No AC coupling!
 
-    QVector<double> x(GRAPH_SAMPLES);
+    QVector<double> x(CH1.size());
     for (int i = 0; i < x.size(); ++i) {
         x[i] = -(display->window*i)/((double)(GRAPH_SAMPLES-1)) - display->delay;
         if (x[i]>0) {
@@ -1579,14 +1585,12 @@ double isoDriver::meanVoltageLast(double seconds, unsigned char channel, int TOP
         break;
     }
 
-	std::unique_ptr<short[]> tempBuffer = currentBuffer->readBuffer(seconds, 1024, 0, 0);
+    auto tempBuffer = currentBuffer->readBuffer(seconds, 1024, 0, 0);
     double sum = 0;
-    double temp;
-    for(int i = 0; i<1024; i++){
-        temp = currentBuffer->sampleConvert(tempBuffer[i], TOP, 0);
-        sum += temp;
+    for (const auto &sample : tempBuffer) {
+        sum += currentBuffer->sampleConvert(sample, TOP, 0);
     }
-    return sum / 1024;
+    return sum / tempBuffer.size();
 }
 
 void isoDriver::rSourceChanged(int newSource){

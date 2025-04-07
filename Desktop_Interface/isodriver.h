@@ -152,10 +152,6 @@ private:
     void triggerStateChanged();
     //Variables that are just pointers to other classes/vars
     QCustomPlot *axes; // TODO: move into DisplayControl
-	std::unique_ptr<short[]> readData375_CH1;
-	std::unique_ptr<short[]> readData375_CH2;
-	std::unique_ptr<short[]> readData750;
-    float *readDataFile;
     char *isoTemp = NULL;
     short *isoTemp_short = NULL;
     siprint *v0, *v1, *dv;
