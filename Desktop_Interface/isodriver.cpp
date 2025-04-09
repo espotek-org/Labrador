@@ -829,14 +829,14 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         CH2 = analogConvert(readData_CH2, 128, AC_CH2, 2);
         if (spectrum) {
             for (int i = 0; i < CH2.size(); ++i) {
-                CH2[i] /= m_attenuation_CH1;
-                CH2[i] += m_offset_CH1;
+                CH2[i] /= m_attenuation_CH2;
+                CH2[i] += m_offset_CH2;
                 CH2[i] *= m_windowFactors[i];
             }
         } else {
             for (int i = 0; i < CH2.size(); ++i) {
-                CH2[i] /= m_attenuation_CH1;
-                CH2[i] += m_offset_CH1;
+                CH2[i] /= m_attenuation_CH2;
+                CH2[i] += m_offset_CH2;
             }
         }
 
