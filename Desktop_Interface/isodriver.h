@@ -139,10 +139,10 @@ private:
 
 
     //Generic Functions
-    void analogConvert(short *shortPtr, QVector<double> *doublePtr, int TOP, bool AC, int channel);
-    void digitalConvert(short *shortPtr, QVector<double> *doublePtr);
+    QVector<double> analogConvert(std::vector<short> &in, int TOP, bool AC, int channel);
+    QVector<double> digitalConvert(std::vector<short> &in);
+    QVector<double> fileStreamConvert(float *in);
     double windowing_factor(int m_windowingType, int n_samples, int index);
-    void fileStreamConvert(float *floatPtr, QVector<double> *doublePtr);
     bool properlyPaused();
     void udateCursors(void);
     short reverseFrontEnd(double voltage);
@@ -152,10 +152,6 @@ private:
     void triggerStateChanged();
     //Variables that are just pointers to other classes/vars
     QCustomPlot *axes; // TODO: move into DisplayControl
-	std::unique_ptr<short[]> readData375_CH1;
-	std::unique_ptr<short[]> readData375_CH2;
-	std::unique_ptr<short[]> readData750;
-    float *readDataFile;
     char *isoTemp = NULL;
     short *isoTemp_short = NULL;
     siprint *v0, *v1, *dv;

@@ -68,7 +68,7 @@ public:
 	void writeBuffer_char(char* data, int len);
 	void writeBuffer_short(short* data, int len);
 
-	std::unique_ptr<short[]> readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset);
+    std::vector<short> readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset);
     std::vector<short> readWindow();
 //	file I/O
 private:

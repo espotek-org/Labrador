@@ -187,8 +187,8 @@ void isoDriver::timerTick(void){
     //free(isoTemp);
 }
 
-void isoDriver::analogConvert(short *shortPtr, QVector<double> *doublePtr, int TOP, bool AC, int channel){
-
+QVector<double> isoDriver::analogConvert(std::vector<short> &in, int TOP, bool AC, int channel)
+{
     double scope_gain = (double)(driver->scopeGain);
     double accumulated = 0;
     double accumulated_square = 0;
@@ -198,51 +198,60 @@ void isoDriver::analogConvert(short *shortPtr, QVector<double> *doublePtr, int T
     double ref = (channel == 1 ? ch1_ref : ch2_ref);
     double frontendGain = (channel == 1 ? frontendGain_CH1 : frontendGain_CH2);
 
-    double *data = doublePtr->data();
-    for (int i=0;i<doublePtr->size();i++){
-        data[i] = (shortPtr[i] * (vcc/2)) / (frontendGain*scope_gain*TOP);
-        if (driver->deviceMode != 7) data[i] += ref;
+    QVector<double> out(in.size());
+    for (int i = 0; i < out.size(); ++i) {
+        out[i] = (in[i] * (vcc/2)) / (frontendGain*scope_gain*TOP);
+        if (driver->deviceMode != 7) out[i] += ref;
         #ifdef INVERT_MM
-            if(driver->deviceMode == 7) data[i] *= -1;
+            if (driver->deviceMode == 7) out[i] *= -1;
         #endif
 
-        accumulated += data[i];
-        accumulated_square += data[i] * data[i];
-        if (data[i] > currentVmax) currentVmax = data[i];
-        if (data[i] < currentVmin) currentVmin = data[i];
+        accumulated += out[i];
+        accumulated_square += out[i] * out[i];
+        if (out[i] > currentVmax) currentVmax = out[i];
+        if (out[i] < currentVmin) currentVmin = out[i];
     }
-    currentVmean  = accumulated / doublePtr->size();
-    currentVRMS = sqrt(accumulated_square / doublePtr->size());
-    if(AC){
+    currentVmean = accumulated / out.size();
+    currentVRMS = sqrt(accumulated_square / out.size());
+    if (AC) {
         //Previous measurments are wrong, edit and redo.
         accumulated = 0;
         accumulated_square = 0;
         currentVmax = -20;
         currentVmin = 20;
 
-        for (int i=0;i<doublePtr->size();i++){
-            data[i] -= currentVmean;
+        for (int i = 0; i < out.size(); ++i) {
+            out[i] -= currentVmean;
 
-            accumulated += data[i];
-            accumulated_square += (data[i] * data[i]);
-            if (data[i] > currentVmax) currentVmax = data[i];
-            if (data[i] < currentVmin) currentVmin = data[i];
+            accumulated += out[i];
+            accumulated_square += out[i] * out[i];
+            if (out[i] > currentVmax) currentVmax = out[i];
+            if (out[i] < currentVmin) currentVmin = out[i];
         }
-        currentVmean  = accumulated / doublePtr->size();
-        currentVRMS = sqrt(accumulated_square / doublePtr->size());
+        currentVmean = accumulated / out.size();
+        currentVRMS = sqrt(accumulated_square / out.size());
     }
-    //cool_waveform = cool_waveform - AC_offset;
+    return out;
 }
 
-void isoDriver::digitalConvert(short *shortPtr, QVector<double> *doublePtr){
-
-    double *data = doublePtr->data();
+QVector<double> isoDriver::digitalConvert(std::vector<short> &in)
+{
+    QVector<double> out(in.size());
     double top = display->topRange - (display->topRange - display->botRange) / 10;
     double bot = display->botRange + (display->topRange - display->botRange) / 10;
-    for (int i=0;i<GRAPH_SAMPLES;i++){
-        data[i] = shortPtr[i] ? top : bot;
+    for (int i = 0; i < out.size(); ++i) {
+        out[i] = in[i] ? top : bot;
     }
-    //cool_waveform = cool_waveform - AC_offset;
+    return out;
+}
+
+QVector<double> isoDriver::fileStreamConvert(float *in)
+{
+    QVector<double> out(GRAPH_SAMPLES);
+    for (int i = 0; i < out.size(); ++i) {
+        out[i] = in[i];
+    }
+    return out;
 }
 
 // Evaluate the windowing factor for a given window function, number of samples and at a given index
@@ -271,14 +280,6 @@ double isoDriver::windowing_factor(int type, int N, int n)
     }
     return factor;
 }
-
-void isoDriver::fileStreamConvert(float *floatPtr, QVector<double> *doublePtr){
-    double *data = doublePtr->data();
-    for (int i=0;i<GRAPH_SAMPLES;i++){
-        data[i] = floatPtr[i];
-    }
-}
-
 
 void isoDriver::startTimer(){
     /*if (isoTimer!=NULL){
@@ -777,150 +778,78 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
-    if (!spectrum && !freqResp) {
-        readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES,CH1_mode==2, display->delay + triggerDelay);
-        if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(display->window,GRAPH_SAMPLES,CH2_mode==2, display->delay + triggerDelay);
-        if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(display->window,GRAPH_SAMPLES,false, display->delay + triggerDelay);
-        if(CH1_mode == -2) readDataFile = internalBufferFile->readBuffer(display->window,GRAPH_SAMPLES,false, display->delay);
+
+    std::vector<short> readData_CH1;
+    std::vector<short> readData_CH2;
+    float *readDataFile;
+
+    if (spectrum) {
+        readData_CH1 = internalBuffer_CH1->readWindow();
+        readData_CH2 = internalBuffer_CH2->readWindow();
+    } else if (freqResp) {
+        double freqResp_window = 1/freqValue_CH1->value();
+        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, triggerDelay);
+        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, triggerDelay);
     } else {
-        if(spectrum)
-        {
-            /*Don't allow moving frequency spectrum right or left
-             * by overwriting display window and delay before reading
-             * the buffer each time.
-             * @TODO improve this limitation.
-            */
-            double const_displ_window = ((double)m_asyncDFT->n_samples)/(internalBuffer375_CH1->m_samplesPerSecond);
-            double const_displ_delay = 0;
-            readData375_CH1 = internalBuffer375_CH1->readBuffer(const_displ_window,GRAPH_SAMPLES,CH1_mode==2, const_displ_delay + triggerDelay);
-            if(CH2_mode) readData375_CH2 = internalBuffer375_CH2->readBuffer(const_displ_window,GRAPH_SAMPLES,CH2_mode==2, const_displ_delay + triggerDelay);
-            if(CH1_mode == -1) readData750 = internalBuffer750->readBuffer(const_displ_window,GRAPH_SAMPLES,false, const_displ_delay + triggerDelay);
-        }
-        else
-        {
-            double freqResp_window = 1/freqValue_CH1->value();
-            readData375_CH1 = internalBuffer375_CH1->readBuffer(freqResp_window, internalBuffer375_CH1->freqResp_samples, CH1_mode==2, triggerDelay);
-            readData375_CH2 = internalBuffer375_CH2->readBuffer(freqResp_window, internalBuffer375_CH2->freqResp_samples, CH2_mode==2, triggerDelay);
-        }
-    }
-    /*Convert data also for spectrum CH1 and CH2*/
-    std::vector<short> dt_samples1, dt_samples2;
-    QVector<double> converted_dt_samples1, converted_dt_samples2;
-    QVector<double> x(GRAPH_SAMPLES), CH1(GRAPH_SAMPLES), CH2(GRAPH_SAMPLES);
-
-    if (spectrum)
-    {
-        dt_samples1 = internalBuffer_CH1->readWindow();
-        dt_samples2 = internalBuffer_CH2->readWindow();
-        converted_dt_samples1.resize(dt_samples1.size());
-        converted_dt_samples2.resize(dt_samples2.size());
-    }
-    else if (freqResp)
-    {
-        converted_dt_samples1.resize(internalBuffer375_CH1->freqResp_samples);
-        converted_dt_samples2.resize(internalBuffer375_CH2->freqResp_samples);
+        if (CH1_mode == -2)
+            readDataFile = internalBufferFile->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay);
+        else if (CH1_mode)
+            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2, display->delay + triggerDelay);
+        if (CH2_mode)
+            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, display->delay + triggerDelay);
     }
 
-    if (CH1_mode == 1){
-        analogConvert(readData375_CH1.get(), &CH1, 128, AC_CH1, 1);
-        for (int i=0; i < CH1.size(); i++)
-        {
-            CH1[i] /= m_attenuation_CH1;
-            CH1[i] += m_offset_CH1;
-        }
+    QVector<double> CH1, CH2;
 
-        if (spectrum)
-        {
-            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
-                converted_dt_samples1[i] *= m_windowFactors[i];
+    if (CH1_mode == -1 || CH1_mode == 1) {
+        CH1 = analogConvert(readData_CH1, 128, AC_CH1, 1);
+        if (spectrum) {
+            for (int i = 0; i < CH1.size(); ++i) {
+                CH1[i] /= m_attenuation_CH1;
+                CH1[i] += m_offset_CH1;
+                CH1[i] *= m_windowFactors[i];
             }
-        }
-        else if (freqResp)
-        {
-            analogConvert(readData375_CH1.get(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
+        } else {
+            for (int i = 0; i < CH1.size(); ++i) {
+                CH1[i] /= m_attenuation_CH1;
+                CH1[i] += m_offset_CH1;
             }
         }
 
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
         xmax = (currentVmax > xmax) ? currentVmax : xmax;
         broadcastStats(0);
+    } else if (CH1_mode == 2) {
+        CH1 = digitalConvert(readData_CH1);
+    } else if (CH1_mode == -2) {
+        CH1 = fileStreamConvert(readDataFile);
     }
-    /*After conversion of dt samples, sending them again to asyncDFT*/
 
-    if (CH1_mode == 2) digitalConvert(readData375_CH1.get(), &CH1);
-
-    if (CH2_mode == 1){
-        analogConvert(readData375_CH2.get(), &CH2, 128, AC_CH2, 2);
-
-        for (int i=0; i < GRAPH_SAMPLES; i++)
-        {
-            CH2[i] /= m_attenuation_CH2;
-            CH2[i] += m_offset_CH2;
-        }
-
-        if (spectrum)
-        {
-            analogConvert(dt_samples2.data(), &converted_dt_samples2, 128, AC_CH2, 2);
-            for (int i=0; i < converted_dt_samples2.size(); i++)
-            {
-                converted_dt_samples2[i] /= m_attenuation_CH1;
-                converted_dt_samples2[i] += m_offset_CH1;
-                converted_dt_samples2[i] *= m_windowFactors[i];
+    if (CH2_mode == 1) {
+        CH2 = analogConvert(readData_CH2, 128, AC_CH2, 2);
+        if (spectrum) {
+            for (int i = 0; i < CH2.size(); ++i) {
+                CH2[i] /= m_attenuation_CH2;
+                CH2[i] += m_offset_CH2;
+                CH2[i] *= m_windowFactors[i];
+            }
+        } else {
+            for (int i = 0; i < CH2.size(); ++i) {
+                CH2[i] /= m_attenuation_CH2;
+                CH2[i] += m_offset_CH2;
             }
         }
-        else if (freqResp)
-        {
-            analogConvert(readData375_CH2.get(), &converted_dt_samples2, 128, AC_CH2, 2);
-            for (int i=0; i < converted_dt_samples2.size(); i++)
-            {
-                converted_dt_samples2[i] /= m_attenuation_CH1;
-                converted_dt_samples2[i] += m_offset_CH1;
-            }
-        }
+
         ymin = (currentVmin < ymin) ? currentVmin : ymin;
         ymax = (currentVmax > ymax) ? currentVmax : ymax;
         broadcastStats(1);
-    }
-    if (CH2_mode == 2) digitalConvert(readData375_CH2.get(), &CH2);
-
-    if(CH1_mode == -1) {
-        analogConvert(readData750.get(), &CH1, 128, AC_CH1, 1);
-
-        for (int i=0; i < GRAPH_SAMPLES; i++)
-        {
-            CH1[i] /= m_attenuation_CH1;
-            CH1[i] += m_offset_CH1;
-        }
-
-        if (spectrum)
-        {
-            analogConvert(dt_samples1.data(), &converted_dt_samples1, 128, AC_CH1, 1);
-            for (int i=0; i < converted_dt_samples1.size(); i++)
-            {
-                converted_dt_samples1[i] /= m_attenuation_CH1;
-                converted_dt_samples1[i] += m_offset_CH1;
-                converted_dt_samples1[i] *= m_windowFactors[i];
-            }
-        }
-        xmin = (currentVmin < xmin) ? currentVmin : xmin;
-        xmax = (currentVmax > xmax) ? currentVmax : xmax;
-        broadcastStats(0);
-    }
-
-    if(CH1_mode == -2) {
-        fileStreamConvert(readDataFile, &CH1);
+    } else if (CH2_mode == 2) {
+        CH2 = digitalConvert(readData_CH2);
     }
 
 
-    for (double i=0; i<GRAPH_SAMPLES; i++){
+    QVector<double> x(GRAPH_SAMPLES);
+    for (int i = 0; i < x.size(); ++i) {
         x[i] = -(display->window*i)/((double)(GRAPH_SAMPLES-1)) - display->delay;
         if (x[i]>0) {
             CH1[i] = 0;
@@ -941,10 +870,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             auto f = m_asyncDFT->getFrequencyWindow(internalBuffer_CH1->m_samplesPerSecond);
 
             /*Creating DFT amplitudes*/
-            auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples1, m_windowFactorsSum);
+            auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(CH1, m_windowFactorsSum);
             axes->graph(0)->setData(f, amplitude);
             if (CH2_mode) {
-                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(converted_dt_samples2, m_windowFactorsSum);
+                auto amplitude = m_asyncDFT->getPowerSpectrum_dBmV(CH2, m_windowFactorsSum);
                 axes->graph(1)->setData(f, amplitude);
             }
 
@@ -958,7 +887,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             if(!paused_CH1)
             {
                 // Using least squares, fit a sinusoid to measured samples
-                int nof_elements = converted_dt_samples1.size();
+                int nof_elements = CH1.size();
                 double delta = 2 * PI / (nof_elements - 1);
                 double amp1, amp2, gain, gain_avg_db, phase1, phase2, phase_diff, phase_avg, norm_rms1, norm_rms2;
                 static double gain_sum = 0, phase_sum = 0;
@@ -970,8 +899,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                     A(i, 0) = 1;
                     A(i, 1) = std::sin(i*delta);
                     A(i, 2) = std::cos(i*delta);
-                    b1(i) = converted_dt_samples1[i];
-                    b2(i) = converted_dt_samples2[i];
+                    b1(i) = CH1[i];
+                    b2(i) = CH2[i];
                 }
 
                 // Solve the least squares solution Ax=b (using QR decomposition)
@@ -1141,12 +1070,11 @@ void isoDriver::multimeterAction(){
     if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
-    readData375_CH1 = internalBuffer375_CH1->readBuffer(display->window,GRAPH_SAMPLES, false, display->delay + triggerDelay);
+    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
+    auto CH1 = analogConvert(readData_CH1, 2048, 0, 1);  //No AC coupling!
 
-    QVector<double> x(GRAPH_SAMPLES), CH1(GRAPH_SAMPLES);
-    analogConvert(readData375_CH1.get(), &CH1, 2048, 0, 1);  //No AC coupling!
-
-    for (double i=0; i<GRAPH_SAMPLES; i++){
+    QVector<double> x(CH1.size());
+    for (int i = 0; i < x.size(); ++i) {
         x[i] = -(display->window*i)/((double)(GRAPH_SAMPLES-1)) - display->delay;
         if (x[i]>0) {
             CH1[i] = 0;
@@ -1593,14 +1521,12 @@ double isoDriver::meanVoltageLast(double seconds, unsigned char channel, int TOP
         break;
     }
 
-	std::unique_ptr<short[]> tempBuffer = currentBuffer->readBuffer(seconds, 1024, 0, 0);
+    auto tempBuffer = currentBuffer->readBuffer(seconds, 1024, 0, 0);
     double sum = 0;
-    double temp;
-    for(int i = 0; i<1024; i++){
-        temp = currentBuffer->sampleConvert(tempBuffer[i], TOP, 0);
-        sum += temp;
+    for (const auto &sample : tempBuffer) {
+        sum += currentBuffer->sampleConvert(sample, TOP, 0);
     }
-    return sum / 1024;
+    return sum / tempBuffer.size();
 }
 
 void isoDriver::rSourceChanged(int newSource){

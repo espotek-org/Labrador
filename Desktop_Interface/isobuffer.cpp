@@ -134,7 +134,7 @@ void isoBuffer::writeBuffer_short(short* data, int len)
     writeBuffer(data, len, 2048, [](short item) -> short {return item >> 4;});
 }
 
-std::unique_ptr<short[]> isoBuffer::readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset)
+std::vector<short> isoBuffer::readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset)
 {
     /*
      * The expected behavior is to run backwards over the buffer with a stride
@@ -150,9 +150,7 @@ std::unique_ptr<short[]> isoBuffer::readBuffer(double sampleWindow, int numSampl
     const double timeBetweenSamples = sampleWindow * m_samplesPerSecond / numSamples;
     const int delaySamples = delayOffset * m_samplesPerSecond;
 
-    std::unique_ptr<short[]> readData = std::make_unique<short[]>(numSamples);
-
-    std::fill (readData.get(), readData.get() + numSamples, short(0));
+    auto readData = std::vector<short>(numSamples, short(0));
 
     double itr = delaySamples, itr_lb, itr_ub;
     short data_lb, data_ub;
