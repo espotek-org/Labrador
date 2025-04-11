@@ -144,6 +144,54 @@ std::vector<uint8_t> *o1buffer::getMany_singleBit(int numToGet, int interval_sub
     return &convertedStream_digital;
 }
 
+std::vector<uint8_t> *o1buffer::getSinceLast_singleBit(int feasible_window_begin, int feasible_window_end, int interval_subsamples) {
+    //Calculate what sample the feasible window begins at
+    //printf_debugging("o1buffer::getSinceLast()\n")
+    int feasible_start_point = mostRecentAddress * 8 - feasible_window_begin;
+    if(feasible_start_point < 0){
+        feasible_start_point += NUM_SAMPLES_PER_CHANNEL * 8;
+    }
+
+    //Work out whether or not we're starting from the feasible window or the last point
+    int actual_start_point;
+    if(distanceFromMostRecentAddress(feasible_start_point / 8) > distanceFromMostRecentAddress(stream_index_at_last_call + interval_subsamples / 8)){
+        actual_start_point = stream_index_at_last_call * 8 + interval_subsamples;
+    } else {
+        actual_start_point = feasible_start_point;
+    }
+
+    //Work out how much we're copying
+    int actual_sample_distance = distanceFromMostRecentAddress(actual_start_point / 8) - distanceFromMostRecentAddress(mostRecentAddress - feasible_window_end / 8);
+    int numToGet = actual_sample_distance / interval_subsamples;
+    //printf_debugging("Fetching %d samples, starting at index %d with interval %d\n", numToGet, actual_start_point, interval_samples);
+
+    //Resize the vector
+    convertedStream_digital.resize(numToGet);
+
+    //Copy raw samples out.
+    int tempAddress;
+    int subsample_current_delay;
+    uint8_t mask;
+    uint8_t *data = convertedStream_digital.data();
+    int tempInt;
+
+    for(int i=0;i<numToGet;i++){
+        subsample_current_delay = actual_start_point + (interval_subsamples * i);
+        tempAddress = mostRecentAddress - subsample_current_delay / 8;
+        mask = 0x01 << (subsample_current_delay % 8);
+        if(tempAddress < 0){
+            tempAddress += NUM_SAMPLES_PER_CHANNEL;
+        }
+        tempInt = get(tempAddress);
+        data[i] = (((uint8_t)tempInt) & mask) ? 1 : 0;
+    }
+
+    //update stream_index_at_last_call for next call
+    stream_index_at_last_call = tempAddress;
+
+    return &convertedStream_digital;
+}
+
 std::vector<double> *o1buffer::getSinceLast(int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode, double scope_gain, bool AC, bool twelve_bit_multimeter){
 
     //Calculate what sample the feasible window begins at
