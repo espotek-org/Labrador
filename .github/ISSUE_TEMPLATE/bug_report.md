@@ -12,18 +12,6 @@ name: Problem Report
 about: Create a Report to help us improve
 ---
 
-<!-- Thanks for reporting a problem for this project. READ THIS FIRST:
-
-This issue template is meant to REPORT Labrador software PROBLEMS ONLY
-
-Please DO NOT OPEN AN ISSUE:
-  - If your Labrador version is not the latest from the master branch, please update your device before submitting your issue. Your problem might already be solved. 
-The latest pre-release binaries of Labrador can be downloaded from GitHub Actions.
-
-Please take a few minutes to complete the requested information below. Our ability to provide assistance is greatly hampered without it. The details requested potentially affect which options to pursue. The small amount of time you spend completing the template will also help the volunteers providing the assistance to you to reduce the time required to help you.
-
-DO NOT DELETE ANY TEXT from this template! Otherwise the issue will be auto-closed.
--->
 
 ### PROBLEM DESCRIPTION
 _A clear and concise description of what the problem is._
