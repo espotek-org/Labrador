@@ -1507,6 +1507,19 @@
          </widget>
         </item>
         <item>
+         <widget class="QPlainTextEdit" name="txuart">
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>30</height>
+           </size>
+          </property>
+          <property name="verticalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPlainTextEdit" name="console2">
           <property name="minimumSize">
            <size>
@@ -1589,6 +1602,13 @@
                  </widget>
                 </item>
                </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="serialEncodingCheck_CH1">
+               <property name="text">
+                <string>Serial Encoding</string>
+               </property>
               </widget>
              </item>
             </layout>
@@ -4355,6 +4375,30 @@
      <y>432</y>
     </hint>
    </hints>
+  </connection>
+  <connection>
+   <sender>serialEncodingCheck_CH1</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>txuart</receiver>
+   <slot>setVisible(bool)</slot>
+  </connection>
+  <connection>
+   <sender>serialEncodingCheck_CH1</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>waveformSelect_CH1</receiver>
+   <slot>setDisabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>serialEncodingCheck_CH1</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>frequencyValue_CH1</receiver>
+   <slot>setDisabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>serialEncodingCheck_CH1</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>dcOffsetValue_CH1</receiver>
+   <slot>setDisabled(bool)</slot>
   </connection>
  </connections>
  <slots>
