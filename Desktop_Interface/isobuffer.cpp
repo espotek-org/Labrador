@@ -29,19 +29,27 @@ constexpr auto kTopMultimeter = 2048;
 constexpr double kTriggerSensitivityMultiplier = 4;
 }
 
+#ifndef DISABLE_SPECTRUM
 isoBuffer::isoBuffer(QWidget* parent, int bufferLen, int windowLen, isoDriver* caller, unsigned char channel_value)
+#else
+isoBuffer::isoBuffer(QWidget* parent, int bufferLen, isoDriver* caller, unsigned char channel_value)
+#endif
     : QWidget(parent)
     , m_channel(channel_value)
     , m_bufferPtr(std::make_unique<short[]>(bufferLen*2))
     , m_bufferLen(bufferLen)
+#ifndef DISABLE_SPECTRUM
     , m_window_capacity(windowLen)
+#endif
     , m_samplesPerSecond(bufferLen/21.0/375*VALID_DATA_PER_375)
     , m_sampleRate_bit(bufferLen/21.0/375*VALID_DATA_PER_375*8)
     , m_virtualParent(caller)
 {
     m_buffer = m_bufferPtr.get();
+#ifndef DISABLE_SPECTRUM
     m_window.reserve(m_window_capacity);
     m_window_iter = m_window.begin();
+#endif
 }
 
 void isoBuffer::insertIntoBuffer(short item)
@@ -61,6 +69,7 @@ void isoBuffer::insertIntoBuffer(short item)
         m_back = 0;
     }
 
+#ifndef DISABLE_SPECTRUM
     /* Fill-in time domain window */
     if (m_window.size() < m_window_capacity) {
         m_window.push_back(item);
@@ -88,6 +97,7 @@ void isoBuffer::insertIntoBuffer(short item)
         /* Update number of freqResp samples */
         freqResp_count++;
     }
+#endif
 
     checkTriggered();
 }
@@ -175,12 +185,14 @@ std::vector<short> isoBuffer::readBuffer(double sampleWindow, int numSamples, bo
     return readData;
 }
 
+#ifndef DISABLE_SPECTRUM
 std::vector<short> isoBuffer::readWindow()
 {
     std::vector<short> readData(m_window.size());
     std::copy(m_window.begin(), m_window_iter, std::copy(m_window_iter, m_window.end(), readData.begin()));
     return readData;
 }
+#endif
 
 void isoBuffer::clearBuffer()
 {
@@ -193,8 +205,10 @@ void isoBuffer::clearBuffer()
     m_back = 0;
     m_insertedCount = 0;
 
+#ifndef DISABLE_SPECTRUM
     m_window.clear();
     m_window_iter = m_window.begin();
+#endif
 }
 
 void isoBuffer::gainBuffer(int gain_log)
@@ -215,11 +229,13 @@ void isoBuffer::gainBuffer(int gain_log)
     }
 }
 
+#ifndef DISABLE_SPECTRUM
 void isoBuffer::enableFreqResp(bool enable, double freqValue)
 {
     m_freqRespActive = enable;
     freqResp_samples = uint32_t(m_samplesPerSecond/freqValue);
 }
+#endif
 
 void isoBuffer::outputSampleToFile(double averageSample)
 {

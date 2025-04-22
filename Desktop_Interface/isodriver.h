@@ -94,15 +94,21 @@ public:
     //DAQ
     bool fileModeEnabled = false;
     double daq_maxWindowSize;
+#ifndef DISABLE_SPECTRUM
     bool spectrum = false;
     bool freqResp = false;
     espoSpinBox *freqValue_CH1 = NULL;
+#endif
     bool horiCursorEnabled0 = false; // TODO: move into DisplayControl
+#ifndef DISABLE_SPECTRUM
     bool horiCursorEnabled1 = false; // TODO: move into DisplayControl
     bool horiCursorEnabled2 = false; // TODO: move into DisplayControl
+#endif
     bool vertCursorEnabled0 = false; // TODO: move into DisplayControl
+#ifndef DISABLE_SPECTRUM
     bool vertCursorEnabled1 = false; // TODO: move into DisplayControl
     bool vertCursorEnabled2 = false; // TODO: move into DisplayControl
+#endif
 private:
     //Those bloody bools that just Enable/Disable a single property
     bool paused_CH1 = false;
@@ -142,7 +148,9 @@ private:
     QVector<double> analogConvert(std::vector<short> &in, int TOP, bool AC, int channel);
     QVector<double> digitalConvert(std::vector<short> &in);
     QVector<double> fileStreamConvert(float *in);
+#ifndef DISABLE_SPECTRUM
     double windowing_factor(int m_windowingType, int n_samples, int index);
+#endif
     bool properlyPaused();
     void udateCursors(void);
     short reverseFrontEnd(double voltage);
@@ -194,6 +202,7 @@ private:
     uint8_t deviceMode_prev;
     //DAQ
     double daqLoad_startTime, daqLoad_endTime;
+#ifndef DISABLE_SPECTRUM
     //Spectrum
     AsyncDFT *m_asyncDFT;
     double m_spectrumMinX = 0;
@@ -210,6 +219,7 @@ private:
     double m_freqRespStep = 100;
     int m_freqRespType = 0;
     bool m_freqRespFlag = false;
+#endif
 
 signals:
     void setGain(double newGain);
@@ -307,6 +317,7 @@ public slots:
     void attenuationChanged_CH2(int attenuationIndex);
     void setHexDisplay_CH1(bool enabled);
     void setHexDisplay_CH2(bool enabled);
+#ifndef DISABLE_SPECTRUM
     void setMinSpectrum(double minSpectrum);
     void setMaxSpectrum(double maxSpectrum);
     void setWindowingType(int windowing);
@@ -315,6 +326,7 @@ public slots:
     void setFreqRespStep(double stepFreqResp);
     void setFreqRespType(int typeFreqResp);
     void restartFreqResp();
+#endif
 };
 
 #endif // ISODRIVER_H

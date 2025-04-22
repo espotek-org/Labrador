@@ -225,8 +225,10 @@ private slots:
     void on_actionDark_Mode_triggered(bool checked);
 
     void on_actionShow_Debug_Console_triggered(bool checked);
+#ifndef DISABLE_SPECTRUM
     void on_actionFrequency_Spectrum_triggered(bool checked);
     void on_actionFrequency_Response_triggered(bool checked);
+#endif
 
     void on_serialEncodingCheck_CH1_toggled(bool checked);
     void on_txuart_textChanged();
@@ -303,6 +305,7 @@ private:
     QShortcut *shortcut_Debug;
     QShortcut *shortcut_Esc;
 
+#ifndef DISABLE_SPECTRUM
     // Frequency spectrum
     QWidget* spectrumLayoutWidget = nullptr;
     espoSpinBox* spectrumMinXSpinbox = nullptr;
@@ -317,6 +320,7 @@ private:
     espoSpinBox* freqRespStepSpinbox = nullptr;
     QComboBox* freqRespTypeComboBox = nullptr;
     QPushButton *freqRespRestartButton = nullptr;
+#endif
 
     //Duct Tape
     bool dt_AlreadyAskedAboutCalibration = false;

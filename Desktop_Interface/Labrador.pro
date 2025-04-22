@@ -218,9 +218,9 @@ unix:SOURCES += unixusbdriver.cpp
 unix:HEADERS += unixusbdriver.h
 
 # For multithreading on Unix fftw
-unix:!macx: LIBS += -fopenmp
+unix:!android:!macx: LIBS += -fopenmp
 macx: LIBS += -lomp
-unix: LIBS += -lfftw3_omp
+unix:!android: LIBS += -lfftw3_omp
 
 #############################################################
 ########       SHARED ANDROID/LINUX GCC FLAGS      #########
@@ -282,6 +282,11 @@ android {
     #liblog include
     LIBS += -L$$PWD/build_android/liblog/lib -llog
     ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
+
+    # Frequency spectrum/response disabled for now, needs UI and supporting libraries
+    DEFINES += DISABLE_SPECTRUM
+    SOURCES -= asyncdft.cpp
+    HEADERS -= asyncdft.h
 
     # Library dependencies are only compiled for this ABI currently
     ANDROID_ABIS = armeabi-v7a

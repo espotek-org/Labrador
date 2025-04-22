@@ -49,7 +49,11 @@ class isoBuffer : public QWidget
 {
 	Q_OBJECT
 public:
+#ifndef DISABLE_SPECTRUM
 	isoBuffer(QWidget* parent = 0, int bufferLen = 0, int windowLen = 0, isoDriver* caller = 0, unsigned char channel_value = 0);
+#else
+	isoBuffer(QWidget* parent = 0, int bufferLen = 0, isoDriver* caller = 0, unsigned char channel_value = 0);
+#endif
 	~isoBuffer() = default;
 
 //	Basic buffer operations
@@ -58,7 +62,9 @@ public:
 	void clearBuffer();
 	void gainBuffer(int gain_log);
 
-	void enableFreqResp(bool enable, double freqValue);
+#ifndef DISABLE_SPECTRUM
+    void enableFreqResp(bool enable, double freqValue);
+#endif
 
 // Advanced buffer operations
 private:
@@ -69,7 +75,9 @@ public:
 	void writeBuffer_short(short* data, int len);
 
     std::vector<short> readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset);
+#ifndef DISABLE_SPECTRUM
     std::vector<short> readWindow();
+#endif
 //	file I/O
 private:
 	void outputSampleToFile(double averageSample);
@@ -109,16 +117,19 @@ public:
 	uint32_t m_insertedCount = 0;
 	uint32_t m_bufferLen;
 
+#ifndef DISABLE_SPECTRUM
 private:
     // Time domain samples for spectrum view
     std::vector<short> m_window;
     std::vector<short>::size_type m_window_capacity;
     std::vector<short>::iterator m_window_iter;
 
+    bool m_freqRespActive = false;
 public:
-	std::list<short> freqResp_buffer;
-	uint32_t freqResp_count = 0;
-	uint32_t freqResp_samples = 0;
+    std::list<short> freqResp_buffer;
+    uint32_t freqResp_count = 0;
+    uint32_t freqResp_samples = 0;
+#endif
 
 // Conversion And Sampling
 	double m_voltage_ref = 1.65;
@@ -144,8 +155,6 @@ private:
 	qulonglong m_fileIO_numBytesWritten;
 	unsigned int m_currentColumn = 0;
     uint32_t m_lastTriggerDetlaT = 0;
-
-	bool m_freqRespActive = false;
 
 	isoDriver* m_virtualParent;
 

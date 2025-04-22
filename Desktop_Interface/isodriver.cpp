@@ -1,11 +1,13 @@
-#include <Eigen/Dense>
 #include "isodriver.h"
 #include "isobuffer.h"
 #include "isobuffer_file.h"
 #include <math.h>
 #include "daqloadprompt.h"
 #include <iostream>
+
+#ifndef DISABLE_SPECTRUM
 #include "asyncdft.h"
+#include <Eigen/Dense>
 
 #define PI 3.141592653589793  // Predefined value for pi
 #define PI_2 2*PI
@@ -16,11 +18,16 @@ static constexpr int kSpectrumCounterMax = 4;
 
 #define HORICURSORENABLED ((!spectrum & !freqResp & horiCursorEnabled0) | (spectrum & horiCursorEnabled1) | (freqResp & horiCursorEnabled2))
 #define VERTCURSORENABLED ((!spectrum & !freqResp & vertCursorEnabled0) | (spectrum & vertCursorEnabled1) | (freqResp & vertCursorEnabled2))
+#else
+#define HORICURSORENABLED (horiCursorEnabled0)
+#define VERTCURSORENABLED (vertCursorEnabled0)
+#endif
 
 isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
 {
     this->hide();
 
+#ifndef DISABLE_SPECTRUM
     m_asyncDFT = new AsyncDFT();
     m_windowFactors.fill(1.0, m_asyncDFT->n_samples);
     m_windowFactorsSum = m_asyncDFT->n_samples;
@@ -28,6 +35,11 @@ isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
     internalBuffer375_CH1 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, m_asyncDFT->n_samples, this, 1);
     internalBuffer375_CH2 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, m_asyncDFT->n_samples, this, 2);
     internalBuffer750 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/10*21, m_asyncDFT->n_samples, this, 1);
+#else
+    internalBuffer375_CH1 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, this, 1);
+    internalBuffer375_CH2 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/20*21, this, 2);
+    internalBuffer750 = new isoBuffer(this, MAX_WINDOW_SIZE*ADC_SPS/10*21, this, 1);
+#endif
 
     isoTemp = (char *) malloc(TIMER_PERIOD*ADC_SPF + 8); //8-byte header contains (unsigned long) length
 
@@ -254,6 +266,7 @@ QVector<double> isoDriver::fileStreamConvert(float *in)
     return out;
 }
 
+#ifndef DISABLE_SPECTRUM
 // Evaluate the windowing factor for a given window function, number of samples and at a given index
 double isoDriver::windowing_factor(int type, int N, int n)
 {
@@ -280,6 +293,7 @@ double isoDriver::windowing_factor(int type, int N, int n)
     }
     return factor;
 }
+#endif
 
 void isoDriver::startTimer(){
     /*if (isoTimer!=NULL){
@@ -308,7 +322,10 @@ void isoDriver::setVisible_CH2(bool visible){
 
 void isoDriver::setVoltageRange(QWheelEvent* event)
 {
-    if((doNotTouchGraph && !fileModeEnabled) || spectrum || freqResp) return;
+    if (doNotTouchGraph && !fileModeEnabled) return;
+#ifndef DISABLE_SPECTRUM
+    if (spectrum || freqResp) return;
+#endif
 
     bool isProperlyPaused = properlyPaused();
     double maxWindowSize = fileModeEnabled ? daq_maxWindowSize : ((double)MAX_WINDOW_SIZE);
@@ -544,23 +561,26 @@ void isoDriver::graphMouseMove(QMouseEvent *event){
 }
 
 void isoDriver::cursorEnableHori(bool enabled){
-
+#ifndef DISABLE_SPECTRUM
     if(spectrum)
         horiCursorEnabled1 = enabled;
     else if(freqResp)
         horiCursorEnabled2 = enabled;
     else
+#endif
         horiCursorEnabled0 = enabled;
     axes->graph(4)->setVisible(enabled);
     axes->graph(5)->setVisible(enabled);
 }
 
 void isoDriver::cursorEnableVert(bool enabled){
+#ifndef DISABLE_SPECTRUM
     if(spectrum)
         vertCursorEnabled1 = enabled;
     else if(freqResp)
         vertCursorEnabled2 = enabled;
     else
+#endif
         vertCursorEnabled0 = enabled;
     axes->graph(2)->setVisible(enabled);
     axes->graph(3)->setVisible(enabled);
@@ -586,13 +606,23 @@ void isoDriver::udateCursors(void){
     vert1y[0] = display->botRange;
     vert1y[1] = display->topRange;
 
+#ifndef DISABLE_SPECTRUM
     hori0x[0] = (spectrum || freqResp) ? 0 : -display->window - display->delay;
     hori0x[1] = (spectrum || freqResp) ? display->window : -display->delay;
+#else
+    hori0x[0] = -display->window - display->delay;
+    hori0x[1] = -display->delay;
+#endif
     hori0y[0] = display->y0;
     hori0y[1] = display->y0;
 
+#ifndef DISABLE_SPECTRUM
     hori1x[0] = (spectrum || freqResp) ? 0 : -display->window - display->delay;
     hori1x[1] = (spectrum || freqResp) ? display->window : -display->delay;
+#else
+    hori1x[0] = -display->window - display->delay;
+    hori1x[1] = -display->delay;
+#endif
     hori1y[0] = display->y1;
     hori1y[1] = display->y1;
 
@@ -614,6 +644,7 @@ void isoDriver::udateCursors(void){
     char temp_hori[64];
     char temp_vert[64];
     char temp_separator[2];
+#ifndef DISABLE_SPECTRUM
     if(spectrum)
     {
         dbmv0->value = display->y0;
@@ -637,6 +668,7 @@ void isoDriver::udateCursors(void){
         sprintf(temp_vert, "f0 = %s, f1 = %s,  Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
     }
     else
+#endif
     {
         v0->value = display->y0;
         v1->value = display->y1;
@@ -714,6 +746,7 @@ void isoDriver::setTriggerMode(int newMode)
 //0 for off, 1 for ana, 2 for dig, -1 for ana750, -2 for file
 void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 {
+#ifndef DISABLE_SPECTRUM
     // The Spectrum is computationally expensive to calculate, so we don't want to do it on every frame
     static int spectrumCounter = 0;
     if(spectrum)
@@ -726,6 +759,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     internalBuffer375_CH1->enableFreqResp(freqResp, freqValue_CH1->value());
     internalBuffer375_CH2->enableFreqResp(freqResp, freqValue_CH1->value());
+#endif
 
     //qDebug() << "made it to frameActionGeneric";
     if(!paused_CH1 && CH1_mode == - 1){
@@ -783,6 +817,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     std::vector<short> readData_CH2;
     float *readDataFile;
 
+#ifndef DISABLE_SPECTRUM
     if (spectrum) {
         readData_CH1 = internalBuffer_CH1->readWindow();
         readData_CH2 = internalBuffer_CH2->readWindow();
@@ -790,7 +825,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         double freqResp_window = 1/freqValue_CH1->value();
         readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, triggerDelay);
         readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, triggerDelay);
-    } else {
+    } else
+#endif
+    {
         if (CH1_mode == -2)
             readDataFile = internalBufferFile->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay);
         else if (CH1_mode)
@@ -803,13 +840,16 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if (CH1_mode == -1 || CH1_mode == 1) {
         CH1 = analogConvert(readData_CH1, 128, AC_CH1, 1);
+#ifndef DISABLE_SPECTRUM
         if (spectrum) {
             for (int i = 0; i < CH1.size(); ++i) {
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
                 CH1[i] *= m_windowFactors[i];
             }
-        } else {
+        } else
+#endif
+        {
             for (int i = 0; i < CH1.size(); ++i) {
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
@@ -827,13 +867,16 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
     if (CH2_mode == 1) {
         CH2 = analogConvert(readData_CH2, 128, AC_CH2, 2);
+#ifndef DISABLE_SPECTRUM
         if (spectrum) {
             for (int i = 0; i < CH2.size(); ++i) {
                 CH2[i] /= m_attenuation_CH2;
                 CH2[i] += m_offset_CH2;
                 CH2[i] *= m_windowFactors[i];
             }
-        } else {
+        } else
+#endif
+        {
             for (int i = 0; i < CH2.size(); ++i) {
                 CH2[i] /= m_attenuation_CH2;
                 CH2[i] += m_offset_CH2;
@@ -865,6 +908,7 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         axes->xAxis->setRange(xmin, xmax);
         axes->yAxis->setRange(ymin, ymax);
     } else{
+#ifndef DISABLE_SPECTRUM
         if (spectrum) { /*If frequency spectrum mode*/
             /*Getting array of frequencies for display purposes*/
             auto f = m_asyncDFT->getFrequencyWindow(internalBuffer_CH1->m_samplesPerSecond);
@@ -1007,7 +1051,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
             }
             axes->graph(1)->clearData();
-        } else {
+        } else
+#endif
+        {
             axes->graph(0)->setData(x,CH1);
             if(CH2_mode) axes->graph(1)->setData(x,CH2);
             axes->xAxis->setLabel("Time (sec)");
@@ -1020,7 +1066,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
 
     if(snapshotEnabled_CH1){
-        if (!spectrum && !freqResp) {
+#ifndef DISABLE_SPECTRUM
+        if (!spectrum && !freqResp)
+#endif
+        {
             snapshotFile_CH1->open(QIODevice::WriteOnly);
             snapshotFile_CH1->write("t, v\n");
 
@@ -1036,7 +1085,12 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
 
     if(snapshotEnabled_CH2){
-        if (!spectrum && !freqResp && CH2_mode) {
+#ifndef DISABLE_SPECTRUM
+        if (!spectrum && !freqResp && CH2_mode)
+#else
+        if (CH2_mode)
+#endif
+        {
             snapshotFile_CH2->open(QIODevice::WriteOnly);
             snapshotFile_CH2->write("t, v\n");
 
@@ -1856,6 +1910,7 @@ void isoDriver::setHexDisplay_CH2(bool enabled)
     hexDisplay_CH2 = enabled;
 }
 
+#ifndef DISABLE_SPECTRUM
 void isoDriver::setMinSpectrum(double minSpectrum)
 {
     m_spectrumMinX = minSpectrum;
@@ -1906,3 +1961,4 @@ void isoDriver::restartFreqResp()
 {
     m_freqRespFlag = true;
 }
+#endif

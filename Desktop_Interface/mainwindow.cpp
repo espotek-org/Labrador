@@ -65,8 +65,10 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
     ui->controller_iso->setAxes(ui->scopeAxes);
 
+#ifndef DISABLE_SPECTRUM
     ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
     connect(ui->frequencyValue_CH1, SIGNAL(valueChanged(double)), this, SLOT(display(double)));
+#endif
 
     ui->timeBaseSlider->setMaximum(10*log10(MAX_WINDOW_SIZE));
 
@@ -266,6 +268,7 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
     connect(ui->controller_iso, &isoDriver::enableCursorGroup, this, &MainWindow::cursorGroupEnabled);
 
+#ifndef DISABLE_SPECTRUM
     // Frequency spectrum
     spectrumMinXSpinbox = new espoSpinBox();
     spectrumMaxXSpinbox = new espoSpinBox();
@@ -389,6 +392,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->verticalLayout->addWidget(freqRespLayout2Widget);
     freqRespLayout1Widget->setVisible(false);
     freqRespLayout2Widget->setVisible(false);
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -2674,6 +2678,7 @@ void MainWindow::on_actionShow_Debug_Console_triggered(bool checked)
     enableLabradorDebugging(checked);
 }
 
+#ifndef DISABLE_SPECTRUM
 void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
 {
     ui->controller_iso->spectrum = checked;
@@ -2737,6 +2742,7 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
     }
 }
+#endif
 
 std::vector<uint8_t> MainWindow::uartEncode(const QString& text, UartParity parity)
 {
