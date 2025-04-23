@@ -1,3 +1,7 @@
+#ifndef DISABLE_SPECTRUM
+#include <Eigen/Dense>  // First so that our #defines won't conflict
+#endif
+
 #include "isodriver.h"
 #include "isobuffer.h"
 #include "isobuffer_file.h"
@@ -7,7 +11,6 @@
 
 #ifndef DISABLE_SPECTRUM
 #include "asyncdft.h"
-#include <Eigen/Dense>
 
 #define PI 3.141592653589793  // Predefined value for pi
 #define PI_2 2*PI
