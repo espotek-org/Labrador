@@ -193,6 +193,10 @@ macx {
     message("Building for Mac")
     DEFINES += PLATFORM_MAC
 
+    ICON = resources/iconfile.icns
+    QMAKE_TARGET_BUNDLE_PREFIX = com.EspoTek
+    QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
+
     #libdfuprog dylib include
     INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
     LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
@@ -204,8 +208,6 @@ macx {
 
     QMAKE_LFLAGS += "-undefined dynamic_lookup"
 }
-
-QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 
 #############################################################
 ########   SHARED UNIX-LIKE BUILDS (MAC + LINUX)   #########

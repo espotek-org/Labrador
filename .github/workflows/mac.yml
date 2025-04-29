@@ -23,12 +23,8 @@ jobs:
         run: |
           qmake CONFIG+=release
           make -j$(sysctl -n hw.ncpu)
-          mkdir -p bin/Labrador.app/Contents/MacOS/Resources
-          mkdir -p bin/Labrador.app/Contents/Frameworks
           cp -r bin/firmware bin/Labrador.app/Contents/MacOS
           cp -r bin/waveforms bin/Labrador.app/Contents/MacOS
-          cp resources/iconfile.icns bin/Labrador.app/Contents/Resources
-          cp resources/Info.plist bin/Labrador.app/Contents
           macdeployqt bin/Labrador.app -verbose=2 -dmg -libpath=build_mac/libdfuprog/lib/
 
       - name: Upload artifacts
