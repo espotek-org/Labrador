@@ -193,16 +193,13 @@ macx {
     message("Building for Mac")
     DEFINES += PLATFORM_MAC
 
-    #libusb dylib include
-    INCLUDEPATH += $$PWD/build_mac/libusb/include/libusb-1.0
-    LIBS += -L$$PWD/build_mac/libusb/lib -lusb-1.0
-
     #libdfuprog dylib include
     INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
     LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
     INCLUDEPATH += $$system(brew --prefix)/include
     INCLUDEPATH += $$system(brew --prefix)/include/eigen3
+    INCLUDEPATH += $$system(brew --prefix)/include/libusb-1.0
     LIBS += -L$$system(brew --prefix)/lib
 
     QMAKE_LFLAGS += "-undefined dynamic_lookup"
