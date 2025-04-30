@@ -194,6 +194,14 @@ macx {
     DEFINES += PLATFORM_MAC
 
     ICON = resources/iconfile.icns
+
+    firmware.path = Contents/MacOS/firmware
+    firmware.files = $$files(bin/firmware/labrafirm*)
+
+    waveforms.path = Contents/MacOS/waveforms
+    waveforms.files = $$files(bin/waveforms/*)
+
+    QMAKE_BUNDLE_DATA += firmware waveforms
     QMAKE_TARGET_BUNDLE_PREFIX = com.EspoTek
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 

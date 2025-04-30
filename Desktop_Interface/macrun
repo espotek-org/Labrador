@@ -1,5 +1,0 @@
-qmake
-make -j$(sysctl -n hw.physicalcpu)
-cp -R ./bin/waveforms ./bin/Labrador.app/Contents/MacOS
-cp -R ./bin/firmware ./bin/Labrador.app/Contents/MacOS
-./bin/Labrador.app/Contents/MacOS/Labrador
