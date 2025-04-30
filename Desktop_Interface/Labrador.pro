@@ -101,18 +101,17 @@ win32 {
 
     #libusbk include
     contains(QT_ARCH, i386) {
-        CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
-        else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86/ -llibusbK
         DEFINES += "WINDOWS_32_BIT"
+
         INCLUDEPATH += $$PWD/build_win/fftw/x86
         LIBS += -L$$PWD/build_win/fftw/x86 -llibfftw3-3
+        LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86 -llibusbK
     } else {
-        CONFIG(release, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
-        else:CONFIG(debug, debug|release): LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64/ -llibusbK
+        DEFINES += "WINDOWS_64_BIT"
+
         INCLUDEPATH += $$PWD/build_win/fftw/x64
         LIBS += -L$$PWD/build_win/fftw/x64 -llibfftw3-3
-
-        DEFINES += "WINDOWS_64_BIT"
+        LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64 -llibusbK
     }
     INCLUDEPATH += $$PWD/build_win/libusbk/includes
 }

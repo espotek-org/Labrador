@@ -3,7 +3,7 @@
 set -e
 
 rm -rf AppDir
-qmake CONFIG+=release PREFIX=/usr
+qmake -config release PREFIX=/usr
 make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
 cp -r build_linux/apprun-hooks AppDir/

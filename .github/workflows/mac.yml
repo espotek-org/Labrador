@@ -21,7 +21,7 @@ jobs:
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
-          qmake CONFIG+=release
+          qmake -config release
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -dmg -libpath=build_mac/libdfuprog/lib/
 

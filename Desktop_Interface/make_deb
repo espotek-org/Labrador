@@ -2,7 +2,7 @@
 
 set -e
 
-qmake CONFIG+=release PREFIX=/usr
+qmake -config release PREFIX=/usr
 make -j$(nproc)
 rm -rf deb
 make INSTALL_ROOT=deb install; find deb/

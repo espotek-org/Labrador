@@ -46,7 +46,7 @@ jobs:
         working-directory: Desktop_Interface
         shell: cmd
         run: |
-          qmake CONFIG+=release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
+          qmake -config release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
           nmake
 
       - name: Gather dependencies
