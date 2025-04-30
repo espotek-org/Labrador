@@ -13,10 +13,8 @@ void espoComboBox::readWaveformList(void)
 {
 #if defined(PLATFORM_ANDROID)
     QFile file("assets:/waveforms/_list.wfl");
-#elif defined(PLATFORM_LINUX)
-    QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, "waveforms/_list.wfl"));
 #else
-    QFile file(QCoreApplication::applicationDirPath().append("/waveforms/_list.wfl"));
+    QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, "waveforms/_list.wfl"));
 #endif
 
     qDebug() << "opening" << file.fileName();

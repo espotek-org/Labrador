@@ -18,10 +18,8 @@ void SingleChannelController::waveformName(QString newName)
 
 #if defined(PLATFORM_ANDROID)
     QFile file(newName.prepend("assets:/waveforms/").append(".tlw"));
-#elif defined(PLATFORM_LINUX)
-    QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, newName.prepend("waveforms/").append(".tlw")));
 #else
-    QFile file(QCoreApplication::applicationDirPath().append("/waveforms/").append(newName).append(".tlw"));
+    QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, newName.prepend("waveforms/").append(".tlw")));
 #endif
 
     qDebug() << "opening" << file.fileName();

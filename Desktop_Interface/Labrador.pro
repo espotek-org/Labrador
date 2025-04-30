@@ -192,10 +192,10 @@ macx {
 
     ICON = build_mac/iconfile.icns
 
-    firmware.path = Contents/MacOS/firmware
+    firmware.path = Contents/Resources/firmware
     firmware.files = $$files(bin/firmware/labrafirm*)
 
-    waveforms.path = Contents/MacOS/waveforms
+    waveforms.path = Contents/Resources/waveforms
     waveforms.files = $$files(bin/waveforms/*)
 
     QMAKE_BUNDLE_DATA += firmware waveforms
