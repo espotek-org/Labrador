@@ -82,14 +82,8 @@ else: FORMS += \
     ui_files_desktop/daqform.ui \
     ui_files_desktop/daqloadprompt.ui
 
-
 RESOURCES += \
     resources.qrc
-
-DESTDIR = bin
-
-RC_ICONS = appicon.ico
-
 
 ###########################################################
 ################    WINDOWS BUILD ONLY    ################
@@ -100,6 +94,10 @@ win32 {
     DEFINES += PLATFORM_WINDOWS
     SOURCES += winusbdriver.cpp
     HEADERS += winusbdriver.h
+
+    DESTDIR = bin
+
+    RC_ICONS = appicon.ico
 
     #libusbk include
     contains(QT_ARCH, i386) {
