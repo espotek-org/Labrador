@@ -83,7 +83,7 @@ else: FORMS += \
     ui_files_desktop/daqloadprompt.ui
 
 RESOURCES += \
-    resources.qrc
+    resources/resources.qrc
 
 ###########################################################
 ################    WINDOWS BUILD ONLY    ################
