@@ -6,6 +6,6 @@ qmake -config release PREFIX=/usr
 make -j$(nproc)
 rm -rf deb
 make INSTALL_ROOT=deb install; find deb/
-cp -r resources/debian deb/DEBIAN
+cp -r debian deb/DEBIAN
 dpkg-deb --build deb
 mv deb.deb EspoTek_Labrador-$(git rev-parse --short HEAD)-amd64.deb
