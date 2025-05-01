@@ -15,7 +15,8 @@ CONFIG += c++14
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-TARGET = Labrador
+unix:!android:!macx: TARGET = labrador
+else: TARGET = Labrador
 TEMPLATE = app
 
 GIT_HASH_SHORT=$$system(git rev-parse --short HEAD)
@@ -164,9 +165,6 @@ unix:!android:!macx {
     desktop.path = $$PREFIX/share/applications
     desktop.files += build_linux/espotek-labrador.desktop
 
-    symlink.path = $$PREFIX/bin
-    symlink.extra = ln -sf Labrador $(INSTALL_ROOT)$$PREFIX/bin/labrador
-
     udevextra.path = /lib/udev/rules.d
     udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
 
@@ -178,7 +176,6 @@ unix:!android:!macx {
     INSTALLS += icon48
     INSTALLS += icon256
     INSTALLS += desktop
-    INSTALLS += symlink
     INSTALLS += udevextra
 }
 
