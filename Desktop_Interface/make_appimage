@@ -23,5 +23,6 @@ chmod a+x linuxdeploy-${ARCH}.AppImage linuxdeploy-plugin-qt-${ARCH}.AppImage li
 unset QTDIR
 unset QT_PLUGIN_PATH
 export LD_LIBRARY_PATH=$(realpath AppDir/usr/lib)
+export LINUXDEPLOY_OUTPUT_APP_NAME=Labrador
 export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
 ./linuxdeploy-${ARCH}.AppImage --appdir=AppDir --plugin=qt --plugin=checkrt --output=appimage

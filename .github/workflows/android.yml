@@ -55,7 +55,7 @@ jobs:
         working-directory: Desktop_Interface
         run: |
           export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/21.3.6528147"
-          APK_BASENAME="EspoTek_Labrador-$(git rev-parse --short HEAD)"
+          APK_BASENAME="Labrador-$(git rev-parse --short HEAD)"
           if [ -e cert.cer ] && [ -e cert.p8 ]; then
             qmake -config release
             make -j$(nproc)
@@ -74,6 +74,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: asset-apk
-          path: Desktop_Interface/EspoTek_Labrador*.apk
+          path: Desktop_Interface/Labrador*.apk
           compression-level: 0
           if-no-files-found: error

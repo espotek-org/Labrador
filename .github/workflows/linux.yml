@@ -34,7 +34,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: asset-appimage-${{ matrix.arch }}
-          path: Desktop_Interface/EspoTek_Labrador*.AppImage
+          path: Desktop_Interface/Labrador*.AppImage
           compression-level: 0
           if-no-files-found: error
 
@@ -59,6 +59,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: asset-deb
-          path: Desktop_Interface/EspoTek_Labrador*.deb
+          path: Desktop_Interface/Labrador*.deb
           compression-level: 0
           if-no-files-found: error
