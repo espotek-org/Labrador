@@ -68,6 +68,11 @@ jobs:
       - build-windows
     runs-on: windows-2019
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: Desktop_Interface/build_win
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -77,11 +82,6 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri "http://espotek.com/ai167.msi" -OutFile "ai167.msi"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/Labrador.aip" -OutFile "Labrador.aip"
-          mkdir "driver"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Bootloader_Install.exe" -OutFile "driver/Bootloader_Install.exe"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Driver_Install.exe" -OutFile "driver/Driver_Install.exe"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Gobindar_Install.exe" -OutFile "driver/Gobindar_Install.exe"
           mkdir "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019"
           Invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/9307e627-aaac-42cb-a32a-a39e166ee8cb/E59AE3E886BD4571A811FE31A47959AE5C40D87C583F786816C60440252CD7EC/VC_redist.x86.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019/VC_redist.x86.exe"
           Invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/3b070396-b7fb-4eee-aa8b-102a23c3e4f4/40EA2955391C9EAE3E35619C4C24B5AAF3D17AEAA6D09424EE9672AA9372AEED/VC_redist.x64.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019/VC_redist.x64.exe"
@@ -90,7 +90,7 @@ jobs:
         shell: cmd
         run: |
           msiexec /i ai167.msi /qn
-          rm ai167.msi
+          del ai167.msi
 
       - name: Register Advanced Installer
         env:
@@ -105,6 +105,11 @@ jobs:
         env:
             PACKAGE_VERSION: "1.0.${{ github.run_number }}"
         run: |
+          move Desktop_Interface\build_win\Labrador.aip .
+          move Desktop_Interface\build_win\driver .
+          rmdir /s /q Desktop_Interface
+          for /f "delims=" %%i in ('git rev-parse --short HEAD') do set GIT_HASH_SHORT=%%i
+          "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /edit Labrador.aip /SetPackageName Labrador-%GIT_HASH_SHORT%-installer.exe
           "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /edit Labrador.aip /SetVersion %PACKAGE_VERSION%
           "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /rebuild Labrador.aip
 
@@ -112,6 +117,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: asset-exe-installer
-          path: Labrador-SetupFiles/Labrador_Installer.exe
+          path: Labrador-SetupFiles/Labrador*.exe
           compression-level: 0
           if-no-files-found: error

@@ -45,7 +45,7 @@ jobs:
 
             ## macOS
 
-            Download `Labrador.dmg` for macOS 10.13 and later.
+            Download `Labrador-<version>.dmg` for macOS 10.13 and later.
             If you are running an older version of macOS, please use the macOS Legacy build below.
 
             - Drag the Labrador app into `/Applications`
@@ -55,7 +55,7 @@ jobs:
 
             ## Windows
 
-            Download `Labrador_Installer.exe` for Windows 7 or later (32-bit and 64-bit supported).
+            Download `Labrador-<version>-installer.exe` for Windows 7 or later (32-bit and 64-bit supported).
         run: |
           UPLOADTOOL_BODY="$(echo "$UPLOADTOOL_BODY" | jq -Rsa '.')"
           UPLOADTOOL_BODY="${UPLOADTOOL_BODY%\"}"

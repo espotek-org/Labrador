@@ -24,11 +24,12 @@ jobs:
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -dmg -libpath=build_mac/libdfuprog/lib/
+          mv Labrador.dmg Labrador-$(git rev-parse --short HEAD).dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-dmg
-          path: Desktop_Interface/Labrador.dmg
+          path: Desktop_Interface/Labrador*.dmg
           compression-level: 0
           if-no-files-found: error
