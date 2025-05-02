@@ -282,6 +282,14 @@ android {
     ANDROID_PERMISSIONS += android.permission.WRITE_EXTERNAL_STORAGE
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
 
+    firmware.path = /assets/firmware
+    firmware.files = bin/firmware/labrafirm_0007_02.hex
+
+    waveforms.path = /assets/waveforms
+    waveforms.files = $$files(bin/waveforms/*)
+
+    INSTALLS += firmware waveforms
+
     #libdfuprog include
     LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
     INCLUDEPATH += $$PWD/build_android/libdfuprog/include
