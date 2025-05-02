@@ -13,11 +13,9 @@ jobs:
         include:
           - qt_arch: 'win64_msvc2019_64'
             platform: 'x64'
-            platform_alt_name: 'amd64'
             output_bin_dir: 'bin64'
           - qt_arch: 'win32_msvc2019'
             platform: 'x86'
-            platform_alt_name: 'x86'
             output_bin_dir: 'bin32'
     steps:
       - name: Checkout repository
@@ -48,14 +46,8 @@ jobs:
         run: |
           qmake -config release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
           nmake
-
-      - name: Gather dependencies
-        working-directory: Desktop_Interface
-        shell: cmd
-        run: |
+          nmake INSTALL_ROOT=bin install
           windeployqt bin\Labrador.exe
-          xcopy /i /s /y "build_win\fftw\${{ matrix.platform }}"\libfftw3-3.dll bin
-          xcopy /i /s /y "build_win\libusbk\bin\dll\${{ matrix.platform_alt_name }}"\libusbK.dll bin
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

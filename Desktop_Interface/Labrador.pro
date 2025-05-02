@@ -96,9 +96,18 @@ win32 {
     SOURCES += winusbdriver.cpp
     HEADERS += winusbdriver.h
 
-    DESTDIR = bin
-
     RC_ICONS = build_win/appicon.ico
+
+    target.path = /
+    lib_deploy.path = /
+
+    firmware.path = /firmware
+    firmware.files = $$files(resources/firmware/*)
+
+    waveforms.path = /waveforms
+    waveforms.files = $$files(resources/waveforms/*)
+
+    INSTALLS += target lib_deploy firmware waveforms
 
     #libusbk include
     contains(QT_ARCH, i386) {
@@ -106,13 +115,17 @@ win32 {
 
         INCLUDEPATH += $$PWD/build_win/fftw/x86
         LIBS += -L$$PWD/build_win/fftw/x86 -llibfftw3-3
+        lib_deploy.files += $$PWD/build_win/fftw/x86/libfftw3-3.dll
         LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86 -llibusbK
+        lib_deploy.files += $$PWD/build_win/libusbk/bin/dll/x86/libusbK.dll
     } else {
         DEFINES += "WINDOWS_64_BIT"
 
         INCLUDEPATH += $$PWD/build_win/fftw/x64
         LIBS += -L$$PWD/build_win/fftw/x64 -llibfftw3-3
+        lib_deploy.files += $$PWD/build_win/fftw/x64/libfftw3-3.dll
         LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64 -llibusbK
+        lib_deploy.files += $$PWD/build_win/libusbk/bin/dll/amd64/libusbK.dll
     }
     INCLUDEPATH += $$PWD/build_win/libusbk/includes
 }
@@ -148,10 +161,10 @@ unix:!android:!macx {
     lib_deploy.files += $$PWD/build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
-    firmware.files += $$files(bin/firmware/labrafirm*)
+    firmware.files += $$files(resources/firmware/labrafirm*)
 
     waveforms.path = $$PREFIX/share/EspoTek/Labrador/waveforms
-    waveforms.files += $$files(bin/waveforms/*)
+    waveforms.files += $$files(resources/waveforms/*)
 
     udev.path = /lib/udev/rules.d
     udev.files = build_linux/69-labrador.rules
@@ -190,10 +203,10 @@ macx {
     ICON = build_mac/iconfile.icns
 
     firmware.path = Contents/Resources/firmware
-    firmware.files = $$files(bin/firmware/labrafirm*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = Contents/Resources/waveforms
-    waveforms.files = $$files(bin/waveforms/*)
+    waveforms.files = $$files(resources/waveforms/*)
 
     QMAKE_BUNDLE_DATA += firmware waveforms
     QMAKE_TARGET_BUNDLE_PREFIX = com.EspoTek
@@ -283,10 +296,10 @@ android {
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
 
     firmware.path = /assets/firmware
-    firmware.files = bin/firmware/labrafirm_0007_02.hex
+    firmware.files = resources/firmware/labrafirm_0007_02.hex
 
     waveforms.path = /assets/waveforms
-    waveforms.files = $$files(bin/waveforms/*)
+    waveforms.files = $$files(resources/waveforms/*)
 
     INSTALLS += firmware waveforms
 
