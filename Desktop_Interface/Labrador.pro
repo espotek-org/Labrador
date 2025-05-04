@@ -34,7 +34,9 @@ equals(QCP_VER,"2"){
 
 include(ui_elements.pri)
 
-MOC_DIR = $$PWD/moc
+MOC_DIR = moc
+RCC_DIR = qrc
+UI_DIR = ui
 
 SOURCES += \
     main.cpp \
