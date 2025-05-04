@@ -115,21 +115,21 @@ win32 {
     contains(QT_ARCH, i386) {
         DEFINES += "WINDOWS_32_BIT"
 
-        INCLUDEPATH += $$PWD/build_win/fftw/x86
+        INCLUDEPATH += build_win/fftw/x86
         LIBS += -L$$PWD/build_win/fftw/x86 -llibfftw3-3
-        lib_deploy.files += $$PWD/build_win/fftw/x86/libfftw3-3.dll
+        lib_deploy.files += build_win/fftw/x86/libfftw3-3.dll
         LIBS += -L$$PWD/build_win/libusbk/bin/lib/x86 -llibusbK
-        lib_deploy.files += $$PWD/build_win/libusbk/bin/dll/x86/libusbK.dll
+        lib_deploy.files += build_win/libusbk/bin/dll/x86/libusbK.dll
     } else {
         DEFINES += "WINDOWS_64_BIT"
 
-        INCLUDEPATH += $$PWD/build_win/fftw/x64
+        INCLUDEPATH += build_win/fftw/x64
         LIBS += -L$$PWD/build_win/fftw/x64 -llibfftw3-3
-        lib_deploy.files += $$PWD/build_win/fftw/x64/libfftw3-3.dll
+        lib_deploy.files += build_win/fftw/x64/libfftw3-3.dll
         LIBS += -L$$PWD/build_win/libusbk/bin/lib/amd64 -llibusbK
-        lib_deploy.files += $$PWD/build_win/libusbk/bin/dll/amd64/libusbK.dll
+        lib_deploy.files += build_win/libusbk/bin/dll/amd64/libusbK.dll
     }
-    INCLUDEPATH += $$PWD/build_win/libusbk/includes
+    INCLUDEPATH += build_win/libusbk/includes
 }
 
 #############################################################
@@ -158,9 +158,9 @@ unix:!android:!macx {
     lib_deploy.path = $$PREFIX/lib
 
     #libdfuprog include
-    INCLUDEPATH += $$PWD/build_linux/libdfuprog/include
+    INCLUDEPATH += build_linux/libdfuprog/include
     LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
-    lib_deploy.files += $$PWD/build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
+    lib_deploy.files += build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
     firmware.files += $$files(resources/firmware/labrafirm*)
@@ -215,7 +215,7 @@ macx {
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 
     #libdfuprog dylib include
-    INCLUDEPATH += $$PWD/build_mac/libdfuprog/include
+    INCLUDEPATH += build_mac/libdfuprog/include
     LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
     INCLUDEPATH += $$system(brew --prefix)/include
@@ -283,9 +283,9 @@ android {
     DEFINES += PLATFORM_ANDROID
     SOURCES += androidusbdriver.cpp
     HEADERS += androidusbdriver.h
-    INCLUDEPATH += $$PWD/build_android/libusb-242
+    INCLUDEPATH += build_android/libusb-242
 
-    ANDROID_PACKAGE_SOURCE_DIR = $$PWD/build_android/package_source
+    ANDROID_PACKAGE_SOURCE_DIR = build_android/package_source
     ANDROID_MIN_SDK_VERSION = 21
     ANDROID_TARGET_SDK_VERSION = 28
     ANDROID_SDK_BUILD_TOOLS_REVISION = 28.0.3
@@ -307,12 +307,12 @@ android {
 
     #libdfuprog include
     LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
-    INCLUDEPATH += $$PWD/build_android/libdfuprog/include
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/libdfuprog-0.9.so
+    INCLUDEPATH += build_android/libdfuprog/include
+    ANDROID_EXTRA_LIBS += build_android/libdfuprog/lib/libdfuprog-0.9.so
 
     #liblog include
     LIBS += -L$$PWD/build_android/liblog/lib -llog
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
+    ANDROID_EXTRA_LIBS += build_android/liblog/lib/liblog.so
 
     # Frequency spectrum/response disabled for now, needs UI and supporting libraries
     DEFINES += DISABLE_SPECTRUM
@@ -325,7 +325,7 @@ android {
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
-    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
+    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += build_android/libusb-242/android/$${abi}/libusb1.0.so
 }
 
 DISTFILES += \
