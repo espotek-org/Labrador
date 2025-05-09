@@ -25,6 +25,7 @@ public:
     std::vector<double> *getMany_double(int numToGet, int interval_samples, int delay_sample, int filter_mode, double scope_gain, bool AC, bool twelve_bit_multimeter);
     std::vector<uint8_t> *getMany_singleBit(int numToGet, int interval_subsamples, int delay_subsamples);
     std::vector<double> *getSinceLast(int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode, double scope_gain, bool AC, bool twelve_bit_multimeter);
+    std::vector<uint8_t> *getSinceLast_singleBit(int feasible_window_begin, int feasible_window_end, int interval_subsamples);
     double vcc = 3.3;
     double frontendGain = (75.0/1075.0);
     double voltage_ref = 1.65;

@@ -67,6 +67,7 @@ public:
     std::vector<double> *getMany_double(int channel, int numToGet, int interval_samples, int delay_sample, int filter_mode);
     std::vector<uint8_t> * getMany_singleBit(int channel, int numToGet, int interval_subsamples, int delay_subsamples);
     std::vector<double> *getMany_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode);
+    std::vector<uint8_t> * getMany_singleBit_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_subsamples);
     bool connected = false;
     //Control Commands
     int set_device_mode(int mode);

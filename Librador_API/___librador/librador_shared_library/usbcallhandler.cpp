@@ -371,6 +371,26 @@ std::vector<double> *usbCallHandler::getMany_sincelast(int channel, int feasible
 
 }
 
+std::vector<uint8_t> * usbCallHandler::getMany_singleBit_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_subsamples){
+    std::vector<uint8_t>* temp_to_return = NULL;
+
+    buffer_read_write_mutex.lock();
+        switch(deviceMode){
+        case 1:
+            if(channel == 1) temp_to_return = internal_o1_buffer_375_CH2->getSinceLast_singleBit(feasible_window_begin, feasible_window_end, interval_subsamples);
+            break;
+        case 3:
+            if(channel == 1) temp_to_return = internal_o1_buffer_375_CH1->getSinceLast_singleBit(feasible_window_begin, feasible_window_end, interval_subsamples);
+            break;
+        case 4:
+            if(channel == 1) temp_to_return = internal_o1_buffer_375_CH1->getSinceLast_singleBit(feasible_window_begin, feasible_window_end, interval_subsamples);
+            else if (channel == 2) temp_to_return = internal_o1_buffer_375_CH2->getSinceLast_singleBit(feasible_window_begin, feasible_window_end, interval_subsamples);
+            break;
+        }
+    buffer_read_write_mutex.unlock();
+    return temp_to_return;
+}
+
 int usbCallHandler::send_device_reset(){
     libusb_reset_device(handle);
     return 0;
