@@ -647,8 +647,8 @@ void isoDriver::updateCursors(){
         f0->value = display->x0;
         f1->value = display->x1;
         df->value = std::fabs(display->x1 - display->x0);
-        temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", dbmv0->printVal(), dbmv1->printVal(), ddbmv->printVal());
-        temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
+        temp_hori = QString::asprintf("P0: %s\nP1: %s\nΔP: %s", dbmv0->printVal(), dbmv1->printVal(), ddbmv->printVal());
+        temp_vert = QString::asprintf("f0: %s\nf1: %s\nΔf: %s", f0->printVal(), f1->printVal(), df->printVal());
     }
     else if(freqResp)
     {
@@ -658,8 +658,8 @@ void isoDriver::updateCursors(){
         f0->value = display->x0;
         f1->value = display->x1;
         df->value = std::fabs(display->x1 - display->x0);
-        temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", db0->printVal(), db1->printVal(), ddb->printVal());
-        temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
+        temp_hori = QString::asprintf("P0: %s\nP1: %s\nΔP: %s", db0->printVal(), db1->printVal(), ddb->printVal());
+        temp_vert = QString::asprintf("f0: %s\nf1: %s\nΔf: %s", f0->printVal(), f1->printVal(), df->printVal());
     }
     else
 #endif
@@ -671,8 +671,8 @@ void isoDriver::updateCursors(){
         t1->value = display->x1;
         dt->value = std::fabs(display->x1 - display->x0);
         f->value = 1.0 / dt->value;
-        temp_hori = QString::asprintf("V0 = %s, V1 = %s, ΔV = %s", v0->printVal(), v1->printVal(), dv->printVal());
-        temp_vert = QString::asprintf("t0 = %s, t1 = %s, Δt = %s, f = %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
+        temp_hori = QString::asprintf("V0: %s\nV1: %s\nΔV: %s", v0->printVal(), v1->printVal(), dv->printVal());
+        temp_vert = QString::asprintf("t0: %s\nt1: %s\nΔt: %s\nf: %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
     }
 
     QString cursorStatsString;
