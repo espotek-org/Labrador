@@ -643,10 +643,10 @@ void isoDriver::updateCursors(){
     {
         dbmv0->value = display->y0;
         dbmv1->value = display->y1;
-        ddbmv->value = display->y0-display->y1;
+        ddbmv->value = std::fabs(display->y1 - display->y0);
         f0->value = display->x0;
         f1->value = display->x1;
-        df->value = fabs(display->x0 - display->x1);
+        df->value = std::fabs(display->x1 - display->x0);
         temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", dbmv0->printVal(), dbmv1->printVal(), ddbmv->printVal());
         temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
     }
@@ -654,10 +654,10 @@ void isoDriver::updateCursors(){
     {
         db0->value = display->y0;
         db1->value = display->y1;
-        ddb->value = display->y0-display->y1;
+        ddb->value = std::fabs(display->y1 - display->y0);
         f0->value = display->x0;
         f1->value = display->x1;
-        df->value = fabs(display->x0 - display->x1);
+        df->value = std::fabs(display->x1 - display->x0);
         temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", db0->printVal(), db1->printVal(), ddb->printVal());
         temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
     }
@@ -666,11 +666,11 @@ void isoDriver::updateCursors(){
     {
         v0->value = display->y0;
         v1->value = display->y1;
-        dv->value = display->y0-display->y1;
+        dv->value = std::fabs(display->y1 - display->y0);
         t0->value = display->x0;
         t1->value = display->x1;
-        dt->value = fabs(display->x0 - display->x1);
-        f->value = 1 / (display->x1 - display->x0);
+        dt->value = std::fabs(display->x1 - display->x0);
+        f->value = 1.0 / dt->value;
         temp_hori = QString::asprintf("V0 = %s, V1 = %s, ΔV = %s", v0->printVal(), v1->printVal(), dv->printVal());
         temp_vert = QString::asprintf("t0 = %s, t1 = %s, Δt = %s, f = %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
     }
