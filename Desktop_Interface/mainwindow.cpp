@@ -416,7 +416,7 @@ void MainWindow::initialisePlot()
     textLabel->position->setCoords(0.99, 0); // place position at center/top of axis rect
     textLabel->setTextAlignment(Qt::AlignTop|Qt::AlignRight);
     textLabel->setText("Cursor Label Here");
-    textLabel->setFont(QFont("Courier New", 16));
+    textLabel->setFont(QFont("Monospace", 12));
     textLabel->setColor(Qt::white);
     textLabel->setPen(QPen(Qt::white));
     textLabel->setBrush(QBrush(Qt::black));
@@ -427,7 +427,7 @@ void MainWindow::initialisePlot()
     triggerFrequencyLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
     triggerFrequencyLabel->position->setCoords(0.5, 0.98);
     triggerFrequencyLabel->setText("Default Trigger Frequency Text");
-    triggerFrequencyLabel->setFont(QFont("Courier New", 16));
+    triggerFrequencyLabel->setFont(QFont("Monospace", 12));
     triggerFrequencyLabel->setColor(Qt::white);
     triggerFrequencyLabel->setPen(QPen(Qt::white));
     triggerFrequencyLabel->setBrush(QBrush(Qt::black));
