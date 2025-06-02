@@ -453,23 +453,24 @@ void MainWindow::initialisePlot()
     ui->scopeAxes->yAxis->setTicker(yTicker);
 #endif
 
-    QPen *dashPen = new QPen(Qt::white, 2);
-    dashPen->setStyle(Qt::DashLine);
+    QPen axisPen(Qt::white, 1);
+    QPen cursorSolidPen(Qt::white, 2);
+    QPen cursorDashPen(Qt::white, 2);
+    cursorDashPen.setStyle(Qt::DashLine);
 
     ui->scopeAxes->graph(0)->setPen(QPen(Qt::yellow, 1));
     ui->scopeAxes->graph(1)->setPen(QPen(Qt::cyan, 1));
-    ui->scopeAxes->graph(2)->setPen(QPen(Qt::white, 2));
-    ui->scopeAxes->graph(3)->setPen(*(dashPen));
-    ui->scopeAxes->graph(4)->setPen(QPen(Qt::white, 2));
-    ui->scopeAxes->graph(5)->setPen(*(dashPen));
+    ui->scopeAxes->graph(2)->setPen(cursorSolidPen);
+    ui->scopeAxes->graph(3)->setPen(cursorDashPen);
+    ui->scopeAxes->graph(4)->setPen(cursorSolidPen);
+    ui->scopeAxes->graph(5)->setPen(cursorDashPen);
 
-
-    ui->scopeAxes->xAxis->setBasePen(QPen(Qt::white, 1));
-    ui->scopeAxes->yAxis->setBasePen(QPen(Qt::white, 1));
-    ui->scopeAxes->xAxis->setTickPen(QPen(Qt::white, 1));
-    ui->scopeAxes->yAxis->setTickPen(QPen(Qt::white, 1));
-    ui->scopeAxes->xAxis->setSubTickPen(QPen(Qt::white, 1));
-    ui->scopeAxes->yAxis->setSubTickPen(QPen(Qt::white, 1));
+    ui->scopeAxes->xAxis->setBasePen(axisPen);
+    ui->scopeAxes->yAxis->setBasePen(axisPen);
+    ui->scopeAxes->xAxis->setTickPen(axisPen);
+    ui->scopeAxes->yAxis->setTickPen(axisPen);
+    ui->scopeAxes->xAxis->setSubTickPen(axisPen);
+    ui->scopeAxes->yAxis->setSubTickPen(axisPen);
     ui->scopeAxes->xAxis->setTickLength(6);
     ui->scopeAxes->yAxis->setTickLength(6);
     ui->scopeAxes->xAxis->setSubTickLength(4);
