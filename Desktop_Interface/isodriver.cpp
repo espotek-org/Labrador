@@ -636,8 +636,6 @@ void isoDriver::updateCursors(){
 #endif
     if (!cursorStatsEnabled) return;
 
-    QString *cursorStatsString = new QString();
-
     char temp_hori[64];
     char temp_vert[64];
 #ifndef DISABLE_SPECTRUM
@@ -677,14 +675,13 @@ void isoDriver::updateCursors(){
         snprintf(temp_vert, sizeof temp_vert, "t0 = %s, t1 = %s, Δt = %s, f = %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
     }
 
-    if(HORICURSORENABLED) cursorStatsString->append(temp_hori);
-    if(HORICURSORENABLED && VERTCURSORENABLED) cursorStatsString->append("\n");
-    if(VERTCURSORENABLED) cursorStatsString->append(temp_vert);
-    //qDebug() << temp;
+    QString cursorStatsString;
+    if (HORICURSORENABLED) cursorStatsString.append(temp_hori);
+    if (HORICURSORENABLED && VERTCURSORENABLED) cursorStatsString.append("\n");
+    if (VERTCURSORENABLED) cursorStatsString.append(temp_vert);
 #if QCP_VER == 1
-    cursorTextPtr->setText(*(cursorStatsString));
+    cursorTextPtr->setText(cursorStatsString);
 #endif
-    delete cursorStatsString;
 }
 
 short isoDriver::reverseFrontEnd(double voltage){
