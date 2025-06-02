@@ -636,8 +636,8 @@ void isoDriver::updateCursors(){
 #endif
     if (!cursorStatsEnabled) return;
 
-    char temp_hori[64];
-    char temp_vert[64];
+    QString temp_hori;
+    QString temp_vert;
 #ifndef DISABLE_SPECTRUM
     if(spectrum)
     {
@@ -647,8 +647,8 @@ void isoDriver::updateCursors(){
         f0->value = display->x0;
         f1->value = display->x1;
         df->value = fabs(display->x0 - display->x1);
-        snprintf(temp_hori, sizeof temp_hori, "P0 = %s, P1 = %s, ΔP = %s", dbmv0->printVal(), dbmv1->printVal(), ddbmv->printVal());
-        snprintf(temp_vert, sizeof temp_vert, "f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
+        temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", dbmv0->printVal(), dbmv1->printVal(), ddbmv->printVal());
+        temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
     }
     else if(freqResp)
     {
@@ -658,8 +658,8 @@ void isoDriver::updateCursors(){
         f0->value = display->x0;
         f1->value = display->x1;
         df->value = fabs(display->x0 - display->x1);
-        snprintf(temp_hori, sizeof temp_hori, "P0 = %s, P1 = %s, ΔP = %s", db0->printVal(), db1->printVal(), ddb->printVal());
-        snprintf(temp_vert, sizeof temp_vert, "f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
+        temp_hori = QString::asprintf("P0 = %s, P1 = %s, ΔP = %s", db0->printVal(), db1->printVal(), ddb->printVal());
+        temp_vert = QString::asprintf("f0 = %s, f1 = %s, Δf = %s", f0->printVal(), f1->printVal(), df->printVal());
     }
     else
 #endif
@@ -671,8 +671,8 @@ void isoDriver::updateCursors(){
         t1->value = display->x1;
         dt->value = fabs(display->x0 - display->x1);
         f->value = 1 / (display->x1 - display->x0);
-        snprintf(temp_hori, sizeof temp_hori, "V0 = %s, V1 = %s, ΔV = %s", v0->printVal(), v1->printVal(), dv->printVal());
-        snprintf(temp_vert, sizeof temp_vert, "t0 = %s, t1 = %s, Δt = %s, f = %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
+        temp_hori = QString::asprintf("V0 = %s, V1 = %s, ΔV = %s", v0->printVal(), v1->printVal(), dv->printVal());
+        temp_vert = QString::asprintf("t0 = %s, t1 = %s, Δt = %s, f = %s", t0->printVal(), t1->printVal(), dt->printVal(), f->printVal());
     }
 
     QString cursorStatsString;
