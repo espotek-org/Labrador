@@ -586,7 +586,7 @@ void isoDriver::cursorEnableVert(bool enabled){
 void isoDriver::updateCursors(){
     if(!(VERTCURSORENABLED || HORICURSORENABLED)){
 #if QCP_VER == 1
-        cursorTextPtr->setVisible(0);
+        cursorLabel->setVisible(0);
 #endif
         return;
     }
@@ -632,7 +632,7 @@ void isoDriver::updateCursors(){
         axes->graph(5)->setData(hori1x, hori1y);
     }
 #if QCP_VER == 1
-    cursorTextPtr->setVisible(cursorStatsEnabled);
+    cursorLabel->setVisible(cursorStatsEnabled);
 #endif
     if (!cursorStatsEnabled) return;
 
@@ -680,7 +680,7 @@ void isoDriver::updateCursors(){
     if (HORICURSORENABLED && VERTCURSORENABLED) cursorStatsString.append("\n");
     if (VERTCURSORENABLED) cursorStatsString.append(temp_vert);
 #if QCP_VER == 1
-    cursorTextPtr->setText(cursorStatsString);
+    cursorLabel->setText(cursorStatsString);
 #endif
 }
 

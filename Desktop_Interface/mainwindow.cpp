@@ -398,7 +398,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::initialisePlot()
 {
-    QCPCurve *xyCurve = new QCPCurve(ui->scopeAxes->xAxis, ui->scopeAxes->yAxis);
+    auto xyCurve = new QCPCurve(ui->scopeAxes->xAxis, ui->scopeAxes->yAxis);
     xyCurve->setPen(QPen(Qt::yellow, 1));
     ui->scopeAxes->addPlottable(xyCurve);
     ui->scopeAxes->addGraph();
@@ -409,19 +409,19 @@ void MainWindow::initialisePlot()
     ui->scopeAxes->addGraph();
 
 #if QCP_VER == 1
-    textLabel = new QCPItemText(ui->scopeAxes);
-    ui->scopeAxes->addItem(textLabel);
-    textLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
-    textLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
-    textLabel->position->setCoords(0.99, 0); // place position at center/top of axis rect
-    textLabel->setTextAlignment(Qt::AlignTop|Qt::AlignRight);
-    textLabel->setText("Cursor Label Here");
-    textLabel->setFont(QFont("Monospace", 12));
-    textLabel->setColor(Qt::white);
-    textLabel->setPen(QPen(Qt::white));
-    textLabel->setBrush(QBrush(Qt::black));
+    auto cursorLabel = new QCPItemText(ui->scopeAxes);
+    ui->scopeAxes->addItem(cursorLabel);
+    cursorLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
+    cursorLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
+    cursorLabel->position->setCoords(0.99, 0); // place position at center/top of axis rect
+    cursorLabel->setTextAlignment(Qt::AlignTop|Qt::AlignRight);
+    cursorLabel->setText("Cursor Label Here");
+    cursorLabel->setFont(QFont("Monospace", 12));
+    cursorLabel->setColor(Qt::white);
+    cursorLabel->setPen(QPen(Qt::white));
+    cursorLabel->setBrush(QBrush(Qt::black));
 
-    QCPItemText* triggerFrequencyLabel = new QCPItemText(ui->scopeAxes);
+    auto triggerFrequencyLabel = new QCPItemText(ui->scopeAxes);
     ui->scopeAxes->addItem(triggerFrequencyLabel);
     triggerFrequencyLabel->setPositionAlignment(Qt::AlignBottom|Qt::AlignHCenter);
     triggerFrequencyLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
@@ -433,9 +433,9 @@ void MainWindow::initialisePlot()
     triggerFrequencyLabel->setBrush(QBrush(Qt::black));
 
 
-    textLabel->setVisible(false);
+    cursorLabel->setVisible(false);
     triggerFrequencyLabel->setVisible(false);
-    ui->controller_iso->cursorTextPtr = textLabel;
+    ui->controller_iso->cursorLabel = cursorLabel;
     ui->controller_iso->triggerFrequencyLabel = triggerFrequencyLabel;
 
     ui->scopeAxes->yAxis->setAutoTickCount(9);

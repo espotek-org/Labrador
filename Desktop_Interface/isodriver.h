@@ -62,7 +62,7 @@ public:
     isoBuffer *internalBuffer750;
     isoBuffer_file *internalBufferFile = NULL;
 #if QCP_VER == 1
-    QCPItemText *cursorTextPtr;
+    QCPItemText *cursorLabel;
     QCPItemText *triggerFrequencyLabel;
 #endif
     genericUsbDriver *driver;
