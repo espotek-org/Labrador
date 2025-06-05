@@ -409,6 +409,9 @@ void MainWindow::initialisePlot()
     ui->scopeAxes->addGraph();
 
 #if QCP_VER == 1
+    QFont labelFont("Monospace", 12);
+    labelFont.setStyleHint(QFont::Monospace);
+
     auto cursorLabel = new QCPItemText(ui->scopeAxes);
     ui->scopeAxes->addItem(cursorLabel);
     cursorLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
@@ -416,7 +419,7 @@ void MainWindow::initialisePlot()
     cursorLabel->position->setCoords(0.99, 0); // place position at center/top of axis rect
     cursorLabel->setTextAlignment(Qt::AlignTop|Qt::AlignRight);
     cursorLabel->setText("Cursor Label Here");
-    cursorLabel->setFont(QFont("Monospace", 12));
+    cursorLabel->setFont(labelFont);
     cursorLabel->setColor(Qt::white);
     cursorLabel->setPen(QPen(Qt::white));
     cursorLabel->setBrush(QBrush(Qt::black));
@@ -427,7 +430,7 @@ void MainWindow::initialisePlot()
     triggerFrequencyLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
     triggerFrequencyLabel->position->setCoords(0.5, 0.98);
     triggerFrequencyLabel->setText("Default Trigger Frequency Text");
-    triggerFrequencyLabel->setFont(QFont("Monospace", 12));
+    triggerFrequencyLabel->setFont(labelFont);
     triggerFrequencyLabel->setColor(Qt::white);
     triggerFrequencyLabel->setPen(QPen(Qt::white));
     triggerFrequencyLabel->setBrush(QBrush(Qt::black));
