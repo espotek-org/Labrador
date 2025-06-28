@@ -227,6 +227,7 @@ private slots:
 #ifndef DISABLE_SPECTRUM
     void on_actionFrequency_Spectrum_triggered(bool checked);
     void on_actionFrequency_Response_triggered(bool checked);
+    void on_actionEye_Diagram_triggered(bool checked);
 #endif
 
     void on_serialEncodingCheck_CH1_toggled(bool checked);
@@ -318,6 +319,10 @@ private:
     espoSpinBox* freqRespStepSpinbox = nullptr;
     QComboBox* freqRespTypeComboBox = nullptr;
     QPushButton *freqRespRestartButton = nullptr;
+
+    // Eye diagram
+    QWidget* eyeDiagramLayoutWidget = nullptr;
+    QSpinBox* eyeDiagramNumTracesSpinbox = nullptr;
 #endif
 
     //Duct Tape

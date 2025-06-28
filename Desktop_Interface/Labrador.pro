@@ -56,6 +56,7 @@ SOURCES += \
     asyncdft.cpp
 
 HEADERS += \
+    spline.h \
     mainwindow.h \
     functiongencontrol.h \
     xmega.h \

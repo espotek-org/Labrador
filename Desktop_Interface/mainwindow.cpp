@@ -388,6 +388,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->verticalLayout->addWidget(freqRespLayout2Widget);
     freqRespLayout1Widget->setVisible(false);
     freqRespLayout2Widget->setVisible(false);
+
+    // Eye diagram
+    eyeDiagramLayoutWidget = new QWidget();
+    QHBoxLayout* eyeDiagram = new QHBoxLayout(eyeDiagramLayoutWidget);
+    eyeDiagramLayoutWidget->setLayout(eyeDiagram);
+    ui->verticalLayout->addWidget(eyeDiagramLayoutWidget);
+    eyeDiagramLayoutWidget->setVisible(false);
 #endif
 }
 
@@ -401,12 +408,14 @@ void MainWindow::initialisePlot()
     auto xyCurve = new QCPCurve(ui->scopeAxes->xAxis, ui->scopeAxes->yAxis);
     xyCurve->setPen(QPen(Qt::yellow, 1));
     ui->scopeAxes->addPlottable(xyCurve);
-    ui->scopeAxes->addGraph();
-    ui->scopeAxes->addGraph();
-    ui->scopeAxes->addGraph();
-    ui->scopeAxes->addGraph();
-    ui->scopeAxes->addGraph();
-    ui->scopeAxes->addGraph();
+    ui->scopeAxes->addGraph(); // Oscilloscope CH1 / Logic Analyzer CH1
+    ui->scopeAxes->addGraph(); // Oscilloscope CH2 / Logic Analyzer CH1 / Logic Analyzer CH2
+    ui->scopeAxes->addGraph(); // Vertical cursor begin
+    ui->scopeAxes->addGraph(); // Vertical cursor end
+    ui->scopeAxes->addGraph(); // Horizontal cursor begin
+    ui->scopeAxes->addGraph(); // Horizontal cursor end
+    for(int i=0; i<=94; ++i)
+        ui->scopeAxes->addGraph(); // eye diagram
 
 #if QCP_VER == 1
     QFont labelFont("Monospace", 12);
@@ -467,6 +476,8 @@ void MainWindow::initialisePlot()
     ui->scopeAxes->graph(3)->setPen(cursorDashPen);
     ui->scopeAxes->graph(4)->setPen(cursorSolidPen);
     ui->scopeAxes->graph(5)->setPen(cursorDashPen);
+    for(int i=0; i<=94; ++i)
+        ui->scopeAxes->graph(6+i)->setPen(QPen(Qt::yellow, 1));
 
     ui->scopeAxes->xAxis->setBasePen(axisPen);
     ui->scopeAxes->yAxis->setBasePen(axisPen);
@@ -2690,6 +2701,10 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         freqRespLayout1Widget->setVisible(false);
         freqRespLayout2Widget->setVisible(false);
         ui->actionFrequency_Response->setChecked(false);
+
+        ui->controller_iso->eyeDiagram = false;
+        eyeDiagramLayoutWidget->setVisible(false);
+        ui->actionEye_Diagram->setChecked(false);
     }
     ui->scopeGroup_CH2->setDisabled(false);
     ui->controller_iso->display = checked ? ui->controller_iso->display1: ui->controller_iso->display0;
@@ -2718,6 +2733,11 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->controller_iso->spectrum = false;
         spectrumLayoutWidget->setVisible(false);
         ui->actionFrequency_Spectrum->setChecked(false);
+
+        ui->controller_iso->eyeDiagram = false;
+        eyeDiagramLayoutWidget->setVisible(false);
+        ui->actionEye_Diagram->setChecked(false);
+
         ui->doubleSampleLabel->setChecked(false);
         ui->multimeterGroup->setChecked(false);
         ui->busSnifferGroup_CH1->setChecked(false);
@@ -2733,6 +2753,39 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
     if(checked){
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
+    }else{
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+    }
+}
+
+void MainWindow::on_actionEye_Diagram_triggered(bool checked)
+{
+    ui->controller_iso->eyeDiagram = checked;
+    eyeDiagramLayoutWidget->setVisible(checked);
+    if(ui->controller_iso->freqResp)
+    {
+        ui->scopeGroup_CH1->setCheckable(true);
+        ui->scopeGroup_CH2->setCheckable(true);
+    }
+    if(checked)
+    {
+        ui->controller_iso->spectrum = false;
+        spectrumLayoutWidget->setVisible(false);
+        ui->actionFrequency_Spectrum->setChecked(false);
+
+        ui->controller_iso->freqResp = false;
+        freqRespLayout1Widget->setVisible(false);
+        freqRespLayout2Widget->setVisible(false);
+        ui->actionFrequency_Response->setChecked(false);
+    }
+
+    ui->scopeGroup_CH2->setDisabled(false);
+    ui->controller_iso->display = checked ? ui->controller_iso->display3: ui->controller_iso->display0;
+
+    if(checked){
+        ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled3);
+        ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled3);
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);

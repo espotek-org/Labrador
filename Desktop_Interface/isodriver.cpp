@@ -11,6 +11,7 @@
 
 #ifndef DISABLE_SPECTRUM
 #include "asyncdft.h"
+#include "spline.h"
 
 #define PI 3.141592653589793  // Predefined value for pi
 #define PI_2 2*PI
@@ -19,8 +20,8 @@
 #define PI_8 8*PI
 static constexpr int kSpectrumCounterMax = 4;
 
-#define HORICURSORENABLED ((!spectrum & !freqResp & horiCursorEnabled0) | (spectrum & horiCursorEnabled1) | (freqResp & horiCursorEnabled2))
-#define VERTCURSORENABLED ((!spectrum & !freqResp & vertCursorEnabled0) | (spectrum & vertCursorEnabled1) | (freqResp & vertCursorEnabled2))
+#define HORICURSORENABLED ((!spectrum & !freqResp & !eyeDiagram & horiCursorEnabled0) | (spectrum & horiCursorEnabled1) | (freqResp & horiCursorEnabled2) | (eyeDiagram & horiCursorEnabled3))
+#define VERTCURSORENABLED ((!spectrum & !freqResp & !eyeDiagram & vertCursorEnabled0) | (spectrum & vertCursorEnabled1) | (freqResp & vertCursorEnabled2) | (eyeDiagram & vertCursorEnabled3))
 #else
 #define HORICURSORENABLED (horiCursorEnabled0)
 #define VERTCURSORENABLED (vertCursorEnabled0)
@@ -321,7 +322,7 @@ void isoDriver::setVoltageRange(QWheelEvent* event)
 {
     if (doNotTouchGraph && !fileModeEnabled) return;
 #ifndef DISABLE_SPECTRUM
-    if (spectrum || freqResp) return;
+    if (spectrum || freqResp || eyeDiagram) return;
 #endif
 
     bool isProperlyPaused = properlyPaused();
@@ -563,6 +564,8 @@ void isoDriver::cursorEnableHori(bool enabled){
         horiCursorEnabled1 = enabled;
     else if(freqResp)
         horiCursorEnabled2 = enabled;
+    else if(eyeDiagram)
+        horiCursorEnabled3 = enabled;
     else
 #endif
         horiCursorEnabled0 = enabled;
@@ -576,6 +579,8 @@ void isoDriver::cursorEnableVert(bool enabled){
         vertCursorEnabled1 = enabled;
     else if(freqResp)
         vertCursorEnabled2 = enabled;
+    else if(eyeDiagram)
+        vertCursorEnabled3 = enabled;
     else
 #endif
         vertCursorEnabled0 = enabled;
@@ -604,8 +609,8 @@ void isoDriver::updateCursors(){
     vert1y[1] = display->topRange;
 
 #ifndef DISABLE_SPECTRUM
-    hori0x[0] = (spectrum || freqResp) ? 0 : -display->window - display->delay;
-    hori0x[1] = (spectrum || freqResp) ? display->window : -display->delay;
+    hori0x[0] = (spectrum || freqResp || eyeDiagram) ? -display->window : -display->window - display->delay;
+    hori0x[1] = (spectrum || freqResp || eyeDiagram) ?  display->window : -display->delay;
 #else
     hori0x[0] = -display->window - display->delay;
     hori0x[1] = -display->delay;
@@ -614,8 +619,8 @@ void isoDriver::updateCursors(){
     hori0y[1] = display->y0;
 
 #ifndef DISABLE_SPECTRUM
-    hori1x[0] = (spectrum || freqResp) ? 0 : -display->window - display->delay;
-    hori1x[1] = (spectrum || freqResp) ? display->window : -display->delay;
+    hori1x[0] = (spectrum || freqResp || eyeDiagram) ? -display->window : -display->window - display->delay;
+    hori1x[1] = (spectrum || freqResp || eyeDiagram) ?  display->window : -display->delay;
 #else
     hori1x[0] = -display->window - display->delay;
     hori1x[1] = -display->delay;
@@ -799,8 +804,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     float *readDataFile;
 
 #ifndef DISABLE_SPECTRUM
-    if (spectrum) {
-        // The spectrum is computationally expensive to calculate, so we don't want to do it on every frame
+    if (spectrum || eyeDiagram) {
+        // The spectrum and eyeDiagram are computationally expensive to calculate, so we don't want to do it on every frame
         m_spectrumCounter = (m_spectrumCounter + 1) % kSpectrumCounterMax;
         if (m_spectrumCounter != 0)
             return;
@@ -823,6 +828,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     }
 
     QVector<double> CH1, CH2;
+    double CH1_avg = 0;
+    double samplesPerSymbol = 0;
+    int numSymbols = 0;
 
     if (CH1_mode == -1 || CH1_mode == 1) {
         CH1 = analogConvert(readData_CH1, 128, AC_CH1, 1);
@@ -840,6 +848,75 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
                 CH1[i] /= m_attenuation_CH1;
                 CH1[i] += m_offset_CH1;
             }
+
+#ifndef DISABLE_SPECTRUM
+            if(eyeDiagram)
+            {
+                // Analog to digital conversion
+                double HYSTERESIS = 0.5;
+                CH1_avg = std::accumulate(CH1.begin(), CH1.end(), 0.0) / CH1.size();
+                QVector<int> CH1_bin(CH1.size());
+                CH1_bin[0] = 0;
+                for (int i = 1; i < CH1.size(); ++i)
+                {
+                    if(CH1_bin[i-1] == 0 && CH1[i] > CH1_avg+HYSTERESIS)
+                        CH1_bin[i] = 1;
+                    else if(CH1_bin[i-1] == 1 && CH1[i] < CH1_avg-HYSTERESIS)
+                        CH1_bin[i] = 0;
+                    else
+                        CH1_bin[i] = CH1_bin[i-1];
+                }
+
+                // Calculate edges
+                QVector<double> CH1_edge(CH1_bin.size());
+                for (int i = 1; i < CH1_bin.size(); ++i)
+                    CH1_edge[i] = std::abs(CH1_bin[i] - CH1_bin[i-1]);
+
+                // Find the index of the peak frequency
+                // Calculate power (frequency) spectrum
+                setWindowingType(1);	// Hann window
+                QVector<double> yf = m_asyncDFT->getPowerSpectrum_dBmV(CH1_edge, m_windowFactorsSum);
+                // Create an index vector excluding the DC component
+                QVector<int> indices(yf.size()-10);
+                std::iota(indices.begin(), indices.end(), 10);
+                // Sort the index vector based on the values in the power spectrum
+                std::sort(indices.begin(), indices.end(),
+                    [&yf](int i, int j) {
+                        return yf[i] < yf[j];
+                    });
+                // Calculate the mininum from the biggest five indices
+                QVector<int> biggestFiveIndices = indices.mid(indices.size() - 5, 5);
+                int peak_idx = *std::min_element(biggestFiveIndices.begin(), biggestFiveIndices.end());
+
+                // Create a cubic spline interpolation function
+                std::vector<double> xf_partial(11);
+                std::vector<double> yf_partial(11);
+                for (int i = 0; i < 11; ++i) {
+                    xf_partial[i] = peak_idx-5+i;
+                    yf_partial[i] = std::abs(yf[xf_partial[i]]);
+                }
+                tk::spline cs(xf_partial, yf_partial);
+
+                // Generate a fine grid of x values to evaluate the cubic spline
+                QVector<double> x_fine(201);
+                QVector<double> y_fine(201);
+                double step = (xf_partial[10] - xf_partial[0]) / 200;
+                for (int i = 0; i < 201; ++i) {
+                    x_fine[i] = xf_partial[0] + i * step;
+                    y_fine[i] = cs(x_fine[i]);
+                }
+
+                // calculate normalized fundamental frequency
+                double *max_it = std::max_element(y_fine.begin(), y_fine.end());
+                peak_idx = std::distance(y_fine.begin(), max_it);
+                double fundamental_frequency_normalized = x_fine[peak_idx]/CH1.size();
+
+                // Calculate samples per symbol and number of symbols
+                samplesPerSymbol = 1 / (2*fundamental_frequency_normalized);
+                numSymbols = std::round(CH1.size()/samplesPerSymbol);
+                samplesPerSymbol = std::round(samplesPerSymbol);
+            }
+#endif
         }
 
         xmin = (currentVmin < xmin) ? currentVmin : xmin;
@@ -1023,6 +1100,113 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
         }
         axes->graph(1)->clearData();
+    } else if (eyeDiagram){
+
+        int numOutputSamples = numSymbols*samplesPerSymbol;
+
+        // Resample at integer samplesPerSymbol
+        QVector<double> CH1_resampled(numOutputSamples);
+        double inputSize = static_cast<double>(CH1.size());
+        double outputSize = static_cast<double>(numOutputSamples);
+        for (int i = 0; i < numOutputSamples; ++i) {
+            double idx = (i + 0.5) * (inputSize-1) / outputSize;
+            int lb_idx = static_cast<size_t>(idx);
+            int ub_idx = lb_idx + 1;
+            double fraction = idx - lb_idx;
+
+            // Interpolate between data points
+            CH1_resampled[i] = CH1[lb_idx] * (1.0 - fraction) + CH1[ub_idx] * fraction;
+        }
+
+        // Analog to digital conversion
+        QVector<double> CH1_bin(CH1_resampled.size());
+        for (int i = 0; i < CH1_resampled.size(); ++i)
+            CH1_bin[i] = (CH1_resampled[i] > CH1_avg) ? 1 : 0;
+
+        // Calculate edges
+        QVector<double> CH1_edge(CH1_bin.size());
+        for (int i = 1; i < CH1_bin.size(); ++i)
+            CH1_edge[i] = std::abs(CH1_bin[i] - CH1_bin[i-1]);
+
+        // Clock Recovery using digital PLL
+        uint16_t NCO_BIAS  = (1l << 16) / samplesPerSymbol;
+        uint16_t PHASE_TARGET = 300 * (1l << 16) / 360;
+
+        uint16_t nco_phase = 0;
+        int32_t nco_word = 0;
+
+        constexpr int16_t Kp = 6; // bit shift division
+        constexpr int16_t Ki = 9; // bit shift division
+        int32_t integrator = 0;
+
+        int32_t error = 0;
+        QVector<int> error_abs;
+        int32_t moving_avg_size = 5 * samplesPerSymbol;
+        QVector<double> error_avg_list;
+
+        // digital PLL Clock Recovery Loop
+        for (int i = 1; i < CH1_edge.size(); ++i)
+        {
+            // Edge detection
+            if (CH1_edge[i])
+            {
+                error = (int32_t)PHASE_TARGET - nco_phase;
+                integrator += error;
+                nco_word = (error >> Kp) + (integrator >> Ki);
+            }
+            error_abs.append(std::abs(error));
+            nco_phase += (nco_word + NCO_BIAS);
+
+            // Store the average phase error
+            if(i > moving_avg_size)
+            {
+                double error_avg = std::accumulate(error_abs.end()-moving_avg_size, error_abs.end(), 0.0) / moving_avg_size;
+                error_avg_list.append(error_avg);
+            }
+        }
+
+        // After PLL is locked (small average error), it can loose lock due to noise or other disturbances.
+        // Hence, we need to find a segment where the average error is below a given threshold
+        // for a given number of samples.
+        int N = 10000;
+        double error_threshold = 100.0;
+        int counter = 0;
+        for (int i = 0; i < error_avg_list.size(); ++i)
+        {
+            if (error_avg_list[i] < error_threshold) {
+                counter += 1;
+                if (counter == N)
+                {
+                    double *max_it = std::max_element(CH1_edge.begin()+i-N, CH1_edge.end());
+                    int idx = std::distance(CH1_edge.begin(), max_it) + int(samplesPerSymbol/2);
+                    CH1_resampled = CH1_resampled.mid(idx, N);
+                    break;
+                }
+            } else {
+                counter = 0;  // Reset counter if value is not less than threshold
+            }
+        }
+
+        // Plot the overlaid segments
+        int nof_symbols = std::min(int(CH1_resampled.size()/samplesPerSymbol), 96);
+        for (int i = 0; i <= nof_symbols-2; ++i) {
+           QVector<double> x(2 * samplesPerSymbol);
+           QVector<double> y(2 * samplesPerSymbol);
+           for (int j = 0; j < 2 * samplesPerSymbol; ++j) {
+               x[j] = (j - samplesPerSymbol)/internalBuffer_CH1->m_samplesPerSecond;
+               y[j] = CH1_resampled[i*samplesPerSymbol + j];
+            }
+            axes->graph(6+i)->setData(x, y);
+        }
+
+        // plot the eye diagram
+        axes->xAxis->setLabel("Time (samples)");
+        axes->yAxis->setLabel("Voltage (V)");
+        axes->xAxis->setRange(-samplesPerSymbol/internalBuffer_CH1->m_samplesPerSecond, samplesPerSymbol/internalBuffer_CH1->m_samplesPerSecond);
+        axes->yAxis->setRange(std::round(*std::min_element(CH1_resampled.begin(), CH1_resampled.end()))-1, std::round(*std::max_element(CH1_resampled.begin(), CH1_resampled.end()))+1);
+
+        axes->graph(0)->clearData();
+        axes->graph(1)->clearData();
 #endif
 
     } else {
@@ -1032,6 +1216,9 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         axes->yAxis->setLabel("Voltage (V)");
         axes->xAxis->setRange(-display->window - display->delay, -display->delay);
         axes->yAxis->setRange(display->topRange, display->botRange);
+
+        for (int i = 0; i <= 94; ++i)
+            axes->graph(6+i)->clearData();
     }
 
     if(snapshotEnabled_CH1){

@@ -84,6 +84,7 @@ public:
     DisplayControl *display0 = new DisplayControl(-0.1, 0, 2.5, -0.5);
     DisplayControl *display1 = new DisplayControl(0, 375000, 90, -60);
     DisplayControl *display2 = new DisplayControl(0, 62500, 90, -90);
+    DisplayControl *display3 = new DisplayControl(-0.001, 0.001, 12, -12);
     DisplayControl *display = display0;
     //Generic Functions
     void setDriver(genericUsbDriver *newDriver);
@@ -97,17 +98,20 @@ public:
 #ifndef DISABLE_SPECTRUM
     bool spectrum = false;
     bool freqResp = false;
+    bool eyeDiagram = false;
     espoSpinBox *freqValue_CH1 = NULL;
 #endif
     bool horiCursorEnabled0 = false; // TODO: move into DisplayControl
 #ifndef DISABLE_SPECTRUM
     bool horiCursorEnabled1 = false; // TODO: move into DisplayControl
     bool horiCursorEnabled2 = false; // TODO: move into DisplayControl
+    bool horiCursorEnabled3 = false; // TODO: move into DisplayControl
 #endif
     bool vertCursorEnabled0 = false; // TODO: move into DisplayControl
 #ifndef DISABLE_SPECTRUM
     bool vertCursorEnabled1 = false; // TODO: move into DisplayControl
     bool vertCursorEnabled2 = false; // TODO: move into DisplayControl
+    bool vertCursorEnabled3 = false; // TODO: move into DisplayControl
 #endif
 private:
     //Those bloody bools that just Enable/Disable a single property
