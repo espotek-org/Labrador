@@ -2,6 +2,7 @@ name: Build Windows
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   build-windows:
@@ -10,19 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - QT_ARCH: 'win64_msvc2019_64'
-            PLATFORM: 'x64'
-            PLATFORM_ALT_NAME: 'amd64'
-            OUTPUT_BIN_DIR: 'bin64'
-          - QT_ARCH: 'win32_msvc2019'
-            PLATFORM: 'x86'
-            PLATFORM_ALT_NAME: 'x86'
-            OUTPUT_BIN_DIR: 'bin32'
-
-    permissions:
-      id-token: write
-      attestations: write
-
+          - qt_arch: 'win64_msvc2019_64'
+            platform: 'x64'
+            output_bin_dir: 'bin64'
+          - qt_arch: 'win32_msvc2019'
+            platform: 'x86'
+            output_bin_dir: 'bin32'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,38 +27,53 @@ jobs:
           choco install eigen
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           aqtversion: '==3.1.*'
           version: '5.15.2'
           host: 'windows'
           target: 'desktop'
-          arch: '${{ matrix.QT_ARCH }}'
+          arch: '${{ matrix.qt_arch }}'
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: ${{ matrix.PLATFORM }}
+          arch: ${{ matrix.platform }}
+
+      - name: Build librador
+        if: matrix.platform == 'x64'
+        working-directory: Librador_API/___librador/librador
+        run: |
+          qmake -config release
+          nmake
+
+      - name: Build librademo
+        if: matrix.platform == 'x64'
+        working-directory: Librador_API/___librador/librademo
+        run: |
+          qmake -config release
+          nmake
+
+      - name: Build basicdemo
+        if: matrix.platform == 'x64'
+        working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          nmake
 
       - name: Build Labrador
         working-directory: Desktop_Interface
         shell: cmd
         run: |
-          qmake CONFIG+=release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
+          qmake -config release INCLUDEPATH+="C:\ProgramData\chocolatey\lib\eigen\include\eigen3"
           nmake
-
-      - name: Gather dependencies
-        working-directory: Desktop_Interface
-        shell: cmd
-        run: |
+          nmake INSTALL_ROOT=bin install
           windeployqt bin\Labrador.exe
-          xcopy /i /s /y "build_win\fftw\${{ matrix.PLATFORM }}"\libfftw3-3.dll bin
-          xcopy /i /s /y "build_win\libusbk\bin\dll\${{ matrix.PLATFORM_ALT_NAME }}"\libusbK.dll bin
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.OUTPUT_BIN_DIR }}
+          name: ${{ matrix.output_bin_dir }}
           path: Desktop_Interface/bin
 
   build-installer:
@@ -72,30 +81,29 @@ jobs:
       - build-windows
     runs-on: windows-2019
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: Desktop_Interface/build_win
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: bin*
 
       - name: Download additional files
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "http://espotek.com/ai157.msi" -OutFile "ai157.msi"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/Labrador.aip" -OutFile "Labrador.aip"
-          mkdir "driver"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Bootloader_Install.exe" -OutFile "driver/Bootloader_Install.exe"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Driver_Install.exe" -OutFile "driver/Driver_Install.exe"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/Desktop_Interface/build_win/driver/Gobindar_Install.exe" -OutFile "driver/Gobindar_Install.exe"
-          mkdir "Prerequisites/Visual C++ Redistributable for Visual Studio 2017"
-          # XXX: Replacing these installers with the 2019 versions and hoping Advanced Installer handles them properly
-          #Invoke-WebRequest -Uri "http://download.visualstudio.microsoft.com/download/pr/9fbed7c7-7012-4cc0-a0a3-a541f51981b5/e7eec15278b4473e26d7e32cef53a34c/vc_redist.x64.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2017/vc_redist.x64.exe"
-          #Invoke-WebRequest -Uri "http://download.visualstudio.microsoft.com/download/pr/d0b808a8-aa78-4250-8e54-49b8c23f7328/9c5e6532055786367ee61aafb3313c95/vc_redist.x86.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2017/vc_redist.x86.exe"
-          mv "bin64/vc_redist.x64.exe" "Prerequisites/Visual C++ Redistributable for Visual Studio 2017"
-          mv "bin32/vc_redist.x86.exe" "Prerequisites/Visual C++ Redistributable for Visual Studio 2017"
+          Invoke-WebRequest -Uri "http://espotek.com/ai167.msi" -OutFile "ai167.msi"
+          mkdir "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019"
+          Invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/9307e627-aaac-42cb-a32a-a39e166ee8cb/E59AE3E886BD4571A811FE31A47959AE5C40D87C583F786816C60440252CD7EC/VC_redist.x86.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019/VC_redist.x86.exe"
+          Invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/3b070396-b7fb-4eee-aa8b-102a23c3e4f4/40EA2955391C9EAE3E35619C4C24B5AAF3D17AEAA6D09424EE9672AA9372AEED/VC_redist.x64.exe" -OutFile "Prerequisites/Visual C++ Redistributable for Visual Studio 2015-2019/VC_redist.x64.exe"
 
       - name: Install Advanced Installer
         shell: cmd
         run: |
-          msiexec /i ai157.msi /qn
-          rm ai157.msi
+          msiexec /i ai167.msi /qn
+          del ai167.msi
 
       - name: Register Advanced Installer
         env:
@@ -103,17 +111,25 @@ jobs:
         if: env.AI_KEY != ''
         shell: cmd
         run: |
-          "C:/Program Files (x86)/Caphyon/Advanced Installer 15.7/bin/x86/AdvancedInstaller.com" /register %AI_KEY%
+          "C:/Program Files (x86)/Caphyon/Advanced Installer 16.7/bin/x86/AdvancedInstaller.com" /register %AI_KEY%
 
       - name: Build installer
         shell: cmd
+        env:
+            PACKAGE_VERSION: "1.0.${{ github.run_number }}"
         run: |
-          "C:/Program Files (x86)/Caphyon/Advanced Installer 15.7/bin/x86/AdvancedInstaller.com" /rebuild Labrador.aip
+          move Desktop_Interface\build_win\Labrador.aip .
+          move Desktop_Interface\build_win\driver .
+          rmdir /s /q Desktop_Interface
+          for /f "delims=" %%i in ('git rev-parse --short HEAD') do set GIT_HASH_SHORT=%%i
+          "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /edit Labrador.aip /SetPackageName Labrador-%GIT_HASH_SHORT%-installer.exe
+          "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /edit Labrador.aip /SetVersion %PACKAGE_VERSION%
+          "C:\Program Files (x86)\Caphyon\Advanced Installer 16.7\bin\x86\AdvancedInstaller.com" /rebuild Labrador.aip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: exe
-          path: Labrador-SetupFiles/Labrador_Installer.exe
+          name: asset-exe-installer
+          path: Labrador-SetupFiles/Labrador*.exe
           compression-level: 0
           if-no-files-found: error
