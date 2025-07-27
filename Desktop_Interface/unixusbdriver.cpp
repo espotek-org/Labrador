@@ -159,7 +159,7 @@ int unixUsbDriver::usbIsoInit(void){
 				return -1;
             } else {
                 if(n == 0){
-                    qint64 t0;
+                    qint64 t0=0;
                     qint64 t = QDateTime::currentMSecsSinceEpoch();
                     if(k==0){
                         t0 = t;
