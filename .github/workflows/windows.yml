@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - qt_arch: 'win64_msvc2019_64'
+          - qt_arch: 'win64_msvc2022_64'
             platform: 'x64'
             output_bin_dir: 'bin64'
-          - qt_arch: 'win32_msvc2019'
+          - qt_arch: 'win32_msvc2022'
             platform: 'x86'
             output_bin_dir: 'bin32'
     steps:
