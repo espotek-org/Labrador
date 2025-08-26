@@ -6,15 +6,15 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         include:
-          - qt_arch: 'win64_msvc2019_64'
+          - qt_arch: 'win64_msvc2022_64'
             platform: 'x64'
             output_bin_dir: 'bin64'
-          - qt_arch: 'win32_msvc2019'
+          - qt_arch: 'win32_msvc2022'
             platform: 'x86'
             output_bin_dir: 'bin32'
     steps:
@@ -79,7 +79,7 @@ jobs:
   build-installer:
     needs:
       - build-windows
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
