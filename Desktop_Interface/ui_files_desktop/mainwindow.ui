@@ -1664,6 +1664,7 @@
       <addaction name="action14400"/>
       <addaction name="action19200"/>
       <addaction name="action28800"/>
+      <addaction name="action31250"/>
       <addaction name="action38400"/>
       <addaction name="action57600"/>
       <addaction name="action115200"/>
@@ -1704,6 +1705,7 @@
       <addaction name="action14400_2"/>
       <addaction name="action19200_2"/>
       <addaction name="action28800_2"/>
+      <addaction name="action31250_2"/>
       <addaction name="action38400_2"/>
       <addaction name="action57600_2"/>
       <addaction name="action115200_2"/>
@@ -2088,6 +2090,14 @@
     <string>2&amp;8800</string>
    </property>
   </action>
+  <action name="action31250">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>31250</string>
+   </property>
+  </action>
   <action name="action38400">
    <property name="checkable">
     <bool>true</bool>
@@ -2201,6 +2211,14 @@
    </property>
    <property name="text">
     <string>2&amp;8800</string>
+   </property>
+  </action>
+  <action name="action31250_2">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>38400</string>
    </property>
   </action>
   <action name="action38400_2">
