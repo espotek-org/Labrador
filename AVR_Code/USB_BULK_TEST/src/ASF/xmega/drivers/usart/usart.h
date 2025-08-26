@@ -83,10 +83,12 @@ extern "C" {
 #define USART_BAUD_9600      0x03
 //! Offset in lookup table for baudrate 19200
 #define USART_BAUD_19200     0x04
+//! Offset in lookup table for baudrate 31250
+#define USART_BAUD_31250     0x05
 //! Offset in lookup table for baudrate 38400
-#define USART_BAUD_38400     0x05
+#define USART_BAUD_38400     0x06
 //! Offset in lookup table for baudrate 57600
-#define USART_BAUD_57600     0x06
+#define USART_BAUD_57600     0x07
 //! Baudrate not in lookup table
 #define USART_BAUD_UNDEFINED 0xFF
 

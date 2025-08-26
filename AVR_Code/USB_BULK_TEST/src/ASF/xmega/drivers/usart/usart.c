@@ -268,6 +268,9 @@ static uint8_t usart_get_baud_offset(uint32_t baud)
 	case 19200:
 		return (uint8_t)USART_BAUD_19200;
 
+	case 31250:
+		return (uint8_t)USART_BAUD_31250;
+
 	case 38400:
 		return (uint8_t)USART_BAUD_38400;
 
@@ -301,7 +304,7 @@ void usart_set_bsel_bscale_value(USART_t *usart, uint16_t bsel, uint8_t bscale)
  * \brief Set the baudrate using precalculated BAUDCTRL values from PROGMEM
  *
  * \note This function only works for cpu_hz 2Mhz or 32Mhz and baudrate values
- * 1200, 2400, 4800, 9600, 19200, 38400 and 57600.
+ * 1200, 2400, 4800, 9600, 19200, 31250, 38400 and 57600.
  *
  * \param usart  The USART module.
  * \param baud   The baudrate.
