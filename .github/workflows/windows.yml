@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +79,7 @@ jobs:
   build-installer:
     needs:
       - build-windows
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
