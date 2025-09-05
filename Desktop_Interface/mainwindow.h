@@ -170,7 +170,6 @@ private slots:
     void daq_saveButtonPressed();
 
 
-
     void on_actionAbout_triggered();
 
     void on_actionOpen_DAQ_File_triggered();
@@ -307,9 +306,8 @@ private:
 #ifndef DISABLE_SPECTRUM
     // Frequency spectrum
     QWidget* spectrumLayoutWidget = nullptr;
-    espoSpinBox* spectrumMinXSpinbox = nullptr;
-    espoSpinBox* spectrumMaxXSpinbox = nullptr;
     QComboBox* windowingComboBox = nullptr;
+    QCheckBox *logHorCheckSpectrum = nullptr;
 
     // Frequency response
     QWidget* freqRespLayout1Widget = nullptr;
@@ -319,6 +317,8 @@ private:
     espoSpinBox* freqRespStepSpinbox = nullptr;
     QComboBox* freqRespTypeComboBox = nullptr;
     QPushButton *freqRespRestartButton = nullptr;
+
+    QCheckBox *logHorCheckResp = nullptr;
 
     // Eye diagram
     QWidget* eyeDiagramLayoutWidget = nullptr;

@@ -63,6 +63,7 @@ isoDriver::isoDriver(QWidget *parent) : QLabel(parent)
     f0 = new siprint("Hz", 0);
     f1 = new siprint("Hz", 0);
     df = new siprint("Hz", 0);
+    
 
     startTimer();
 
@@ -322,7 +323,11 @@ void isoDriver::setVoltageRange(QWheelEvent* event)
 {
     if (doNotTouchGraph && !fileModeEnabled) return;
 #ifndef DISABLE_SPECTRUM
-    if (spectrum || freqResp || eyeDiagram) return;
+    if (freqResp || spectrum) {
+        display->setRespAndSpecRanges(event, axes, this);
+        return;
+    }
+    if (eyeDiagram) return;
 #endif
 
     bool isProperlyPaused = properlyPaused();
@@ -340,7 +345,89 @@ DisplayControl::DisplayControl(double left, double right, double top, double bot
     window = right-left;
     topRange = top;
     botRange = bottom;
+    leftRange = left;
+    rightRange = right;
 }
+
+void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes, isoDriver* driver)
+{
+    double steps = event->delta() / 120.0;
+    double c;
+    double pixPct;
+//     QDebug() << "steps" << steps;
+    if (!(event->modifiers() == Qt::ControlModifier) && event->orientation() == Qt::Orientation::Vertical) {
+        QCPRange range = axes->yAxis->range();
+        double upper_range = range.upper;
+        double lower_range = range.lower;
+
+        c = (upper_range - lower_range) / (double)400;
+        pixPct = (double)100 - ((double)100 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
+        if (pixPct < 0) pixPct = 0;
+        if (pixPct > 100) pixPct = 100;
+//         qDebug() << "WHEEL @ " << pixPct << "%";
+//         qDebug() << range.upper;
+        upper_range -= steps * c * pixPct;
+        lower_range += steps * c * (100.0 - pixPct);
+
+        if (upper_range > (double)90) upper_range = (double)90;
+        if (lower_range < -(double)90) lower_range = (double)-90;
+
+        topRange = upper_range;
+        botRange = lower_range;
+        topRangeUpdated(topRange);
+        botRangeUpdated(botRange);
+    } else  {
+        QCPRange range = axes->xAxis->range();
+        double upper_range = range.upper;
+        double lower_range = range.lower;
+
+        if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
+            pixPct = (double)100 * (log((double)axes->xAxis->pixelToCoord(event->x())) - log(range.lower));
+            pixPct /= (double)(log(range.upper) - log(range.lower));
+        } else {
+            pixPct = (double)100 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
+            pixPct /= (double)(range.upper - range.lower);
+        }
+
+        if (pixPct < 0)
+            pixPct = 0;
+
+        if (pixPct > 100)
+            pixPct = 100;
+
+        if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
+            upper_range *= pow(upper_range/lower_range , (-steps * (100.0-pixPct)/200.));
+            lower_range *= pow(upper_range/lower_range , (steps * pixPct)/200.);
+//             driver->retickXAxis();
+            if (lower_range < (double)1) lower_range = (double)1;
+        } else {
+            c = (upper_range - lower_range) / (double)200;
+            upper_range -= steps * c * (100.0 - pixPct);
+            lower_range += steps * c * pixPct;
+            if (lower_range < (double)0) lower_range = (double)0;
+        }
+
+        qDebug() << "WHEEL @ " << pixPct << "%";
+        qDebug() << c * ((double)pixPct);
+
+        if (upper_range > (double)750e3) upper_range = (double)750e3;
+        leftRange = lower_range;
+        rightRange = upper_range;
+
+        if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
+            driver->retickXAxis();
+        }
+
+        // judging by the scopeRangeSwitch code in mainwindow.cpp, it will take a bit more work to make this work on android
+//         m_spectrumMinX = lower_range;
+//         m_spectrumMaxX = upper_range;
+//         setMinSpectrum(lower_range);
+//         axes->xAxis->setRange(lower_range, upper_range);
+        
+    }
+  }
+
+
 
 void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused, double maxWindowSize, QCustomPlot* axes)
 {
@@ -990,9 +1077,12 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
 
         axes->xAxis->setLabel("Frequency (Hz)");
         axes->yAxis->setLabel("Relative Power (dBmV)");
-        axes->xAxis->setRange(m_spectrumMinX, m_spectrumMaxX);
+        axes->xAxis->setRange(display->leftRange, display->rightRange);
+        axes->yAxis->setRange(display->botRange, display->topRange);
+//         axes->yAxis->setRange(m_spectrumMinY, m_spectrumMaxY);
         /*Setting maximum/minimum y-axis -60dBmV to 90dBmV*/
-        axes->yAxis->setRange(90, -60);
+
+//         axes->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
 
     } else if (freqResp) {
         if (!paused_CH1) {
@@ -1092,14 +1182,18 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             // Plot gain response
             axes->graph(0)->setData(m_freqRespFreq, m_freqRespGain);
             axes->yAxis->setLabel("Gain (dB)");
-            axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
-            axes->yAxis->setRange(*std::min_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())-10, *std::max_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())+10);
+            axes->xAxis->setRange(display->leftRange, display->rightRange);
+            axes->yAxis->setRange(display->botRange, display->topRange);
+//             axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
+//             axes->yAxis->setRange(*std::min_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())-10, *std::max_element(m_freqRespGain.constBegin(), m_freqRespGain.constEnd())+10);
         } else {
             // Plot phase response
             axes->graph(0)->setData(m_freqRespFreq, m_freqRespPhase);
             axes->yAxis->setLabel("Phase (degree)");
-            axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
-            axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
+            axes->xAxis->setRange(display->leftRange, display->rightRange);
+            axes->yAxis->setRange(display->botRange, display->topRange);
+//             axes->xAxis->setRange(m_freqRespMin-10, m_freqRespMax+10);
+//             axes->yAxis->setRange(*std::min_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())-10, *std::max_element(m_freqRespPhase.constBegin(), m_freqRespPhase.constEnd())+10);
         }
         axes->graph(1)->clearData();
     } else if (eyeDiagram){
@@ -2069,15 +2163,6 @@ void isoDriver::setHexDisplay_CH2(bool enabled)
 }
 
 #ifndef DISABLE_SPECTRUM
-void isoDriver::setMinSpectrum(double minSpectrum)
-{
-    m_spectrumMinX = minSpectrum;
-}
-
-void isoDriver::setMaxSpectrum(double maxSpectrum)
-{
-    m_spectrumMaxX = maxSpectrum;
-}
 
 void isoDriver::setWindowingType(int windowingType)
 {
@@ -2103,6 +2188,62 @@ void isoDriver::setMaxFreqResp(double maxFreqResp)
     m_freqRespMax = maxFreqResp;
     m_freqRespFlag = true;
 }
+
+void isoDriver::retickXAxis()
+{
+    double lower_range = display->leftRange;
+    double upper_range = display->rightRange;
+
+    if(display->logSpaceX) {
+        axes->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    } else {
+        axes->xAxis->setScaleType(QCPAxis::stLinear);
+    }
+    if(display->logSpaceX) {
+        if((upper_range/lower_range)>100.0) {
+            axes->xAxis->setScaleLogBase(10.0);
+            axes->xAxis->setSubTickCount(9);
+            fSpaceLabel->setVisible(false);
+            axes->xAxis->setNumberPrecision(0);
+            axes->xAxis->setNumberFormat("gb");
+        } else if ((upper_range/lower_range)>10.0) {
+            axes->xAxis->setScaleLogBase(pow(10.0,1./4));
+            axes->xAxis->setSubTickCount(0);
+            fSpaceLabel->setText(QString::asprintf("freq. spacing: x%.2f", pow(10.0,1./4)));
+            fSpaceLabel->setVisible(true);
+            axes->xAxis->setNumberPrecision(0);
+            axes->xAxis->setNumberFormat("f");
+        } else {
+            // round the inverse of the log10 power to the closest power of two, then divide by 4.  e.g, upper_range/lower_range = 10^(1/3.5) yields 10^(1/4/3)=10^(1/16)
+            int log2_inv_log10 = round(log2(1./log10(upper_range/lower_range)));
+            axes->xAxis->setScaleLogBase(pow(10.0,1./(pow(2,log2_inv_log10)*4.)));
+            axes->xAxis->setSubTickCount(0);
+            fSpaceLabel->setText(QString::asprintf("freq. spacing: x%.2f", pow(10.0,1./(pow(2,log2_inv_log10)*4.))));
+            fSpaceLabel->setVisible(true);
+            if(lower_range>10.0) {
+                axes->xAxis->setNumberPrecision(0);
+            } else {
+                axes->xAxis->setNumberPrecision(1);
+            }
+            axes->xAxis->setNumberFormat("f");
+        }
+    } else {
+        fSpaceLabel->setVisible(false);
+        axes->xAxis->setAutoTickCount(6);
+        axes->xAxis->setNumberPrecision(3);
+        axes->xAxis->setNumberFormat("gb");
+    }
+}
+
+void isoDriver::logSpacingEnableHor(bool horLogSpace)
+{
+    if(display->leftRange<1.0) {
+        display->leftRange = 1.0;
+    }
+    display->logSpaceX = horLogSpace;
+    this->retickXAxis();
+}
+
 
 void isoDriver::setFreqRespStep(double freqRespStep)
 {

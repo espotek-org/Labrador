@@ -40,8 +40,12 @@ public:
     double x1 = 0;
     double topRange = 0;
     double botRange = 0;
+    double leftRange = 0;
+    double rightRange = 0;
+    bool logSpaceX = false;
 
     void setVoltageRange (QWheelEvent* event, bool isProperlyPaused, double maxWindowSize, QCustomPlot* axes);
+    void setRespAndSpecRanges (QWheelEvent* event, QCustomPlot* axes, isoDriver* driver);
 
 signals:
     void topRangeUpdated(double);
@@ -63,6 +67,7 @@ public:
     isoBuffer_file *internalBufferFile = NULL;
 #if QCP_VER == 1
     QCPItemText *cursorLabel;
+    QCPItemText *fSpaceLabel;
     QCPItemText *triggerFrequencyLabel;
 #endif
     genericUsbDriver *driver;
@@ -210,8 +215,11 @@ private:
     //Spectrum
     int m_spectrumCounter = 0;
     AsyncDFT *m_asyncDFT;
-    double m_spectrumMinX = 0;
-    double m_spectrumMaxX = 375000;
+//     double m_spectrumMinX = 0;
+//     double m_spectrumMaxX = 375000;
+    bool m_specrumLogF = false;
+    double m_spectrumMinY = -60;
+    double m_spectrumMaxY = 90;
     int m_windowingType = 0;
     QVector<double> m_windowFactors;
     double m_windowFactorsSum;
@@ -224,6 +232,7 @@ private:
     double m_freqRespStep = 100;
     int m_freqRespType = 0;
     bool m_freqRespFlag = false;
+
 #endif
 
 signals:
@@ -323,14 +332,15 @@ public slots:
     void setHexDisplay_CH1(bool enabled);
     void setHexDisplay_CH2(bool enabled);
 #ifndef DISABLE_SPECTRUM
-    void setMinSpectrum(double minSpectrum);
-    void setMaxSpectrum(double maxSpectrum);
     void setWindowingType(int windowing);
     void setMinFreqResp(double minFreqResp);
     void setMaxFreqResp(double maxFreqResp);
     void setFreqRespStep(double stepFreqResp);
     void setFreqRespType(int typeFreqResp);
     void restartFreqResp();
+
+    void logSpacingEnableHor(bool horLogSpace);
+    void retickXAxis();
 #endif
 };
 

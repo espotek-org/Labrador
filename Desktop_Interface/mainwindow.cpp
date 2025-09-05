@@ -269,24 +269,17 @@ MainWindow::MainWindow(QWidget *parent) :
 
 #ifndef DISABLE_SPECTRUM
     // Frequency spectrum
-    spectrumMinXSpinbox = new espoSpinBox();
-    spectrumMaxXSpinbox = new espoSpinBox();
-    windowingComboBox = new QComboBox();
     spectrumLayoutWidget = new QWidget();
     QHBoxLayout* spectrumLayout = new QHBoxLayout(spectrumLayoutWidget);
-    QLabel* spectrumMinFreqLabel = new QLabel("Min Frequency");
-    QLabel* spectrumMaxFreqLabel = new QLabel("Max Frequency");
     QLabel* windowingLabel = new QLabel("Window");
+    windowingComboBox = new QComboBox();
+    QLabel* logSpacingLabelSpec = new QLabel("Log Space Freq.");
+
+    logHorCheckSpectrum = new QCheckBox(spectrumLayoutWidget);
+
+    connect(logHorCheckSpectrum, SIGNAL(toggled(bool)), ui->controller_iso, SLOT(logSpacingEnableHor(bool)));
 
     spectrumLayoutWidget->setLayout(spectrumLayout);
-    spectrumMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    spectrumMinXSpinbox->setRange(0, 375000);
-    spectrumMinXSpinbox->setValue(0);
-    spectrumMinXSpinbox->setSingleStep(1000);
-    spectrumMaxXSpinbox->setSuffix(QString::fromUtf8("Hz"));
-    spectrumMaxXSpinbox->setRange(0, 375000);
-    spectrumMaxXSpinbox->setValue(375000);
-    spectrumMaxXSpinbox->setSingleStep(10000);
     windowingComboBox->addItem("Rectangular");
     windowingComboBox->addItem("Hann");
     windowingComboBox->addItem("Hamming");
@@ -295,25 +288,14 @@ MainWindow::MainWindow(QWidget *parent) :
     windowingComboBox->setCurrentIndex(0);
 
     spectrumLayout->addStretch();
-    spectrumLayout->addWidget(spectrumMinFreqLabel);
-    spectrumLayout->addWidget(spectrumMinXSpinbox);
-    spectrumLayout->addStretch();
-    spectrumLayout->addWidget(spectrumMaxFreqLabel);
-    spectrumLayout->addWidget(spectrumMaxXSpinbox);
-    spectrumLayout->addStretch();
     spectrumLayout->addWidget(windowingLabel);
     spectrumLayout->addWidget(windowingComboBox);
     spectrumLayout->addStretch();
+    spectrumLayout->addWidget(logSpacingLabelSpec);
+    spectrumLayout->addWidget(logHorCheckSpectrum);
+    spectrumLayout->addStretch();
 
-    connect(spectrumMinXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMinSpectrum);
-    connect(spectrumMaxXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), ui->controller_iso, &isoDriver::setMaxSpectrum);
     connect(windowingComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), ui->controller_iso, &isoDriver::setWindowingType);
-
-    connect(spectrumMinXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), spectrumMaxXSpinbox, &espoSpinBox::setMinimum);
-    connect(spectrumMaxXSpinbox, QOverload<double>::of(&espoSpinBox::valueChanged), spectrumMinXSpinbox, &espoSpinBox::setMaximum);
-
-    connect(spectrumMinXSpinbox, SIGNAL(valueChanged(double)), spectrumMinXSpinbox, SLOT(changeStepping(double)));
-    connect(spectrumMaxXSpinbox, SIGNAL(valueChanged(double)), spectrumMaxXSpinbox, SLOT(changeStepping(double)));
 
     ui->verticalLayout->addWidget(spectrumLayoutWidget);
     spectrumLayoutWidget->setVisible(false);
@@ -332,6 +314,10 @@ MainWindow::MainWindow(QWidget *parent) :
     QLabel* freqRespMaxFreqLabel = new QLabel("Max Frequency");
     QLabel* freqRespStepLabel = new QLabel("Step");
     QLabel* freqRespTypeLabel = new QLabel("Response");
+    QLabel* logSpacingLabelResp = new QLabel("Log Space Freq.");
+
+    logHorCheckResp = new QCheckBox(freqRespLayout1Widget);
+    connect(logHorCheckResp, SIGNAL(toggled(bool)), ui->controller_iso, SLOT(logSpacingEnableHor(bool)));
 
     freqRespLayout1Widget->setLayout(freqRespLayout1);
     freqRespMinXSpinbox->setSuffix(QString::fromUtf8("Hz"));
@@ -349,6 +335,9 @@ MainWindow::MainWindow(QWidget *parent) :
     freqRespLayout1->addStretch();
     freqRespLayout1->addWidget(freqRespMaxFreqLabel);
     freqRespLayout1->addWidget(freqRespMaxXSpinbox);
+    freqRespLayout1->addStretch();
+    freqRespLayout1->addWidget(logSpacingLabelResp);
+    freqRespLayout1->addWidget(logHorCheckResp);
     freqRespLayout1->addStretch();
 
     freqRespLayout2Widget->setLayout(freqRespLayout2);
@@ -382,7 +371,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(freqRespMinXSpinbox, SIGNAL(valueChanged(double)), freqRespMinXSpinbox, SLOT(changeStepping(double)));
     connect(freqRespMaxXSpinbox, SIGNAL(valueChanged(double)), freqRespMaxXSpinbox, SLOT(changeStepping(double)));
     connect(freqRespStepSpinbox, SIGNAL(valueChanged(double)), freqRespStepSpinbox, SLOT(changeStepping(double)));
-
 
     ui->verticalLayout->addWidget(freqRespLayout1Widget);
     ui->verticalLayout->addWidget(freqRespLayout2Widget);
@@ -433,6 +421,20 @@ void MainWindow::initialisePlot()
     cursorLabel->setPen(QPen(Qt::white));
     cursorLabel->setBrush(QBrush(Qt::black));
 
+    auto fSpaceLabel = new QCPItemText(ui->scopeAxes);
+    ui->scopeAxes->addItem(fSpaceLabel);
+    fSpaceLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
+    fSpaceLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
+    fSpaceLabel->position->setCoords(1.00, 1.04); // place position at center/top of axis rect
+    fSpaceLabel->setTextAlignment(Qt::AlignBottom|Qt::AlignRight);
+    fSpaceLabel->setText("Cursor Label Here");
+    fSpaceLabel->setClipToAxisRect(false);
+    fSpaceLabel->setFont(labelFont);
+    fSpaceLabel->setColor(Qt::white);
+    fSpaceLabel->setPen(QPen(Qt::white));
+    fSpaceLabel->setBrush(QBrush(Qt::black));
+    fSpaceLabel->setVisible(false);
+
     auto triggerFrequencyLabel = new QCPItemText(ui->scopeAxes);
     ui->scopeAxes->addItem(triggerFrequencyLabel);
     triggerFrequencyLabel->setPositionAlignment(Qt::AlignBottom|Qt::AlignHCenter);
@@ -449,6 +451,7 @@ void MainWindow::initialisePlot()
     triggerFrequencyLabel->setVisible(false);
     ui->controller_iso->cursorLabel = cursorLabel;
     ui->controller_iso->triggerFrequencyLabel = triggerFrequencyLabel;
+    ui->controller_iso->fSpaceLabel = fSpaceLabel;
 
     ui->scopeAxes->yAxis->setAutoTickCount(9);
     ui->scopeAxes->xAxis->setAutoTickCount(9);
@@ -2712,9 +2715,17 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
     if(checked){
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled1);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled1);
+//         ui->controller_iso->logSpacingEnableHorSpec(logHorCheckSpectrum->isChecked());
+        ui->controller_iso->retickXAxis();
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+        ui->controller_iso->fSpaceLabel->setVisible(false);
+        ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
+
+//         ui->controller_iso->logSpacingEnableHorSpec(false);
+        ui->scopeAxes->xAxis->setNumberPrecision(6);
+        ui->scopeAxes->xAxis->setAutoTickCount(9);
     }
 
     if (checked == true)
@@ -2753,9 +2764,14 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
     if(checked){
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
+//         ui->controller_iso->logSpacingEnableHorResp(logHorCheckResp->isChecked());
+        ui->controller_iso->retickXAxis();
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+        ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
+        ui->scopeAxes->xAxis->setNumberPrecision(6);
+        ui->scopeAxes->xAxis->setAutoTickCount(9);
     }
 }
 
