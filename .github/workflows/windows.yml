@@ -39,6 +39,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.platform }}
+          toolset: 14.2
 
       - name: Build librador
         if: matrix.platform == 'x64'
