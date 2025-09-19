@@ -2724,6 +2724,7 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
 
         ui->scopeAxes->xAxis->setNumberPrecision(6);
         ui->scopeAxes->xAxis->setAutoTickCount(9);
+        ui->scopeAxes->xAxis->setNumberFormat("gb");
     }
 
     if (checked == true)
@@ -2769,6 +2770,7 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
         ui->scopeAxes->xAxis->setNumberPrecision(6);
         ui->scopeAxes->xAxis->setAutoTickCount(9);
+        ui->scopeAxes->xAxis->setNumberFormat("gb");
     }
 }
 
