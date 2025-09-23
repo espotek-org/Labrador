@@ -80,6 +80,9 @@ void isoDriver::setDriver(genericUsbDriver *newDriver){
 void isoDriver::setAxes(QCustomPlot *newAxes){
     axes = newAxes;
     qDebug() << "axes = " << axes;
+    qDebug() << "axes = " << axes->xAxis->numberFormat();
+    qDebug() << "axes = " << axes->xAxis->numberPrecision();
+    qDebug() << "axes = " << axes->xAxis->autoTickCount();
 }
 
 void isoDriver::timerTick(void){

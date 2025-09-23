@@ -405,6 +405,7 @@ void MainWindow::initialisePlot()
     for(int i=0; i<=94; ++i)
         ui->scopeAxes->addGraph(); // eye diagram
 
+    defaultNumberFormat = ui->scopeAxes->xAxis->numberFormat();
 #if QCP_VER == 1
     QFont labelFont("Monospace", 12);
     labelFont.setStyleHint(QFont::Monospace);
@@ -2722,9 +2723,9 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         ui->controller_iso->fSpaceLabel->setVisible(false);
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
 
-        ui->scopeAxes->xAxis->setNumberPrecision(6);
-        ui->scopeAxes->xAxis->setAutoTickCount(9);
-        ui->scopeAxes->xAxis->setNumberFormat("gb");
+        ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
+        ui->scopeAxes->xAxis->setAutoTickCount(defaultAutoTickCount);
+        ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
     }
 
     if (checked == true)
@@ -2767,10 +2768,12 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+        ui->controller_iso->fSpaceLabel->setVisible(false);
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
-        ui->scopeAxes->xAxis->setNumberPrecision(6);
-        ui->scopeAxes->xAxis->setAutoTickCount(9);
-        ui->scopeAxes->xAxis->setNumberFormat("gb");
+
+        ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
+        ui->scopeAxes->xAxis->setAutoTickCount(defaultAutoTickCount);
+        ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
     }
 }
 
