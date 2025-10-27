@@ -24,7 +24,7 @@ void isoBuffer_file::writeBuffer_float(float* data, int len)
 float *isoBuffer_file::readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset)
 {
     //ignore singleBit for now
-    double timeBetweenSamples = (double) sampleWindow * samplesPerSecond / (double) numSamples;
+    double timeBetweenSamples = (double) sampleWindow * samplesPerSecond / ((double) numSamples - 1);
     double accumulatedDelay = 0;
     int delaySamples = (int)((double)delayOffset * samplesPerSecond);
 

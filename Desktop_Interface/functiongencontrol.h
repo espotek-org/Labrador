@@ -35,9 +35,15 @@ class SingleChannelController : public QObject
 
 public:
 	ChannelData const& getData() const;
+    void reinitWfData();
+    void resizeWaveform();
+    unsigned char doScalingForTripleMode(unsigned char fGenTriple, ChannelID);
+    void scaleToDAC();
+    void getClockSettings(int* clkSetting, int* timerPeriod);
 
 signals:
     void notifyUpdate(SingleChannelController* controller);
+    void notifyFreqUpdate(int clkSetting, int timerPeriod, int wfSize);
 	void setMaxFreq(double maxFreq);
     void setMinFreq(double minFreq);
 
@@ -53,6 +59,7 @@ public slots:
 
 private:
 	ChannelData m_data;
+	ChannelData m_data_orig;
 };
 
 class DualChannelController : public QLabel
@@ -69,6 +76,7 @@ public:
 
 signals:
     void functionGenToUpdate(ChannelID channel, SingleChannelController* fGenControl);
+    void freqUpdated(ChannelID channel, int newClkSetting, int newTimerPeriod, int wfSize);
     void setMaxFreq_CH1(double maxFreq);
     void setMinFreq_CH1(double minFreq);
     void setMaxFreq_CH2(double maxFreq);

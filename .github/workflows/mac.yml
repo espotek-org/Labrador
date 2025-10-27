@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-dmg:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
         run: |
           brew update
           brew remove --force $(brew list --formula) || true
-          brew install fftw libomp qt@5 libusb eigen
+          brew install fftw libomp qt@5 libusb eigen create-dmg
           brew link libomp qt@5 --force
 
       - name: Build librador
@@ -36,13 +36,106 @@ jobs:
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
 
+      - name: Import code signing certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          # Create keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Import certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$MACOS_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          security import $CERTIFICATE_PATH -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
-          macdeployqt Labrador.app -verbose=2 -dmg -libpath=build_mac/libdfuprog/lib/
-          mv Labrador.dmg Labrador-$(git rev-parse --short HEAD).dmg
+          macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
+
+      - name: Code sign app bundle
+        working-directory: Desktop_Interface
+        run: |
+          # Find the signing identity
+          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          echo "Using signing identity: $IDENTITY"
+          
+          # Sign all frameworks and dylibs first
+          find Labrador.app/Contents/Frameworks -name "*.dylib" -o -name "*.framework" | while read file; do
+            codesign --force --timestamp --options runtime --sign "$IDENTITY" "$file" || true
+          done
+          
+          # Sign the main app bundle
+          codesign --force --deep --timestamp --options runtime --sign "$IDENTITY" Labrador.app
+          
+          # Verify the signature is valid (but don't check Gatekeeper yet - app isn't notarized)
+          codesign -vv --deep --strict Labrador.app
+          echo "App bundle signed successfully"
+
+      - name: Create and sign DMG
+        working-directory: Desktop_Interface
+        run: |
+          # Get the git hash for the filename
+          GIT_HASH=$(git rev-parse --short HEAD)
+          
+          # Find the signing identity
+          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          
+          # Create a beautiful DMG with:
+          # - Applications folder symlink for drag-and-drop
+          # - Custom window size and icon positions
+          # - App icon extracted and used as DMG icon
+          create-dmg \
+            --volname "Labrador" \
+            --volicon "Labrador.app/Contents/Resources/iconfile.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Labrador.app" 175 190 \
+            --hide-extension "Labrador.app" \
+            --app-drop-link 425 190 \
+            --codesign "$IDENTITY" \
+            "Labrador-${GIT_HASH}.dmg" \
+            "Labrador.app"
+
+      - name: Notarize DMG
+        working-directory: Desktop_Interface
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          GIT_HASH=$(git rev-parse --short HEAD)
+          DMG_PATH="Labrador-${GIT_HASH}.dmg"
+          
+          # Submit for notarization
+          echo "Submitting DMG for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          
+          # Staple the notarization ticket to the DMG
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_PATH"
+          
+          # Verify notarization
+          echo "Verifying notarization..."
+          xcrun stapler validate "$DMG_PATH"
+          spctl -a -vvv -t install "$DMG_PATH"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

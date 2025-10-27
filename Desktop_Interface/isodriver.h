@@ -7,6 +7,7 @@
 #include <QVector>
 #include "qcustomplot.h"
 #include "genericusbdriver.h"
+#include "functiongencontrol.h"
 #include "desktop_settings.h"
 #include "siprint.h"
 #include "i2cdecoder.h"
@@ -54,6 +55,7 @@ signals:
     void botRangeUpdated(double);
     void timeWindowUpdated(double);
     void delayUpdated(double);
+
 };
 
 class isoDriver : public QLabel
@@ -71,6 +73,7 @@ public:
     QCPItemText *cursorLabel;
     QCPItemText *fSpaceLabel;
     QCPItemText *triggerFrequencyLabel;
+    bool showTriggerFrequencyLabel = true;
 #endif
     genericUsbDriver *driver;
     bool doNotTouchGraph = true;
@@ -153,7 +156,6 @@ private:
     bool firstFrame = true;
     bool hexDisplay_CH1 = false;
     bool hexDisplay_CH2 = false;
-
 
     //Generic Functions
     QVector<double> analogConvert(std::vector<short> &in, int TOP, bool AC, int channel);
@@ -330,6 +332,8 @@ public slots:
     void attenuationChanged_CH2(int attenuationIndex);
     void setHexDisplay_CH1(bool enabled);
     void setHexDisplay_CH2(bool enabled);
+
+    void newSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize);
 #ifndef DISABLE_SPECTRUM
     void setWindowingType(int windowing);
     void setMinFreqResp(double minFreqResp);

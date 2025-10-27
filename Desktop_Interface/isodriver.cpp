@@ -348,10 +348,7 @@ DisplayControl::DisplayControl(double left, double right, double top, double bot
     rightRange = right;
 }
 
-<<<<<<< HEAD
-=======
 #ifndef DISABLE_SPECTRUM
->>>>>>> freq_resp_and_spec_zoom
 void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes, isoDriver* driver)
 {
     double steps = event->delta() / 120.0;
@@ -420,10 +417,7 @@ void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes,
         
     }
   }
-<<<<<<< HEAD
-=======
 #endif
->>>>>>> freq_resp_and_spec_zoom
 
 
 
@@ -812,6 +806,13 @@ void isoDriver::setTriggerLevel(double level)
     triggerStateChanged();
 }
 
+// channel ID here refers to the wf gen channels
+void isoDriver::newSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize) {
+    internalBuffer375_CH1->setSigGenTriggerFreq(channelID, clkSetting, timerPeriod, wfSize);
+    internalBuffer750->setSigGenTriggerFreq(channelID, clkSetting, timerPeriod, wfSize);
+}
+
+
 void isoDriver::setSingleShotEnabled(bool enabled)
 {
     singleShotEnabled = enabled;
@@ -871,17 +872,13 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     auto internalBuffer_CH1 = (CH1_mode == -1) ? internalBuffer750 : internalBuffer375_CH1;
     auto internalBuffer_CH2 = internalBuffer375_CH2;
 
-    double triggerDelay = 0;
-    if (triggerEnabled)
-    {
-        triggerDelay = (triggerMode < 2) ? internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window
-                                         : internalBuffer_CH2->getDelayedTriggerPoint(display->window) - display->window;
-
-        if (triggerDelay < 0)
-            triggerDelay = 0;
-    }
-
-    if(singleShotEnabled && (triggerDelay != 0))
+    int fullDelaySamples;
+    bool triggering;
+    if((triggerMode<2)||(triggerMode>=4))
+        internalBuffer_CH1->getDelayedTriggerPoint(display->delay,display->window,&fullDelaySamples,&triggering);
+    else
+        internalBuffer_CH2->getDelayedTriggerPoint(display->delay, display->window,&fullDelaySamples,&triggering);
+    if(singleShotEnabled && triggering)
         singleShotTriggered(1);
 
     std::vector<short> readData_CH1;
@@ -899,17 +896,17 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         readData_CH2 = internalBuffer_CH2->readWindow();
     } else if (freqResp) {
         double freqResp_window = 1/freqValue_CH1->value();
-        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, triggerDelay);
-        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, triggerDelay);
+        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, fullDelaySamples);
+        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, fullDelaySamples);
     } else
 #endif
     {
         if (CH1_mode == -2)
             readDataFile = internalBufferFile->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay);
         else if (CH1_mode)
-            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2, display->delay + triggerDelay);
+            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2,  fullDelaySamples);
         if (CH2_mode)
-            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, display->delay + triggerDelay);
+            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, fullDelaySamples);
     }
 
     QVector<double> CH1, CH2;
@@ -1356,19 +1353,14 @@ void isoDriver::multimeterAction(){
         }
     }
 
-    double triggerDelay = 0;
-    if (triggerEnabled)
-    {
-        triggerDelay = internalBuffer375_CH1->getDelayedTriggerPoint(display->window) - display->window;
+    int fullDelaySamples;
+    bool triggering;
+    internalBuffer375_CH1->getDelayedTriggerPoint(display->delay, display->window, &fullDelaySamples, &triggering);
 
-        if (triggerDelay < 0)
-            triggerDelay = 0;
-    }
-
-    if(singleShotEnabled && (triggerDelay != 0))
+    if(singleShotEnabled && triggering)
         singleShotTriggered(1);
 
-    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
+    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, fullDelaySamples);
     auto CH1 = analogConvert(readData_CH1, 2048, 0, 1);  //No AC coupling!
 
     QVector<double> x(CH1.size());
@@ -1734,7 +1726,7 @@ void isoDriver::slowTimerTick(){
     update_CH1 = true;
     update_CH2 = true;
 
-    bool frequencyLabelVisible = false;
+    bool frequencyLabelValid = false;
 
     if (triggerEnabled)
     {
@@ -1750,11 +1742,15 @@ void isoDriver::slowTimerTick(){
         case 3:
             triggerFrequency = internalBuffer375_CH2->getTriggerFrequencyHz();
             break;
+        case 4:
+        case 5:
+            triggerFrequency = (driver->deviceMode == 6) ? internalBuffer750->getTriggerFrequencyHz() : internalBuffer375_CH1->getTriggerFrequencyHz();
+            break;
         }
 
         if (triggerFrequency > 0.)
         {
-            frequencyLabelVisible = true;
+            frequencyLabelValid = true;
             siprint triggerFreqSiprint("Hz", triggerFrequency);
             siprint periodSiprint("s", 1. / triggerFrequency);
 
@@ -1764,7 +1760,7 @@ void isoDriver::slowTimerTick(){
         qDebug() << triggerFrequency << "Hz";
     }
 
-    triggerFrequencyLabel->setVisible(frequencyLabelVisible);
+    triggerFrequencyLabel->setVisible(showTriggerFrequencyLabel&&frequencyLabelValid);
 }
 
 void isoDriver::setTopRange(double newTop)
@@ -2053,6 +2049,7 @@ void isoDriver::triggerStateChanged()
 {
     if (!triggerEnabled)
     {
+
         internalBuffer375_CH1->setTriggerType(TriggerType::Disabled);
         internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
         internalBuffer750->setTriggerType(TriggerType::Disabled);
@@ -2091,6 +2088,23 @@ void isoDriver::triggerStateChanged()
             internalBuffer750->setTriggerType(TriggerType::Disabled);
             break;
         }
+    // use the CH1 buffer to do the sig gen trigger timekeeping.  If there were a Ch. 2-only mode for the device,
+    // this practice could be problematic, but at present there is no Ch. 2-only mode.
+    // Also, in CH#SigGen below, the channel number refers to the sig gen channel
+        case 4:
+        {
+            internalBuffer375_CH1->setTriggerType(TriggerType::CH1SigGen);
+            internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
+            internalBuffer750->setTriggerType(TriggerType::CH1SigGen);
+            break;
+        }
+        case 5:
+        {
+            internalBuffer375_CH1->setTriggerType(TriggerType::CH2SigGen);
+            internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
+            internalBuffer750->setTriggerType(TriggerType::CH2SigGen);
+        }
+
     }
 }
 
