@@ -249,6 +249,10 @@ private:
     double reinitScopeGain;
     double reinitCurrentPsuVoltage;
     int reinitDigitalPinState;
+    
+    int defaultAutoTickCount = 9;
+    int defaultNumberPrecision = 6;
+    QString defaultNumberFormat;
 
     QSettings *settings;
 	bool calibrationCanceled = false;

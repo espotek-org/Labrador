@@ -9,7 +9,7 @@
 #ifndef GLOBALS_H_
 #define GLOBALS_H_
 
-//#define SINGLE_ENDPOINT_INTERFACE
+#define SINGLE_ENDPOINT_INTERFACE
 
 //#define VERO
 #define OVERCLOCK 48

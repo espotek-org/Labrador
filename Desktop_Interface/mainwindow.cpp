@@ -406,6 +406,7 @@ void MainWindow::initialisePlot()
     for(int i=0; i<=94; ++i)
         ui->scopeAxes->addGraph(); // eye diagram
 
+    defaultNumberFormat = ui->scopeAxes->xAxis->numberFormat();
 #if QCP_VER == 1
     QFont labelFont("Monospace", 12);
     labelFont.setStyleHint(QFont::Monospace);
@@ -2724,8 +2725,9 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         ui->controller_iso->fSpaceLabel->setVisible(false);
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
 
-        ui->scopeAxes->xAxis->setNumberPrecision(6);
-        ui->scopeAxes->xAxis->setAutoTickCount(9);
+        ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
+        ui->scopeAxes->xAxis->setAutoTickCount(defaultAutoTickCount);
+        ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
     }
 
     if (checked == true) {
@@ -2768,13 +2770,18 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
         ui->controller_iso->retickXAxis();
+
         ui->controller_iso->showTriggerFrequencyLabel = false;
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+        ui->controller_iso->fSpaceLabel->setVisible(false);
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
-        ui->scopeAxes->xAxis->setNumberPrecision(6);
-        ui->scopeAxes->xAxis->setAutoTickCount(9);
+
+        ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
+        ui->scopeAxes->xAxis->setAutoTickCount(defaultAutoTickCount);
+        ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
+
         ui->controller_iso->showTriggerFrequencyLabel = true;
     }
 }
@@ -2912,11 +2919,11 @@ void MainWindow::triggerChannelChanged(int newTriggerChannel){
         ui->triggerLevelValue->setEnabled(false);
         ui->singleShotCheckBox->setEnabled(false);
         ui->singleShotCheckBox->setChecked(false);
-        ui->label_6->setEnabled(false);
+//         ui->label_6->setEnabled(false);
     } else {
         ui->triggerLevelValue->setEnabled(true);
         ui->singleShotCheckBox->setEnabled(true);
-        ui->label_6->setEnabled(true);
+//         ui->label_6->setEnabled(true);
     }
 }
 
