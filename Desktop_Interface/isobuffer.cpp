@@ -449,14 +449,10 @@ void isoBuffer::setTriggerLevel(double voltageLevel, uint16_t top, bool acCouple
 void isoBuffer::setSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize)
 {
     int validClockDivs[7] = {1, 2, 4, 8, 64, 256, 1024};
-    qDebug() << "clksetting" << clkSetting;
-    qDebug() << "timerPeriod" << timerPeriod;
-    qDebug() << "wfSize" << wfSize;
 
     double freq_ratio = ((double) (CLOCK_FREQ/m_samplesPerSecond))/validClockDivs[clkSetting-1]; // a power 2**n, n possibly < 0
 
     double bufferSamplesPerWfCycle = wfSize * (timerPeriod+1) / freq_ratio;
-    qDebug() << "bspwfc" << bufferSamplesPerWfCycle;
 
     if(channelID==functionGen::ChannelID::CH1) {
         if(bufferSamplesPerCH1WfCycle!=bufferSamplesPerWfCycle){

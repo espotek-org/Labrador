@@ -167,7 +167,7 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(ui->psuSlider, SIGNAL(voltageChanged(double)), ui->controller_iso->driver, SLOT(setPsu(double)));
         connect(ui->controller_iso, SIGNAL(setGain(double)), ui->controller_iso->driver, SLOT(setGain(double)));
         connect(ui->controller_fg, &functionGenControl::functionGenToUpdate, ui->controller_iso->driver, &genericUsbDriver::setFunctionGen);
-        connect(ui->controller_fg, &functionGenControl::freqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
+        connect(ui->controller_iso->driver, &genericUsbDriver::sigGenFreqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
         connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 		connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 			// Force a trigger refresh
@@ -1515,7 +1515,7 @@ void MainWindow::reinitUsbStage2(void){
     connect(ui->psuSlider, SIGNAL(voltageChanged(double)), ui->controller_iso->driver, SLOT(setPsu(double)));
     connect(ui->controller_iso, SIGNAL(setGain(double)), ui->controller_iso->driver, SLOT(setGain(double)));
     connect(ui->controller_fg, &functionGenControl::functionGenToUpdate, ui->controller_iso->driver, &genericUsbDriver::setFunctionGen);
-    connect(ui->controller_fg, &functionGenControl::freqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
+    connect(ui->controller_iso->driver, &genericUsbDriver::sigGenFreqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
     connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 	connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 		// Force a trigger refresh
@@ -2919,11 +2919,15 @@ void MainWindow::triggerChannelChanged(int newTriggerChannel){
         ui->triggerLevelValue->setEnabled(false);
         ui->singleShotCheckBox->setEnabled(false);
         ui->singleShotCheckBox->setChecked(false);
-//         ui->label_6->setEnabled(false);
+#ifndef PLATFORM_ANDROID
+        ui->label_6->setEnabled(false);
+#endif
     } else {
         ui->triggerLevelValue->setEnabled(true);
         ui->singleShotCheckBox->setEnabled(true);
-//         ui->label_6->setEnabled(true);
+#ifndef PLATFORM_ANDROID
+        ui->label_6->setEnabled(true);
+#endif
     }
 }
 
