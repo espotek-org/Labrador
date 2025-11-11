@@ -307,13 +307,7 @@ android {
     INSTALLS += firmware waveforms
 
     #libdfuprog include
-    LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
     INCLUDEPATH += build_android/libdfuprog/include
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/libdfuprog-0.9.so
-
-    #liblog include
-    LIBS += -L$$PWD/build_android/liblog/lib -llog
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
 
     # Frequency spectrum/response disabled for now, needs UI and supporting libraries
     DEFINES += DISABLE_SPECTRUM
@@ -321,12 +315,20 @@ android {
     HEADERS -= asyncdft.h
 
     # Library dependencies are only compiled for this ABI currently
-    ANDROID_ABIS = armeabi-v7a
+    ANDROID_ABIS = arm64-v8a
 
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
+
+    #libdfuprog library
+    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/libdfuprog/lib/$${abi} -ldfuprog-0.9
+    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/$${abi}/libdfuprog-0.9.so
+
+    #liblog library
+    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/liblog/lib/$${abi} -llog
+    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/$${abi}/liblog.so
 }
 
 DISTFILES += \
