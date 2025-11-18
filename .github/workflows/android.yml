@@ -46,7 +46,7 @@ jobs:
           make -j$(nproc)
           make INSTALL_ROOT=android-build install
           JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-libLabrador.so-deployment-settings.json --output android-build --android-platform android-28 --verbose --gradle --release
-          cp android-build/build/outputs/apk/release/android-build-release-unsigned.apk ${APK_BASENAME}-release-unsigned.apk
+          cp android-build/build/outputs/apk/release/android-build-release-unsigned.apk ${APK_BASENAME}-release-unsigned_arm64_v8a_test_nov17.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
