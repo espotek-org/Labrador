@@ -60,7 +60,7 @@ unsigned char androidUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin
     qDebug() << "Opening Device!";
     //libusb_device * device_ptr = libusb_get_device2(ctx, usbfs_path);
     //error = libusb_open2(device_ptr, &handle, file_descriptor);
-    error = libusb_wrap_fd(ctx, file_descriptor, &handle);
+    error = libusb_wrap_sys_device(ctx, file_descriptor, &handle);
     if(error){
         qDebug() << "ERROR OPENING DEVICE";
         return error;
@@ -121,7 +121,7 @@ int androidUsbDriver::get_new_bootloader_ctx(libusb_device **device_ptr, libusb_
 
     //*(device_ptr) = libusb_get_device2(*(ctx), usbfs_path);
     //error = libusb_open2(*(device_ptr), handle, file_descriptor);
-    error = libusb_wrap_fd(*(ctx), file_descriptor, handle);
+    error = libusb_wrap_sys_device(*(ctx), file_descriptor, handle);
     if(error){
         qDebug() << "ERROR OPENING DEVICE";
         return error;

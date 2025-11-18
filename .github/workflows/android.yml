@@ -21,7 +21,7 @@ jobs:
           arch: 'android_arm64_v8a'
 
       - name: Install SDK
-        run: ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install 'platforms;android-30' 'build-tools;30.0.1' 'ndk;23.2.8568313'
+        run: ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install 'platforms;android-28' 'build-tools;28.0.3' 'ndk;21.3.6528147'
 
       # Secrets should be the base64 portion of the PEM format
       # (i.e. the stuff between the BEGIN/END lines):
@@ -40,13 +40,13 @@ jobs:
       - name: Build Android package
         working-directory: Desktop_Interface
         run: |
-          export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/23.2.8568313"
+          export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/21.3.6528147"
           APK_BASENAME="Labrador-$(git rev-parse --short HEAD)"
           qmake -config release
           make -j$(nproc)
           make INSTALL_ROOT=android-build install
-          JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-libLabrador.so-deployment-settings.json --output android-build --android-platform android-30 --verbose --gradle --release
-          cp android-build/build/outputs/apk/release/android-build-release-unsigned.apk ${APK_BASENAME}-release-unsigned_arm64_v8a_android_11_test_nov18.apk
+          JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-libLabrador.so-deployment-settings.json --output android-build --android-platform android-28 --verbose --gradle --release
+          cp android-build/build/outputs/apk/release/android-build-release-unsigned.apk ${APK_BASENAME}-release-unsigned_arm64_v8a_test_nov17.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
