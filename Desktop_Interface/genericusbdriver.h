@@ -121,6 +121,7 @@ signals:
     void initialConnectComplete(void);
     void signalFirmwareFlash(void);
     void calibrateMe(void);
+    void sigGenFreqUpdated(functionGen::ChannelID channelID, int newClkSetting, int newTimerPeriod, int wfSize);
 public slots:
     void setPsu(double voltage);
     void setFunctionGen(functionGen::ChannelID channelID, functionGen::SingleChannelController *fGenControl);
