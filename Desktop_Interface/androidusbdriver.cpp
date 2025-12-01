@@ -49,9 +49,10 @@ unsigned char androidUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin
         return E_BOARD_IN_BOOTLOADER;
     }
 
+    libusb_set_option(ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);
     int error = libusb_init(&ctx);
     if(error){
-        qDebug() << "libusb_init FAILED";
+        qDebug() << "libusb_init FAILED with error" << error;
         return error;
     } else qDebug() << "Libusb context initialised";
 
