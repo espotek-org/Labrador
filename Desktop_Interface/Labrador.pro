@@ -287,9 +287,9 @@ android {
     INCLUDEPATH += build_android/libusb-242
 
     ANDROID_PACKAGE_SOURCE_DIR = build_android/package_source
-    #ANDROID_MIN_SDK_VERSION = 21
-    #ANDROID_TARGET_SDK_VERSION = 28
-    ANDROID_SDK_BUILD_TOOLS_REVISION = 28.0.3
+    ANDROID_MIN_SDK_VERSION = 21
+    ANDROID_TARGET_SDK_VERSION = 31
+    ANDROID_SDK_BUILD_TOOLS_REVISION = 31.0.0
 
     # These are used in the AndroidManifest.xml template
     ANDROID_VERSION_NAME = 1.3
