@@ -18,7 +18,8 @@
                   android:label="-- %%INSERT_APP_NAME%% --"
                   android:screenOrientation="unspecified"
                   android:launchMode="singleTop"
-                  android:icon="@mipmap/ic_launcher">
+                  android:icon="@mipmap/ic_launcher"
+                  android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
