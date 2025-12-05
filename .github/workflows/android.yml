@@ -61,7 +61,7 @@ jobs:
             make -j$(nproc)
             make INSTALL_ROOT=android-build install
             JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-libLabrador.so-deployment-settings.json --output android-build --android-platform android-31 --verbose --gradle --release
-            ${ANDROID_SDK_ROOT}/build-tools/28.0.3/apksigner sign --in android-build/build/outputs/apk/release/android-build-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
+            ${ANDROID_SDK_ROOT}/build-tools/31.0.0/apksigner sign --in android-build/build/outputs/apk/release/android-build-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
           else
             qmake -config debug
             make -j$(nproc)
