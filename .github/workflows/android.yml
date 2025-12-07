@@ -71,13 +71,15 @@ jobs:
           fi
           cp android-build/build/outputs/bundle/release/android-build-release.aab ${APK_BASENAME}-release-unsigned.aab
 
-      - name: Upload artifacts
+      - name: Upload apk artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-apk
           path: Desktop_Interface/Labrador*.apk
           compression-level: 0
           if-no-files-found: error
+      - name: Upload aab artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: asset-aab
           path: Desktop_Interface/Labrador*.aab
