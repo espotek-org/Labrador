@@ -279,6 +279,7 @@ android {
 
     QT += androidextras
     CONFIG += mobility
+    CONFIG += android_app_bundle
     MOBILITY =
 
     DEFINES += PLATFORM_ANDROID
@@ -315,7 +316,7 @@ android {
     HEADERS -= asyncdft.h
 
     # Library dependencies are only compiled for this ABI currently
-    ANDROID_ABIS = arm64-v8a
+    ANDROID_ABIS = armeabi-v7a arm64-v8a
 
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
