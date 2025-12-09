@@ -293,8 +293,8 @@ android {
     ANDROID_SDK_BUILD_TOOLS_REVISION = 31.0.0
 
     # These are used in the AndroidManifest.xml template
-    ANDROID_VERSION_NAME = 1.3
-    ANDROID_VERSION_CODE = 8
+    ANDROID_VERSION_NAME = 1.4
+    ANDROID_VERSION_CODE = 9
     ANDROID_PERMISSIONS += android.permission.INTERNET
     ANDROID_PERMISSIONS += android.permission.WRITE_EXTERNAL_STORAGE
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
