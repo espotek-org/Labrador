@@ -290,7 +290,6 @@ android {
     ANDROID_PACKAGE_SOURCE_DIR = build_android/package_source
     ANDROID_MIN_SDK_VERSION = 21
     ANDROID_TARGET_SDK_VERSION = 31
-    ANDROID_COMPILE_SDK_VERSION = 31
     ANDROID_SDK_BUILD_TOOLS_REVISION = 31.0.0
 
     # These are used in the AndroidManifest.xml template
