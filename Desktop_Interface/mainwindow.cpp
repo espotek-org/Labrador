@@ -1864,6 +1864,7 @@ void MainWindow::vertScaleEvent(bool enabled){
 
 void MainWindow::on_actionCalibrate_triggered()
 {
+    dt_userWantsToCalibrate = true; // in case triggered from the menu option
     //Must be mode 4
     //Must be DC coupled
     //Voltage must be disconnected
