@@ -15,7 +15,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           aqtversion: '==3.3.*'
-          version: '5.14.2'
+          version: '5.15.2'
           host: 'linux'
           target: 'android'
           arch: 'android'
