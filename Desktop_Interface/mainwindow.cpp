@@ -194,8 +194,15 @@ MainWindow::MainWindow(QWidget *parent) :
 
         ui->androidMenuButton->setVisible(false);
 
-
         ui->menuAndroid_Special->menuAction()->setVisible(false);
+
+        ui->controller_iso->driver->setGain(reinitScopeGain);
+        ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
+
+        readSettingsFile();
+
+        ui->controller_iso->driver->calibrateOnConnect = dt_userWantsToCalibrate;
+        connect(ui->controller_iso->driver, SIGNAL(calibrateMe()), this, SLOT(on_actionCalibrate_triggered()));
     #endif
 
     connect(ui->controller_iso->driver, SIGNAL(killMe()), this, SLOT(reinitUsb()));
