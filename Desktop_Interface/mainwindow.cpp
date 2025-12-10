@@ -195,8 +195,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
         ui->menuAndroid_Special->menuAction()->setVisible(false);
 
-        readSettingsFile();
-
         ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
 
         ui->controller_iso->driver->calibrateOnConnect = dt_userWantsToCalibrate;
