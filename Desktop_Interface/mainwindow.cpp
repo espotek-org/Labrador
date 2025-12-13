@@ -197,6 +197,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
         ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
 
+        if((ui->controller_iso->driver->connected)&&dt_userWantsToCalibrate)
+            QTimer::singleShot(0, this, SLOT(on_actionCalibrate_triggered()));// a callback upon ui setup completion
+
         ui->controller_iso->driver->calibrateOnConnect = dt_userWantsToCalibrate;
         connect(ui->controller_iso->driver, SIGNAL(calibrateMe()), this, SLOT(on_actionCalibrate_triggered()));
     #endif
@@ -387,6 +390,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->verticalLayout->addWidget(eyeDiagramLayoutWidget);
     eyeDiagramLayoutWidget->setVisible(false);
 #endif
+
 }
 
 MainWindow::~MainWindow()
