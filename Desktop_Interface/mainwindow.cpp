@@ -45,7 +45,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
-    calibrationMessages = new QMessageBox();
     ui->psuDisplay->display("4.00");
     ui->bufferDisplay->refreshImage();
 
@@ -194,8 +193,15 @@ MainWindow::MainWindow(QWidget *parent) :
 
         ui->androidMenuButton->setVisible(false);
 
-
         ui->menuAndroid_Special->menuAction()->setVisible(false);
+
+        ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
+
+        if((ui->controller_iso->driver->connected)&&dt_userWantsToCalibrate)
+            QTimer::singleShot(0, this, SLOT(on_actionCalibrate_triggered()));// a callback upon ui setup completion
+
+        ui->controller_iso->driver->calibrateOnConnect = dt_userWantsToCalibrate;
+        connect(ui->controller_iso->driver, SIGNAL(calibrateMe()), this, SLOT(on_actionCalibrate_triggered()));
     #endif
 
     connect(ui->controller_iso->driver, SIGNAL(killMe()), this, SLOT(reinitUsb()));
@@ -384,6 +390,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->verticalLayout->addWidget(eyeDiagramLayoutWidget);
     eyeDiagramLayoutWidget->setVisible(false);
 #endif
+
 }
 
 MainWindow::~MainWindow()
@@ -1470,6 +1477,8 @@ void MainWindow::readSettingsFile(){
     if(!dt_AlreadyAskedAboutCalibration && ((calibrate_vref_ch1 == 1.65) || (calibrate_vref_ch2 == 1.65) || (calibrate_gain_ch1 == R4/(R3+R4)) || (calibrate_gain_ch2 == R4/(R3+R4)))){
         //Prompt user to calibrate if no calibration data found.
         QApplication::processEvents();
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
         calibrationMessages->setStandardButtons(QMessageBox::Yes|QMessageBox::No);
         calibrationMessages->setText("No calibration data detected!\nWould you like to run calibration once connected?");
         dt_userWantsToCalibrate = calibrationMessages->exec() == QMessageBox::Yes;
@@ -1864,22 +1873,26 @@ void MainWindow::vertScaleEvent(bool enabled){
 
 void MainWindow::on_actionCalibrate_triggered()
 {
+    dt_userWantsToCalibrate = true; // in case triggered from the menu option
     //Must be mode 4
     //Must be DC coupled
     //Voltage must be disconnected
     caibrateStage = 0;
 
     if(!ui->controller_iso->driver->connected){
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
         calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("You need to connect the board before calibrating it!");
         calibrationMessages->exec();
         return;
     }
     if(ui->controller_iso->driver->deviceMode!=4){
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
         calibrationMessages->setStandardButtons(QMessageBox::Ok|QMessageBox::Cancel);
         calibrationMessages->setText("The calibration sequence requires all devices to be turned off, except for the oscilloscope CH1 and CH2.  Is it OK for me to change your workspace?");
         int choice = calibrationMessages->exec();
-        calibrationMessages->setStandardButtons(QMessageBox::Ok);
         if(choice == QMessageBox::Ok){
             qDebug() << "Changing workspace...";
             ui->psuSlider->setValue(0);
@@ -1920,6 +1933,9 @@ void MainWindow::on_actionCalibrate_triggered()
     settings->setValue("CalibrateGainCH2", R4/(R3+R4));
 
     qDebug() << "Calibration routine beginning!";
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+    calibrationMessages->setStandardButtons(QMessageBox::Ok);
     calibrationMessages->setText("Please disconnect all wires from your Labrador board then press OK to continue.");
     calibrationMessages->exec();
 
@@ -1934,6 +1950,9 @@ void MainWindow::calibrateStage2(){
     qDebug() << "VRef (CH2) = " << vref_CH2;
 
     if((vref_CH1 > 2.1) | (vref_CH1 < 1.1) | (vref_CH2 > 2.1) | (vref_CH2 < 1.1)){
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+        calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("Calibration has been abandoned due to out-of-range values.  Both channels should show approximately 1.6V.  Please disconnect all wires from your Labrador board and try again.");
         calibrationMessages->exec();
         return;
@@ -1949,6 +1968,9 @@ void MainWindow::calibrateStage2(){
     settings->setValue("CalibrateVrefCH1", vref_CH1);
     settings->setValue("CalibrateVrefCH2", vref_CH2);
 
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+    calibrationMessages->setStandardButtons(QMessageBox::Ok);
     calibrationMessages->setText("Please connect both oscilloscope channels to the outer shield of the USB connector then press OK to continue.");
     calibrationMessages->exec();
 
@@ -1964,6 +1986,9 @@ void MainWindow::calibrateStage3(){
     qDebug() << "VMeasured (CH2) = " << vMeasured_CH2;
 
     if((vMeasured_CH1 > 0.3) | (vMeasured_CH1 < -0.3) | (vMeasured_CH2 > 0.3) | (vMeasured_CH2 < -0.3)){
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+        calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("Calibration has been abandoned due to out-of-range values.  Both channels should show approximately 0V.  Please try again.");
         calibrationMessages->exec();
         return;
@@ -1983,6 +2008,9 @@ void MainWindow::calibrateStage3(){
     ui->controller_iso->internalBuffer375_CH2->m_frontendGain = (vref_CH2 - vMeasured_CH2)*(ui->controller_iso->frontendGain_CH2)/vref_CH2;
     settings->setValue("CalibrateGainCH1", ui->controller_iso->frontendGain_CH1);
     settings->setValue("CalibrateGainCH2", ui->controller_iso->frontendGain_CH2);
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+    calibrationMessages->setStandardButtons(QMessageBox::Ok);
     calibrationMessages->setText("Oscilloscope Calibration complete.");
     calibrationMessages->exec();
 
@@ -2383,6 +2411,8 @@ void MainWindow::on_actionCalibrate_2_triggered()
 {
     qDebug() << "Calibrating PSU!";
 
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
     if (!ui->controller_iso->driver->connected) {
         calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("You need to connect the board before calibrating it!");
@@ -2401,7 +2431,8 @@ void MainWindow::on_actionCalibrate_2_triggered()
 
     calibrationMessages->setStandardButtons(QMessageBox::Ok|QMessageBox::Cancel);
     calibrationMessages->setText("Power Supply calibration requires me to control your power supply temporarily.  \n\nTO PREVENT BLUE SMOKE DAMAGE, DISCONNECT ANY CIRCUIT ATTACHED TO YOUR POWER SUPPLY NOW.");
-    if (calibrationMessages->exec() == QMessageBox::Cancel) {
+    int choice = calibrationMessages->exec();
+    if (choice == QMessageBox::Cancel) {
         return;
     }
 
@@ -2434,6 +2465,8 @@ void MainWindow::on_actionCalibrate_2_triggered()
     ui->controller_iso->driver->psu_offset = 0;
 
     qDebug() << "PSU Calibration routine beginning!";
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
     calibrationMessages->setStandardButtons(QMessageBox::Ok);
     calibrationMessages->setText("Please connect your Labrador's Oscilloscope CH1 (DC) pin to the Power Supply Output (positive) then press OK to continue.");
     calibrationMessages->exec();
@@ -2453,6 +2486,9 @@ void MainWindow::calibrate_psu_stage2()
         ui->controller_iso->clearBuffers(1,1,1);
         ui->controller_iso->setAutoGain(true);
         ui->controller_iso->autoGain();
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+        calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("Calibration has been abandoned due to out-of-range values.  The oscilloscope should show approximately 5V.  Please check all wires on your Labrador board and try again.");
         calibrationMessages->exec();
         return;
@@ -2475,6 +2511,9 @@ void MainWindow::calibrate_psu_stage3()
 
 
     if((PSU10 > 12) | (PSU10 < 8) ){
+        calibrationMessages = new QMessageBox();
+        calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
+        calibrationMessages->setStandardButtons(QMessageBox::Ok);
         calibrationMessages->setText("Calibration has been abandoned due to out-of-range values.  The oscilloscope should show approximately 10V.  Please check all wires on your Labrador board and try again.");
         calibrationMessages->exec();
         return;
@@ -2484,6 +2523,8 @@ void MainWindow::calibrate_psu_stage3()
     settings->setValue("CalibratePsu", psu_voltage_calibration_offset);
     ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
 
+    calibrationMessages = new QMessageBox();
+    calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
     calibrationMessages->setStandardButtons(QMessageBox::Ok);
     calibrationMessages->setText("PSU calibration complete.");
     calibrationMessages->exec();
