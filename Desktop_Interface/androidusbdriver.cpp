@@ -49,9 +49,10 @@ unsigned char androidUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin
         return E_BOARD_IN_BOOTLOADER;
     }
 
+    libusb_set_option(ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);
     int error = libusb_init(&ctx);
     if(error){
-        qDebug() << "libusb_init FAILED";
+        qDebug() << "libusb_init FAILED with error" << error;
         return error;
     } else qDebug() << "Libusb context initialised";
 
@@ -60,7 +61,7 @@ unsigned char androidUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin
     qDebug() << "Opening Device!";
     //libusb_device * device_ptr = libusb_get_device2(ctx, usbfs_path);
     //error = libusb_open2(device_ptr, &handle, file_descriptor);
-    error = libusb_wrap_fd(ctx, file_descriptor, &handle);
+    error = libusb_wrap_sys_device(ctx, file_descriptor, &handle);
     if(error){
         qDebug() << "ERROR OPENING DEVICE";
         return error;
@@ -121,7 +122,7 @@ int androidUsbDriver::get_new_bootloader_ctx(libusb_device **device_ptr, libusb_
 
     //*(device_ptr) = libusb_get_device2(*(ctx), usbfs_path);
     //error = libusb_open2(*(device_ptr), handle, file_descriptor);
-    error = libusb_wrap_fd(*(ctx), file_descriptor, handle);
+    error = libusb_wrap_sys_device(*(ctx), file_descriptor, handle);
     if(error){
         qDebug() << "ERROR OPENING DEVICE";
         return error;

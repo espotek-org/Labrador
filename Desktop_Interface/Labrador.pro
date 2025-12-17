@@ -279,6 +279,7 @@ android {
 
     QT += androidextras
     CONFIG += mobility
+    CONFIG += android_app_bundle
     MOBILITY =
 
     DEFINES += PLATFORM_ANDROID
@@ -287,13 +288,13 @@ android {
     INCLUDEPATH += build_android/libusb-242
 
     ANDROID_PACKAGE_SOURCE_DIR = build_android/package_source
-    #ANDROID_MIN_SDK_VERSION = 21
-    #ANDROID_TARGET_SDK_VERSION = 28
-    ANDROID_SDK_BUILD_TOOLS_REVISION = 28.0.3
+    ANDROID_MIN_SDK_VERSION = 21
+    ANDROID_TARGET_SDK_VERSION = 31
+    ANDROID_SDK_BUILD_TOOLS_REVISION = 31.0.0
 
     # These are used in the AndroidManifest.xml template
-    ANDROID_VERSION_NAME = 1.3
-    ANDROID_VERSION_CODE = 8
+    ANDROID_VERSION_NAME = 1.4
+    ANDROID_VERSION_CODE = 9
     ANDROID_PERMISSIONS += android.permission.INTERNET
     ANDROID_PERMISSIONS += android.permission.WRITE_EXTERNAL_STORAGE
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
@@ -307,13 +308,7 @@ android {
     INSTALLS += firmware waveforms
 
     #libdfuprog include
-    LIBS += -L$$PWD/build_android/libdfuprog/lib -ldfuprog-0.9
     INCLUDEPATH += build_android/libdfuprog/include
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/libdfuprog-0.9.so
-
-    #liblog include
-    LIBS += -L$$PWD/build_android/liblog/lib -llog
-    ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/liblog.so
 
     # Frequency spectrum/response disabled for now, needs UI and supporting libraries
     DEFINES += DISABLE_SPECTRUM
@@ -321,12 +316,20 @@ android {
     HEADERS -= asyncdft.h
 
     # Library dependencies are only compiled for this ABI currently
-    ANDROID_ABIS = armeabi-v7a
+    ANDROID_ABIS = armeabi-v7a arm64-v8a
 
     # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
+
+    #libdfuprog library
+    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/libdfuprog/lib/$${abi} -ldfuprog-0.9
+    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/$${abi}/libdfuprog-0.9.so
+
+    #liblog library
+    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/liblog/lib/$${abi} -llog
+    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/$${abi}/liblog.so
 }
 
 DISTFILES += \
