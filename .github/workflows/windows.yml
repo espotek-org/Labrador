@@ -6,6 +6,8 @@ permissions:
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+  pull_request:
 
 jobs:
   build-windows:
