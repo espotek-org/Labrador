@@ -27,7 +27,9 @@ enum class TriggerType : uint8_t
 {
     Disabled,
     Rising,
-    Falling
+    Falling,
+    CH1SigGen,
+    CH2SigGen
 };
 
 enum class TriggerSeekState : uint8_t
@@ -74,7 +76,7 @@ public:
 	void writeBuffer_char(char* data, int len);
 	void writeBuffer_short(short* data, int len);
 
-    std::vector<short> readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset);
+    std::vector<short> readBuffer(double sampleWindow, int numSamples, bool singleBit, int delaySamples);
 #ifndef DISABLE_SPECTRUM
     std::vector<short> readWindow();
 #endif
@@ -89,7 +91,7 @@ public:
 private:
 	template<typename Function>
 	int capSample(int offset, int target, double seconds, double value, Function comp);
-    void checkTriggered();
+    void checkTriggered(int m_back);
 public:
 	int cap_x0fromLast(double seconds, double vbot);
 	int cap_x1fromLast(double seconds, int x0, double vbot);
@@ -97,8 +99,9 @@ public:
 	void serialManage(double baudRate, UartParity parity, bool hexDisplay);
     void setTriggerType(TriggerType newType);
     void setTriggerLevel(double voltageLevel, uint16_t top, bool acCoupled);
-    double getDelayedTriggerPoint(double delay);
+    void getDelayedTriggerPoint(double delay, double window, int* fullDelaySamples, bool* triggering);
     double getTriggerFrequencyHz();
+    void setSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize);
 
 // ---- MEMBER VARIABLES ----
 
@@ -116,6 +119,15 @@ public:
 	uint32_t m_back = 0;
 	uint32_t m_insertedCount = 0;
 	uint32_t m_bufferLen;
+	uint32_t m_back_prev = 0;
+
+    std::unique_ptr<bool[]> m_isTriggeredPtr;
+    bool* m_isTriggered;
+    bool triggerIsReset = true;
+    void resetTrigger();
+
+
+
 
 #ifndef DISABLE_SPECTRUM
 private:
@@ -140,7 +152,6 @@ public:
     TriggerSeekState m_triggerSeekState = TriggerSeekState::BelowTriggerLevel;
     short m_triggerLevel = 0;
     short m_triggerSensitivity = 0;
-    std::vector<uint32_t> m_triggerPositionList = {};
 //	UARTS decoding
 	uartStyleDecoder* m_decoder = NULL;
 	bool m_isDecoding = true;
@@ -154,11 +165,13 @@ private:
 	qulonglong m_fileIO_maxFileSize;
 	qulonglong m_fileIO_numBytesWritten;
 	unsigned int m_currentColumn = 0;
-    uint32_t m_lastTriggerDetlaT = 0;
+    double m_lastTriggerDeltaT = 0.0;
+    float bufferSamplesPerCH1WfCycle;
+    float bufferSamplesPerCH2WfCycle;
 
 	isoDriver* m_virtualParent;
 
-    void addTriggerPosition(uint32_t position);
+    void addTriggerPosition(uint32_t m_back, uint32_t position, int n_cycles);
 signals:
 	void fileIOinternalDisable();
 public slots:
