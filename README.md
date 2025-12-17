@@ -1,3 +1,11 @@
+[![GitHub All Releases](https://img.shields.io/github/downloads/espotek-org/Labrador/total?logo=github&style=for-the-badge)](https://github.com/espotek-org/Labrador/releases/latest)
+
+![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-win32/Labrador_Installer.exe)
+
+![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-Linux/EspoTek_Labrador-ca7ac83-x86_64.AppImage)
+
+![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/espotek-org/Labrador/continuous-macOS/Labrador.dmg)
+
 # What is it?
 The [EspoTek Labrador](http://espotek.com/labrador) is an open-source board that turns your PC, Raspberry Pi, or Android Smartphone into a full-featured electronics lab bench, complete with oscilloscope, signal generator, and more.
 
