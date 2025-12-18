@@ -114,7 +114,7 @@ void tiny_dma_set_mode_0(void){
 		
 	DMA.CH0.CTRLA = DMA_STANDARD_CTRLA;
 	DMA.CH0.CTRLB = DMA_STANDARD_INTERRUPT;
-	DMA.CH0.ADDRCTRL = DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
+	DMA.CH0.ADDRCTRL = DMA_CH_SRCDIR_FIXED_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
 	DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc;	//Triggered from ADCA channel 0
 	DMA.CH0.TRFCNT = DMA_STANDARD_TRANSFER_LENGTH;
 		
@@ -211,7 +211,7 @@ void tiny_dma_set_mode_1(void){
 	
 	DMA.CH0.CTRLA = DMA_STANDARD_CTRLA;
 	DMA.CH0.CTRLB = DMA_STANDARD_INTERRUPT;
-	DMA.CH0.ADDRCTRL = DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
+	DMA.CH0.ADDRCTRL = DMA_CH_SRCDIR_FIXED_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
 	DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc;	//Triggered from ADCA channel 0
 	DMA.CH0.TRFCNT = DMA_STANDARD_TRANSFER_LENGTH;
 	
@@ -253,7 +253,7 @@ void tiny_dma_set_mode_2(void){
 		DMA.CH2.CTRLA = DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm;
 	}
 	DMA.CH2.CTRLB = 0x00; //No interrupt for DacBuf!!
-	DMA.CH2.ADDRCTRL = DMA_CH_DESTRELOAD_BURST_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_SRCRELOAD_BLOCK_gc | DMA_CH_SRCDIR_INC_gc;   //Dest reloads after each burst, with byte incrementing.  Src reloads at end of block, also incrementing address.
+	DMA.CH2.ADDRCTRL = DMA_CH_DESTDIR_FIXED_gc | DMA_CH_SRCRELOAD_BLOCK_gc | DMA_CH_SRCDIR_INC_gc;   //Dest reloads after each burst, with byte incrementing.  Src reloads at end of block, also incrementing address.
 	DMA.CH2.TRIGSRC = DMA_CH_TRIGSRC_EVSYS_CH1_gc;	//Triggered from TCC0 when it hits PER
 	DMA.CH2.TRFCNT = auxDacBufLen;
 
@@ -271,7 +271,7 @@ void tiny_dma_set_mode_2(void){
 	DMA.CH3.REPCNT = 0; //Repeat forever!
 	DMA.CH3.CTRLA = DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm;
 	DMA.CH3.CTRLB = 0x00; //Hi interrupt on block complete
-	DMA.CH3.ADDRCTRL = DMA_CH_DESTRELOAD_BURST_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_SRCRELOAD_BLOCK_gc | DMA_CH_SRCDIR_INC_gc;   //Dest reloads after each burst, with byte incrementing.  Src reloads at end of block, also incrementing address.
+	DMA.CH3.ADDRCTRL = DMA_CH_DESTDIR_FIXED_gc | DMA_CH_SRCRELOAD_BLOCK_gc | DMA_CH_SRCDIR_INC_gc;   //Dest reloads after each burst, with byte incrementing.  Src reloads at end of block, also incrementing address.
 	DMA.CH3.TRIGSRC = DMA_CH_TRIGSRC_EVSYS_CH2_gc;	//Triggered from TCC0 when it hits PER
 	DMA.CH3.TRFCNT = dacBuf_len;
 
@@ -291,7 +291,7 @@ void tiny_dma_set_mode_2(void){
 	
 	DMA.CH0.CTRLA = DMA_STANDARD_CTRLA;
 	DMA.CH0.CTRLB = DMA_STANDARD_INTERRUPT;
-	DMA.CH0.ADDRCTRL = DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
+	DMA.CH0.ADDRCTRL = DMA_CH_SRCDIR_FIXED_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
 	DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc;	//Triggered from ADCA channel 0
 	DMA.CH0.TRFCNT = DMA_STANDARD_TRANSFER_LENGTH;
 	
@@ -306,8 +306,8 @@ void tiny_dma_set_mode_2(void){
 				
 	DMA.CH1.CTRLA = DMA_STANDARD_CTRLA;
 	DMA.CH1.CTRLB = DMA_STANDARD_INTERRUPT;
-	DMA.CH1.ADDRCTRL = DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
-	DMA.CH1.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc;	//Triggered from ADCA channel 0
+	DMA.CH1.ADDRCTRL = DMA_CH_SRCDIR_FIXED_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
+	DMA.CH1.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH2_gc;	//Triggered from ADCA channel 2
 	DMA.CH1.TRFCNT = DMA_STANDARD_TRANSFER_LENGTH;
 				
 	DMA.CH1.SRCADDR0 = (( (uint16_t) &ADCA.CH2.RESL) >> 0) & 0xFF; //Source address is ADC
