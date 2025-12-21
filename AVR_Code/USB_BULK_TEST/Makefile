@@ -14,62 +14,6 @@ INCLUDES=-I"./common/services/usb/class/vendor/device/example/atxmega256a3bu_xme
 
 CFLAGS=-std=gnu99 -ffunction-sections -mmcu=atxmega32a4u -fsigned-char -funsigned-bitfields -fdata-sections -fshort-enums -fno-strict-aliasing -fno-jump-tables -fpack-struct -Wall -O2 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" 
 
-SUBDIRS := \
-src/ \
-src/ASF/ \
-src/ASF/common/ \
-src/ASF/common/boards/ \
-src/ASF/common/boards/user_board/ \
-src/ASF/common/services/ \
-src/ASF/common/services/clock/ \
-src/ASF/common/services/clock/xmega/ \
-src/ASF/common/services/ioport/ \
-src/ASF/common/services/ioport/xmega/ \
-src/ASF/common/services/sleepmgr/ \
-src/ASF/common/services/sleepmgr/xmega/ \
-src/ASF/common/services/usb/ \
-src/ASF/common/services/usb/class/ \
-src/ASF/common/services/usb/class/vendor/ \
-src/ASF/common/services/usb/class/vendor/device/ \
-src/ASF/common/services/usb/class/vendor/device/example/ \
-src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ \
-src/ASF/common/services/usb/udc/ \
-src/ASF/common/utils/ \
-src/ASF/common/utils/interrupt/ \
-src/ASF/common/utils/make/ \
-src/ASF/xmega/ \
-src/ASF/xmega/drivers/ \
-src/ASF/xmega/drivers/cpu/ \
-src/ASF/xmega/drivers/nvm/ \
-src/ASF/xmega/drivers/sleep/ \
-src/ASF/xmega/drivers/usb/ \
-src/ASF/xmega/utils/ \
-src/ASF/xmega/utils/assembler/ \
-src/ASF/xmega/utils/bit_handling/ \
-src/ASF/xmega/utils/preprocessor/ \
-src/config/
-
-C_srcS += \
-./src/tiny_calibration.c \
-./src/tiny_dig.c \
-./src/tiny_eeprom.c \
-./src/ASF/common/boards/user_board/init.c \
-./src/ASF/common/services/ioport/xmega/ioport_compat.c \
-./src/main.c \
-./src/tiny_adc.c \
-./src/tiny_dac.c \
-./src/tiny_dma.c \
-./src/tiny_timer.c \
-./src/tiny_uart.c \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.c \
-./src/ASF/common/services/clock/xmega/sysclk.c \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.c \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.c \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.c \
-./src/ASF/common/services/usb/udc/udc.c \
-./src/ASF/xmega/drivers/nvm/nvm.c \
-./src/ASF/xmega/drivers/usb/usb_device.c
-
 OBJS += \
 ./src/tiny_calibration.o \
 ./src/tiny_dig.o \

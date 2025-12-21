@@ -18,18 +18,18 @@ When installing, make sure you tick the box to install Qt 5.15 or later.
 
 Once it's installed, open `Desktop_Interface/Labrador.pro`, then Clean All -> Run `qmake` -> Build All.
 
-If you're on Linux (including Raspberry Pi), then you can also build the software from source by cloning the repo, `cd`ing to the `Desktop_Interface` directory, then running:  
+Alternatively, you can build on the command line.  The process will consist of a subset of the commands present in the build scripts in the `.github/workflows/` directory of this repo.  These are run by Github to produce the packages on the [releases page](https://github.com/espotek-org/Labrador/releases), but include app deployment commands that can be skipped for individual users.
+
+Streamlined build scripts for individual Linux (including Raspberry Pi) and macOS users are described in the [Building the desktop interface](https://github.com/espotek-org/Labrador/wiki/Building-from-source#building-the-desktop-interface) section of the wiki.  As shown there, following installation of prerequisite packages, the Linux build simplifies to the following sequence of commands run within the `/Desktop_Interface` directory,
 ```
 QT_SELECT=qt5 qmake
 make
 sudo make install
 sudo ldconfig
 ```
-Then, to launch, just type `labrador` into the terminal.  Additional packages may be required, please see the full [build instructions](https://github.com/espotek-org/Labrador/wiki/Building-from-source) on the wiki.
+after which the command `labrador` launches the app.
 
-On macOS, additional steps may be required.  See issue https://github.com/espotek-org/Labrador/issues/238
-
-To build the AVR software, I use Atmel Studio 7.  Just load up the .atsln and push F7.  You can use `avr-gcc` if you don't want to install a full IDE.
+To build the AVR software, I use Atmel Studio 7.  Just load up the .atsln located in the `/AVR_Code` directory and push F7.  You can alternatively use open-source command-line AVR tools from GNU if you don't want to install a full IDE.  Instructions for doing so are given in the [Building the firmware](https://github.com/espotek-org/Labrador/wiki/Building-from-source/_edit#building-the-desktop-interface) section of the wiki.  If you already have the GNU AVR tools installed, you can jump straight to the [firmware Makefile](https://github.com/espotek-org/Labrador/blob/master/AVR_Code/USB_BULK_TEST/Makefile), set `AVRDIR` in it appropriately, and start building.  The wiki includes troubleshooting tips in case you run into issues.
 
 The PCB files can be edited in KiCAD 5.0 or later.
 
