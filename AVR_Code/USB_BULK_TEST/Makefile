@@ -8,14 +8,15 @@
 # After running 'make 0x01', to switch to building variant 0x02 instead, first run 'make clean'.
 # The same goes for switching from building the 0x02 variant to building the 0x01 variant.
 # Some details:
-# 	In the build process for variant 0x01, the macro SINGLE_ENDPOINT_INTERFACE is
-# 	undefined, while in the build process for variant 0x02,
-# 	SINGLE_ENDPOINT_INTERFACE is defined.  In several regions of the source code,
-# 	the undefined/defined status of this macro determines which of two possible
-# 	code blocks are compiled into the firmware.  The collective effect is to
-# 	"change the headers so that it uses 1x 1023-byte isochronous endpoint,
-# 	rather than 6x 128-byte endpoints to send the scope/logic analyzer data"
-# 	(from https://github.com/espotek-org/Labrador/issues/260)
+# 	In the build process for variant 0x01, the macro SINGLE_ENDPOINT_INTERFACE
+# 	is undefined, while in the build process for variant 0x02,
+# 	SINGLE_ENDPOINT_INTERFACE is defined.  In several regions of the source
+# 	code, the undefined/defined status of this macro determines which of two
+# 	possible code blocks are compiled into the firmware.  The collective effect
+# 	of having SINGLE_ENDPOINT_INTERFACE defined is to "change the headers so
+# 	that it uses 1x 1023-byte isochronous endpoint, rather than 6x 128-byte
+# 	endpoints to send the scope/logic analyzer data" (from
+# 	https://github.com/espotek-org/Labrador/issues/260)
 # *NOTE* : there is a commented-out line defining SINGLE_ENDPOINT_INTERFACE in
 # globals.h.  If it is uncommented, both 'make 0x01' and 'make 0x02' will
 # produce variant 0x02.  Further, 'make 0x01' will mislabel the firmware with
