@@ -29,7 +29,7 @@ sudo ldconfig
 ```
 after which the command `labrador` launches the app.
 
-To build the AVR software, I use Atmel Studio 7.  Just load up the .atsln located in the `/AVR_Code` directory and push F7.  You can alternatively use open-source command-line AVR tools from GNU if you don't want to install a full IDE.  Instructions for doing so are given in the [Building the firmware](https://github.com/espotek-org/Labrador/wiki/Building-from-source/_edit#building-the-desktop-interface) section of the wiki.  If you already have the GNU AVR tools installed, you can jump straight to the [firmware Makefile](https://github.com/espotek-org/Labrador/blob/master/AVR_Code/USB_BULK_TEST/Makefile), set `AVRDIR` in it appropriately, and start building.  The wiki includes troubleshooting tips in case you run into issues.
+To build the AVR software, I use Atmel Studio 7.  Just load up the .atsln located in the `/AVR_Code` directory and push F7.  You can alternatively use open-source command-line AVR tools from GNU if you don't want to install a full IDE.  Instructions for doing so are given in the [Building the firmware](https://github.com/espotek-org/Labrador/wiki/Building-from-source/#building-the-desktop-interface) section of the wiki.  If you already have the GNU AVR tools installed, you can jump straight to the [firmware Makefile](https://github.com/espotek-org/Labrador/blob/master/AVR_Code/USB_BULK_TEST/Makefile), set `AVRDIR` in it appropriately, and start building.  The wiki includes troubleshooting tips in case you run into issues.
 
 The PCB files can be edited in KiCAD 5.0 or later.
 
