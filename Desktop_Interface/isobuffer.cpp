@@ -38,7 +38,6 @@ isoBuffer::isoBuffer(QWidget* parent, int bufferLen, isoDriver* caller, unsigned
     , m_channel(channel_value)
     , m_bufferPtr(std::make_unique<short[]>(bufferLen*2))
     , m_bufferLen(bufferLen)
-    , m_isTriggeredPtr(std::make_unique<bool[]>(bufferLen*2))
 #ifndef DISABLE_SPECTRUM
     , m_window_capacity(windowLen)
 #endif
@@ -47,7 +46,6 @@ isoBuffer::isoBuffer(QWidget* parent, int bufferLen, isoDriver* caller, unsigned
     , m_virtualParent(caller)
 {
     m_buffer = m_bufferPtr.get();
-    m_isTriggered = m_isTriggeredPtr.get();
 #ifndef DISABLE_SPECTRUM
     m_window.reserve(m_window_capacity);
     m_window_iter = m_window.begin();
@@ -101,7 +99,7 @@ void isoBuffer::insertIntoBuffer(short item)
     }
 #endif
 
-    checkTriggered(m_back);
+    checkTriggered();
 }
 
 short isoBuffer::bufferAt(uint32_t idx) const
@@ -146,7 +144,7 @@ void isoBuffer::writeBuffer_short(short* data, int len)
     writeBuffer(data, len, 2048, [](short item) -> short {return item >> 4;});
 }
 
-std::vector<short> isoBuffer::readBuffer(double sampleWindow, int numSamples, bool singleBit, int delaySamples)
+std::vector<short> isoBuffer::readBuffer(double sampleWindow, int numSamples, bool singleBit, double delayOffset)
 {
     /*
      * The expected behavior is to run backwards over the buffer with a stride
@@ -159,7 +157,8 @@ std::vector<short> isoBuffer::readBuffer(double sampleWindow, int numSamples, bo
      *
      * (1) m_insertedCount < (delayOffset + sampleWindow) * m_samplesPerSecond
      */
-    const double timeBetweenSamples = sampleWindow * m_samplesPerSecond / (numSamples-1);
+    const double timeBetweenSamples = sampleWindow * m_samplesPerSecond / numSamples;
+    const int delaySamples = delayOffset * m_samplesPerSecond;
 
     auto readData = std::vector<short>(numSamples, short(0));
 
@@ -210,9 +209,6 @@ void isoBuffer::clearBuffer()
     m_window.clear();
     m_window_iter = m_window.begin();
 #endif
-
-    resetTrigger();
-    
 }
 
 void isoBuffer::gainBuffer(int gain_log)
@@ -432,7 +428,6 @@ void isoBuffer::setTriggerType(TriggerType newType)
     qDebug() << "Trigger Type: " << (uint8_t)newType;
     if(newType != m_triggerType){
         m_triggerType = newType;
-        resetTrigger();
         m_lastTriggerDeltaT = 0;
     }
 }
@@ -454,27 +449,15 @@ void isoBuffer::setSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSe
 
     double bufferSamplesPerWfCycle = wfSize * (timerPeriod+1) / freq_ratio;
 
-    if(channelID==functionGen::ChannelID::CH1) {
-        if(bufferSamplesPerCH1WfCycle!=bufferSamplesPerWfCycle){
-            bufferSamplesPerCH1WfCycle = bufferSamplesPerWfCycle;
-            if(m_triggerType==TriggerType::CH1SigGen){
-                resetTrigger();
-            }
-        }
-    } else if (channelID==functionGen::ChannelID::CH2) {
-        qDebug() << "bufferSamplesPerCH2WfCycle set";
-        if(bufferSamplesPerCH2WfCycle!=bufferSamplesPerWfCycle){
-            bufferSamplesPerCH2WfCycle = bufferSamplesPerWfCycle;
-            if(m_triggerType==TriggerType::CH2SigGen){
-                resetTrigger();
-            }
-        }
-    }
+    if(channelID==functionGen::ChannelID::CH1)
+        bufferSamplesPerCH1WfCycle = bufferSamplesPerWfCycle;
+    else if (channelID==functionGen::ChannelID::CH2)
+        bufferSamplesPerCH2WfCycle = bufferSamplesPerWfCycle;
 }
 
 // TODO: Clear trigger
 // FIXME: AC changes will not be reflected here
-void isoBuffer::checkTriggered(int m_back)
+void isoBuffer::checkTriggered()
 {
     static uint32_t s_lastPosition = 0;
     if (m_triggerType == TriggerType::Disabled)
@@ -488,19 +471,12 @@ void isoBuffer::checkTriggered(int m_back)
             diff += m_bufferLen;
         }
         int n_cycles = diff/bufferSamplesPerWfCycle;
-        if( triggerIsReset || (diff-n_cycles*bufferSamplesPerWfCycle == 0) ) {
+        if( (m_triggerPositionList.size()==0) || (diff-n_cycles*bufferSamplesPerWfCycle == 0) ) {
             addTriggerPosition(m_back, s_lastPosition, n_cycles);
             s_lastPosition=m_back;
-        } else {
-            m_isTriggered[m_back]=false;
-            m_isTriggered[m_back+m_bufferLen]=false;
         }
-        triggerIsReset = false;
 
     } else {
-        m_isTriggered[m_back] = false;
-        m_isTriggered[m_back+m_bufferLen] = false;
-
         if ((bufferAt(0) >= (m_triggerLevel + m_triggerSensitivity)) && (m_triggerSeekState == TriggerSeekState::BelowTriggerLevel))
         {
             // Rising Edge
@@ -522,29 +498,55 @@ void isoBuffer::checkTriggered(int m_back)
     }
 }
 
-void isoBuffer::getDelayedTriggerPoint(double delay, double window, int* fullDelaySamples, bool* triggering)
+double isoBuffer::getDelayedTriggerPoint(double delay)
 {
-    const uint32_t delaySamples = delay * m_samplesPerSecond;
-    const uint32_t windowSamples = window * m_samplesPerSecond;
+    if (m_triggerPositionList.size() == 0)
+        return 0;
 
-    const uint32_t delayPosition = m_back + m_bufferLen - delaySamples;
-    
-// starting from the delay position, go back in time until finding a trigger position, making sure that a full windowSamples's worth of samples is available from the trigger position to the earliest available sample
-    if(m_triggerType==TriggerType::Disabled) {
-        *fullDelaySamples = delaySamples;
-        *triggering=false;
-        return;
-    } else {
-        for (int i = delayPosition-1; i > delayPosition - (m_bufferLen-delaySamples-windowSamples); i--){
-            if(m_isTriggered[i]){
-                *fullDelaySamples = (delayPosition - i + delaySamples);
-                *triggering=true;
-                return;
-            }
-        }
-        *fullDelaySamples = delaySamples;
-        *triggering=false;
+    const uint32_t delaySamples = delay * m_samplesPerSecond;
+
+    auto isValid = [=](uint32_t index)->bool
+    {
+        if (m_back > delaySamples)
+            return (index < m_back - delaySamples) || (index >= m_back);
+        else
+            return (index < m_bufferLen + m_back - delaySamples) && (index >= m_back);
+    };
+
+    auto getDelay = [=](uint32_t index)->double
+    {
+        if (m_back > index)
+            return (m_back - index) / static_cast<double>(m_samplesPerSecond);
+        else
+            return (m_bufferLen + (m_back - 1) - index) / static_cast<double>(m_samplesPerSecond);
+    };
+
+    // Like std::find_if but returns the last element matching the predicate instead of the first one
+    // TODO: Move this elsewhere (maybe a utils / algorithms file??)
+    // requires first and last to be Bidirectional iters, and form a valid range
+    // requires p to be a valid unaryPredicate
+    // Full signature would be:
+    // template<typename It, typename Predicate>
+    // It find_last_if(It begin, It end, Predicate p)
+    auto find_last_if = [](auto begin, auto end, auto p)
+    {
+        using It = decltype(begin); // TODO: remove this line once this is a proper function
+        std::reverse_iterator<It> rlast(begin), rfirst(end);
+        auto found = std::find_if(rfirst, rlast, p);
+        return found == rlast
+               ? end
+               : std::prev(found.base());
+    };
+
+    auto it = find_last_if(m_triggerPositionList.begin(), m_triggerPositionList.end(), isValid);
+    if (it != m_triggerPositionList.end())
+    {
+        // NOTE: vector::erase does not remove the element pointed to by the second iterator.
+        m_triggerPositionList.erase(m_triggerPositionList.begin(), it);
+        return getDelay(m_triggerPositionList[0]);
     }
+
+    return 0;
 }
 
 double isoBuffer::getTriggerFrequencyHz()
@@ -554,17 +556,9 @@ double isoBuffer::getTriggerFrequencyHz()
 
 void isoBuffer::addTriggerPosition(uint32_t position, uint32_t s_lastPosition, int n_cycles)
 {
+    m_triggerPositionList.push_back(m_back - 1);
     uint32_t delta_samples = (position > s_lastPosition) ? (position - s_lastPosition) : position + m_bufferLen - s_lastPosition;
     m_lastTriggerDeltaT = delta_samples / static_cast<double>(m_samplesPerSecond) / n_cycles;
-    m_isTriggered[position] = true;
-    m_isTriggered[position+m_bufferLen] = true;
 
     //qDebug() << position << s_lastPosition << static_cast<double>(m_samplesPerSecond) / static_cast<double>(m_lastTriggerDeltaT) << "Hz";
-}
-
-void isoBuffer::resetTrigger() {
-    for(int i = 0; i < 2*m_bufferLen; i++) {
-        m_isTriggered[i] = false;
-    }
-    triggerIsReset = true;
 }

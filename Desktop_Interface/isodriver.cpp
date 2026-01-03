@@ -872,13 +872,19 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     auto internalBuffer_CH1 = (CH1_mode == -1) ? internalBuffer750 : internalBuffer375_CH1;
     auto internalBuffer_CH2 = internalBuffer375_CH2;
 
-    int fullDelaySamples;
-    bool triggering;
-    if((triggerMode<2)||(triggerMode>=4))
-        internalBuffer_CH1->getDelayedTriggerPoint(display->delay,display->window,&fullDelaySamples,&triggering);
-    else
-        internalBuffer_CH2->getDelayedTriggerPoint(display->delay, display->window,&fullDelaySamples,&triggering);
-    if(singleShotEnabled && triggering)
+    double triggerDelay = 0;
+    if (triggerEnabled)
+    {
+        if((triggerMode<2)||(triggerMode>=4))
+            triggerDelay = internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window;
+        else
+            triggerDelay = internalBuffer_CH2->getDelayedTriggerPoint(display->window) - display->window;
+
+        if (triggerDelay < 0)
+            triggerDelay = 0;
+    }
+
+    if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
     std::vector<short> readData_CH1;
@@ -896,17 +902,17 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         readData_CH2 = internalBuffer_CH2->readWindow();
     } else if (freqResp) {
         double freqResp_window = 1/freqValue_CH1->value();
-        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, fullDelaySamples);
-        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, fullDelaySamples);
+        readData_CH1 = internalBuffer_CH1->readBuffer(freqResp_window, internalBuffer_CH1->freqResp_samples, CH1_mode == 2, triggerDelay);
+        readData_CH2 = internalBuffer_CH2->readBuffer(freqResp_window, internalBuffer_CH2->freqResp_samples, CH2_mode == 2, triggerDelay);
     } else
 #endif
     {
         if (CH1_mode == -2)
             readDataFile = internalBufferFile->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay);
         else if (CH1_mode)
-            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2,  fullDelaySamples);
+            readData_CH1 = internalBuffer_CH1->readBuffer(display->window, GRAPH_SAMPLES, CH1_mode == 2, display->delay + triggerDelay);
         if (CH2_mode)
-            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, fullDelaySamples);
+            readData_CH2 = internalBuffer_CH2->readBuffer(display->window, GRAPH_SAMPLES, CH2_mode == 2, display->delay + triggerDelay);
     }
 
     QVector<double> CH1, CH2;
@@ -1353,14 +1359,19 @@ void isoDriver::multimeterAction(){
         }
     }
 
-    int fullDelaySamples;
-    bool triggering;
-    internalBuffer375_CH1->getDelayedTriggerPoint(display->delay, display->window, &fullDelaySamples, &triggering);
+    double triggerDelay = 0;
+    if (triggerEnabled)
+    {
+        triggerDelay = internalBuffer375_CH1->getDelayedTriggerPoint(display->window) - display->window;
 
-    if(singleShotEnabled && triggering)
+        if (triggerDelay < 0)
+            triggerDelay = 0;
+    }
+
+    if(singleShotEnabled && (triggerDelay != 0))
         singleShotTriggered(1);
 
-    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, fullDelaySamples);
+    auto readData_CH1 = internalBuffer375_CH1->readBuffer(display->window, GRAPH_SAMPLES, false, display->delay + triggerDelay);
     auto CH1 = analogConvert(readData_CH1, 2048, 0, 1);  //No AC coupling!
 
     QVector<double> x(CH1.size());
