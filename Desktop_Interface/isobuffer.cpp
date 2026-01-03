@@ -426,8 +426,10 @@ void isoBuffer::serialManage(double baudRate, UartParity parity, bool hexDisplay
 void isoBuffer::setTriggerType(TriggerType newType)
 {
     qDebug() << "Trigger Type: " << (uint8_t)newType;
-    m_triggerType = newType;
-    m_lastTriggerDetlaT = 0;
+    if(newType != m_triggerType){
+        m_triggerType = newType;
+        m_lastTriggerDeltaT = 0;
+    }
 }
 
 void isoBuffer::setTriggerLevel(double voltageLevel, uint16_t top, bool acCoupled)
@@ -436,29 +438,63 @@ void isoBuffer::setTriggerLevel(double voltageLevel, uint16_t top, bool acCouple
     m_triggerSensitivity = static_cast<short>(1 + abs(voltageLevel * kTriggerSensitivityMultiplier * static_cast<double>(top) / 128.));
     qDebug() << "Trigger Level: " << m_triggerLevel;
     qDebug() << "Trigger sensitivity:" << m_triggerSensitivity;
-    m_lastTriggerDetlaT = 0;
+    m_lastTriggerDeltaT = 0;
+}
+
+void isoBuffer::setSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize)
+{
+    int validClockDivs[7] = {1, 2, 4, 8, 64, 256, 1024};
+
+    double freq_ratio = ((double) (CLOCK_FREQ/m_samplesPerSecond))/validClockDivs[clkSetting-1]; // a power 2**n, n possibly < 0
+
+    double bufferSamplesPerWfCycle = wfSize * (timerPeriod+1) / freq_ratio;
+
+    if(channelID==functionGen::ChannelID::CH1)
+        bufferSamplesPerCH1WfCycle = bufferSamplesPerWfCycle;
+    else if (channelID==functionGen::ChannelID::CH2)
+        bufferSamplesPerCH2WfCycle = bufferSamplesPerWfCycle;
 }
 
 // TODO: Clear trigger
 // FIXME: AC changes will not be reflected here
 void isoBuffer::checkTriggered()
 {
+    static uint32_t s_lastPosition = 0;
     if (m_triggerType == TriggerType::Disabled)
         return;
 
-    if ((bufferAt(0) >= (m_triggerLevel + m_triggerSensitivity)) && (m_triggerSeekState == TriggerSeekState::BelowTriggerLevel))
+    if((m_triggerType == TriggerType::CH1SigGen)||(m_triggerType == TriggerType::CH2SigGen))
     {
-        // Rising Edge
-        m_triggerSeekState = TriggerSeekState::AboveTriggerLevel;
-        if (m_triggerType == TriggerType::Rising)
-            addTriggerPosition(m_back - 1);
-    }
-    else if ((bufferAt(0) < (m_triggerLevel - m_triggerSensitivity)) && (m_triggerSeekState == TriggerSeekState::AboveTriggerLevel))
-    {
-        // Falling Edge
-        m_triggerSeekState = TriggerSeekState::BelowTriggerLevel;
-        if (m_triggerType == TriggerType::Falling)
-            addTriggerPosition(m_back - 1);
+        float bufferSamplesPerWfCycle = m_triggerType == TriggerType::CH1SigGen ? bufferSamplesPerCH1WfCycle : bufferSamplesPerCH2WfCycle;
+        int32_t diff = m_back-s_lastPosition;
+        if(diff < 0) {
+            diff += m_bufferLen;
+        }
+        int n_cycles = diff/bufferSamplesPerWfCycle;
+        if( (m_triggerPositionList.size()==0) || (diff-n_cycles*bufferSamplesPerWfCycle == 0) ) {
+            addTriggerPosition(m_back, s_lastPosition, n_cycles);
+            s_lastPosition=m_back;
+        }
+
+    } else {
+        if ((bufferAt(0) >= (m_triggerLevel + m_triggerSensitivity)) && (m_triggerSeekState == TriggerSeekState::BelowTriggerLevel))
+        {
+            // Rising Edge
+            m_triggerSeekState = TriggerSeekState::AboveTriggerLevel;
+            if (m_triggerType == TriggerType::Rising){
+                addTriggerPosition(m_back, s_lastPosition, 1);
+                s_lastPosition=m_back;
+            }
+        }
+        else if ((bufferAt(0) < (m_triggerLevel - m_triggerSensitivity)) && (m_triggerSeekState == TriggerSeekState::AboveTriggerLevel))
+        {
+            // Falling Edge
+            m_triggerSeekState = TriggerSeekState::BelowTriggerLevel;
+            if (m_triggerType == TriggerType::Falling){
+                addTriggerPosition(m_back, s_lastPosition, 1);
+                s_lastPosition=m_back;
+            } 
+        } 
     }
 }
 
@@ -515,16 +551,14 @@ double isoBuffer::getDelayedTriggerPoint(double delay)
 
 double isoBuffer::getTriggerFrequencyHz()
 {
-    return (m_lastTriggerDetlaT == 0) ? -1. : static_cast<double>(m_samplesPerSecond) / static_cast<double>(m_lastTriggerDetlaT);
+    return (m_lastTriggerDeltaT == 0) ? -1. : 1. / (m_lastTriggerDeltaT);
 }
 
-void isoBuffer::addTriggerPosition(uint32_t position)
+void isoBuffer::addTriggerPosition(uint32_t position, uint32_t s_lastPosition, int n_cycles)
 {
-    static uint32_t s_lastPosition = 0;
     m_triggerPositionList.push_back(m_back - 1);
-    m_lastTriggerDetlaT = (position > s_lastPosition) ? (position - s_lastPosition) : position + m_bufferLen - s_lastPosition;
+    uint32_t delta_samples = (position > s_lastPosition) ? (position - s_lastPosition) : position + m_bufferLen - s_lastPosition;
+    m_lastTriggerDeltaT = delta_samples / static_cast<double>(m_samplesPerSecond) / n_cycles;
 
-    s_lastPosition = position;
-
-    //qDebug() << position << s_lastPosition << static_cast<double>(m_samplesPerSecond) / static_cast<double>(m_lastTriggerDetlaT) << "Hz";
+    //qDebug() << position << s_lastPosition << static_cast<double>(m_samplesPerSecond) / static_cast<double>(m_lastTriggerDeltaT) << "Hz";
 }
