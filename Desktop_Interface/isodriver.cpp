@@ -359,64 +359,58 @@ void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes,
         double upper_range = range.upper;
         double lower_range = range.lower;
 
-        c = (upper_range - lower_range) / (double)400;
-        pixPct = (double)100 - ((double)100 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
-        if (pixPct < 0) pixPct = 0;
-        if (pixPct > 100) pixPct = 100;
+        c = (upper_range - lower_range) / 400.0;
+        pixPct = 100.0 - (100.0 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
+        if (pixPct < 0.0) pixPct = 0.0;
+        if (pixPct > 100.0) pixPct = 100.0;
         upper_range -= steps * c * pixPct;
         lower_range += steps * c * (100.0 - pixPct);
 
-        if (upper_range > (double)90) upper_range = (double)90;
-        if (lower_range < -(double)90) lower_range = (double)-90;
+        if (upper_range > 90.0) upper_range = 90.0;
+        if (lower_range < -90.0) lower_range = -90.0;
 
         topRange = upper_range;
         botRange = lower_range;
         topRangeUpdated(topRange);
         botRangeUpdated(botRange);
-    } else  {
+    } else {
         QCPRange range = axes->xAxis->range();
         double upper_range = range.upper;
         double lower_range = range.lower;
 
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
-            pixPct = (double)100 * (log((double)axes->xAxis->pixelToCoord(event->x())) - log(range.lower));
-            pixPct /= (double)(log(range.upper) - log(range.lower));
+            pixPct = 100.0 * (log((double)axes->xAxis->pixelToCoord(event->x())) - log(range.lower));
+            pixPct /= log(range.upper) - log(range.lower);
         } else {
-            pixPct = (double)100 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
-            pixPct /= (double)(range.upper - range.lower);
+            pixPct = 100.0 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
+            pixPct /= range.size();
         }
-
-        if (pixPct < 0)
-            pixPct = 0;
-
-        if (pixPct > 100)
-            pixPct = 100;
+        if (pixPct < 0.0) pixPct = 0.0;
+        if (pixPct > 100.0) pixPct = 100.0;
 
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
             upper_range *= pow(upper_range/lower_range , (-steps * (100.0-pixPct)/200.));
             lower_range *= pow(upper_range/lower_range , (steps * pixPct)/200.);
-            if (lower_range < (double)1) lower_range = (double)1;
+            if (lower_range < 1.0) lower_range = 1.0;
         } else {
-            c = (upper_range - lower_range) / (double)200;
+            c = (upper_range - lower_range) / 200.0;
             upper_range -= steps * c * (100.0 - pixPct);
             lower_range += steps * c * pixPct;
-            if (lower_range < (double)0) lower_range = (double)0;
+            if (lower_range < 0.0) lower_range = 0.0;
         }
 
         qDebug() << "WHEEL @ " << pixPct << "%";
-        qDebug() << c * ((double)pixPct);
+        qDebug() << c * pixPct;
 
-        if (upper_range > (double)750e3) upper_range = (double)750e3;
+        if (upper_range > 750.0e3) upper_range = 750.0e3;
         leftRange = lower_range;
         rightRange = upper_range;
 
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
             driver->retickXAxis();
         }
-
-        
     }
-  }
+}
 #endif
 
 
@@ -425,13 +419,12 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
 {
     double steps = event->delta() / 120.0;
     if (!(event->modifiers() == Qt::ControlModifier) && event->orientation() == Qt::Orientation::Vertical) {
-        double c = (topRange - botRange) / (double)400;
-
+        double c = (topRange - botRange) / 400.0;
         QCPRange range = axes->yAxis->range();
 
-        double pixPct = (double)100 - ((double)100 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
-        if (pixPct < 0) pixPct = 0;
-        if (pixPct > 100) pixPct = 100;
+        double pixPct = 100.0 - (100.0 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
+        if (pixPct < 0.0) pixPct = 0.0;
+        if (pixPct > 100.0) pixPct = 100.0;
 
         qDebug() << "WHEEL @ " << pixPct << "%";
         qDebug() << range.upper;
@@ -439,26 +432,18 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
         topRange -= steps * c * pixPct;
         botRange += steps * c * (100.0 - pixPct);
 
-        if (topRange > (double)20) topRange = (double)20;
-        if (botRange < -(double)20) botRange = (double)-20;
+        if (topRange > 20.0) topRange = 20.0;
+        if (botRange < -20.0) botRange = -20.0;
         topRangeUpdated(topRange);
         botRangeUpdated(botRange);
-    }
-    else
-    {
-        double c = (window) / (double)200;
+    } else {
+        double c = window / 200.0;
         QCPRange range = axes->xAxis->range();
 
-        double pixPct = (double)100 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
-
-        pixPct /= isProperlyPaused ? (double)(range.upper - range.lower)
-                                   : (double)(window);
-
-        if (pixPct < 0)
-            pixPct = 0;
-
-        if (pixPct > 100)
-            pixPct = 100;
+        double pixPct = 100.0 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
+        pixPct /= isProperlyPaused ? range.size() : window;
+        if (pixPct < 0.0) pixPct = 0.0;
+        if (pixPct > 100.0) pixPct = 100.0;
 
         qDebug() << "WHEEL @ " << pixPct << "%";
 
@@ -467,8 +452,8 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
             qDebug() << "TIGGERED";
             qDebug() << "upper = " << range.upper << "lower = " << range.lower;
             qDebug() << "window = " << window;
-            qDebug() << c * ((double)pixPct);
-            qDebug() << c * ((double)100 - (double)pixPct) * pixPct / 100;
+            qDebug() << c * pixPct;
+            qDebug() << c * (100.0 - pixPct) * pixPct / 100.0;
         }
 
         window -= steps * c * pixPct;
@@ -497,9 +482,7 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
             delay = 0;
             delayUpdated(delay);
         }
-
     }
-
 }
 
 bool isoDriver::properlyPaused(){
