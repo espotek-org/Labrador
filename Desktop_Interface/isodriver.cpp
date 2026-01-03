@@ -352,32 +352,26 @@ DisplayControl::DisplayControl(double left, double right, double top, double bot
 void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes, isoDriver* driver)
 {
     double steps = event->delta() / 120.0;
-    double c;
-    double pixPct;
     if (!(event->modifiers() == Qt::ControlModifier) && event->orientation() == Qt::Orientation::Vertical) {
         QCPRange range = axes->yAxis->range();
-        double upper_range = range.upper;
-        double lower_range = range.lower;
-
-        c = (upper_range - lower_range) / 400.0;
-        pixPct = 100.0 - (100.0 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
+        double pixPct = 100.0 - (100.0 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
         if (pixPct < 0.0) pixPct = 0.0;
         if (pixPct > 100.0) pixPct = 100.0;
-        upper_range -= steps * c * pixPct;
-        lower_range += steps * c * (100.0 - pixPct);
+        qDebug() << "WHEEL @" << pixPct << "%";
 
-        if (upper_range > 90.0) upper_range = 90.0;
-        if (lower_range < -90.0) lower_range = -90.0;
+        double scale = steps * range.size() / 400.0;
+        range.upper -= scale * pixPct;
+        range.lower += scale * (100.0 - pixPct);
+        if (range.upper > 90.0) range.upper = 90.0;
+        if (range.lower < -90.0) range.lower = -90.0;
+        topRange = range.upper;
+        botRange = range.lower;
 
-        topRange = upper_range;
-        botRange = lower_range;
         topRangeUpdated(topRange);
         botRangeUpdated(botRange);
     } else {
         QCPRange range = axes->xAxis->range();
-        double upper_range = range.upper;
-        double lower_range = range.lower;
-
+        double pixPct;
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
             pixPct = 100.0 * (log((double)axes->xAxis->pixelToCoord(event->x())) - log(range.lower));
             pixPct /= log(range.upper) - log(range.lower);
@@ -387,24 +381,23 @@ void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes,
         }
         if (pixPct < 0.0) pixPct = 0.0;
         if (pixPct > 100.0) pixPct = 100.0;
+        qDebug() << "WHEEL @" << pixPct << "%";
 
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
-            upper_range *= pow(upper_range/lower_range , (-steps * (100.0-pixPct)/200.));
-            lower_range *= pow(upper_range/lower_range , (steps * pixPct)/200.);
-            if (lower_range < 1.0) lower_range = 1.0;
+            double base = range.upper / range.lower;
+            range.upper *= pow(base, (-steps * (100.0-pixPct)/200.));
+            range.lower *= pow(base, (steps * pixPct)/200.);
+            if (range.lower < 1.0) range.lower = 1.0;
         } else {
-            c = (upper_range - lower_range) / 200.0;
-            upper_range -= steps * c * (100.0 - pixPct);
-            lower_range += steps * c * pixPct;
-            if (lower_range < 0.0) lower_range = 0.0;
+            double scale = steps * range.size() / 200.0;
+            range.upper -= scale * (100.0 - pixPct);
+            range.lower += scale * pixPct;
+            qDebug() << scale * pixPct;
+            if (range.lower < 0.0) range.lower = 0.0;
         }
-
-        qDebug() << "WHEEL @ " << pixPct << "%";
-        qDebug() << c * pixPct;
-
-        if (upper_range > 750.0e3) upper_range = 750.0e3;
-        leftRange = lower_range;
-        rightRange = upper_range;
+        if (range.upper > 750.0e3) range.upper = 750.0e3;
+        leftRange = range.lower;
+        rightRange = range.upper;
 
         if(axes->xAxis->scaleType()==QCPAxis::stLogarithmic) {
             driver->retickXAxis();
@@ -419,45 +412,39 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
 {
     double steps = event->delta() / 120.0;
     if (!(event->modifiers() == Qt::ControlModifier) && event->orientation() == Qt::Orientation::Vertical) {
-        double c = (topRange - botRange) / 400.0;
         QCPRange range = axes->yAxis->range();
-
         double pixPct = 100.0 - (100.0 * (((double)axes->yAxis->pixelToCoord(event->y())-range.lower) / range.size()));
         if (pixPct < 0.0) pixPct = 0.0;
         if (pixPct > 100.0) pixPct = 100.0;
-
-        qDebug() << "WHEEL @ " << pixPct << "%";
+        qDebug() << "WHEEL @" << pixPct << "%";
         qDebug() << range.upper;
 
-        topRange -= steps * c * pixPct;
-        botRange += steps * c * (100.0 - pixPct);
-
+        double scale = steps * (topRange - botRange) / 400.0;
+        topRange -= scale * pixPct;
+        botRange += scale * (100.0 - pixPct);
         if (topRange > 20.0) topRange = 20.0;
         if (botRange < -20.0) botRange = -20.0;
+
         topRangeUpdated(topRange);
         botRangeUpdated(botRange);
     } else {
-        double c = window / 200.0;
         QCPRange range = axes->xAxis->range();
-
         double pixPct = 100.0 * ((double)axes->xAxis->pixelToCoord(event->x()) - range.lower);
         pixPct /= isProperlyPaused ? range.size() : window;
         if (pixPct < 0.0) pixPct = 0.0;
         if (pixPct > 100.0) pixPct = 100.0;
+        qDebug() << "WHEEL @" << pixPct << "%";
 
-        qDebug() << "WHEEL @ " << pixPct << "%";
-
-        if (! isProperlyPaused)
-        {
+        double scale = steps * window / 200.0;
+        if (!isProperlyPaused) {
             qDebug() << "TIGGERED";
             qDebug() << "upper = " << range.upper << "lower = " << range.lower;
             qDebug() << "window = " << window;
-            qDebug() << c * pixPct;
-            qDebug() << c * (100.0 - pixPct) * pixPct / 100.0;
+            qDebug() << scale * pixPct;
+            qDebug() << scale * (100.0 - pixPct) * pixPct / 100.0;
         }
-
-        window -= steps * c * pixPct;
-        delay += steps * c * (100.0 - pixPct) * pixPct / 100.0;
+        window -= scale * pixPct;
+        delay += scale * (100.0 - pixPct) * pixPct / 100.0;
 
         // NOTE: delayUpdated and timeWindowUpdated are called more than once beyond here,
         // maybe they should only be called once at the end?
