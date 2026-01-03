@@ -576,6 +576,16 @@
                      <string>CH2 (Falling)</string>
                     </property>
                    </item>
+                   <item>
+                    <property name="text">
+                     <string>Sig. Gen. CH1</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>Sig. Gen. CH2</string>
+                    </property>
+                   </item>
                   </widget>
                  </item>
                  <item>
@@ -3626,6 +3636,12 @@
      <y>757</y>
     </hint>
    </hints>
+  </connection>
+  <connection>
+   <sender>triggerChannelSelect</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>triggerChannelChanged(int)</slot>
   </connection>
   <connection>
    <sender>acCoupledLabel_CH1</sender>
