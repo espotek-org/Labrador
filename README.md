@@ -38,12 +38,17 @@ The PCB files can be edited in KiCAD 5.0 or later.
 A `flake.nix` is provided for NixOS and Nix users:
 
 ```bash
-# Enter development shell with all dependencies
-nix develop
-
-# Or build the package directly
+# Build the package directly (recommended)
 nix build
 ./result/bin/labrador
+
+# Or enter development shell for hacking
+nix develop
+cd Desktop_Interface
+qmake PREFIX=$PWD/_install
+make -j$(nproc)
+make install
+./_install/bin/labrador
 ```
 
 **udev rules:** To access the USB device without root, add these rules to your system. On NixOS, add to your `configuration.nix`:

@@ -59,13 +59,16 @@
             echo "║       EspoTek Labrador Development Environment                   ║"
             echo "╚══════════════════════════════════════════════════════════════════╝"
             echo ""
-            echo "To build the desktop interface:"
+            echo "To build and install locally:"
             echo "  cd Desktop_Interface"
-            echo "  qmake"
+            echo "  qmake PREFIX=\$PWD/_install"
             echo "  make -j\$(nproc)"
+            echo "  make install"
             echo ""
-            echo "To run after building:"
-            echo "  ./labrador"
+            echo "To run after installing:"
+            echo "  ./_install/bin/labrador"
+            echo ""
+            echo "Or use 'nix build' from repo root for a proper package."
             echo ""
 
             # Ensure the bundled libdfuprog can be found
@@ -73,6 +76,9 @@
 
             # Help Qt find plugins
             export QT_PLUGIN_PATH="${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.qtPluginPrefix}"
+
+            # Add local install to data dirs so Qt can find resources
+            export XDG_DATA_DIRS="$PWD/Desktop_Interface/_install/share:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
           '';
         };
 
