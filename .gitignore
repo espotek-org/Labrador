@@ -54,3 +54,7 @@ Librador_API/___librador/basicdemo/basicdemo
 
 Labrador.app
 .DS_Store
+
+# Nix
+result
+Desktop_Interface/_install/
