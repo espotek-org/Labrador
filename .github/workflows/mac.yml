@@ -69,7 +69,7 @@ jobs:
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
-        if [ -e ${{env.CERTIFICATE_PATH}} ]; then
+        if: ( -e ${{env.CERTIFICATE_PATH}} ); then
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
