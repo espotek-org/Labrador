@@ -74,12 +74,14 @@ jobs:
             make -j$(sysctl -n hw.ncpu)
             macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
           else
+            # for debugging
             qmake -config debug  
             make -j$(sysctl -n hw.ncpu)
             macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
           fi
       - name: Code sign app bundle
         working-directory: Desktop_Interface
+        if: ( -e ${{env.CERTIFICATE_PATH}} )
         run: |
           # Find the signing identity
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
@@ -99,6 +101,7 @@ jobs:
 
       - name: Create and sign DMG
         working-directory: Desktop_Interface
+        if: ( -e ${{env.CERTIFICATE_PATH}} )
         run: |
           # Get the git hash for the filename
           GIT_HASH=$(git rev-parse --short HEAD)
@@ -129,6 +132,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        if: ( -e ${{env.CERTIFICATE_PATH}} )  
         run: |
           GIT_HASH=$(git rev-parse --short HEAD)
           DMG_PATH="Labrador-${GIT_HASH}.dmg"
