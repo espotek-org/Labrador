@@ -2791,6 +2791,8 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled1);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled1);
         ui->controller_iso->retickXAxis();
+        ui->controller_iso->freqRespStatusMark->setVisible(false);
+        ui->controller_iso->freqRespStatusLabel->setVisible(false);
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
@@ -2877,6 +2879,10 @@ void MainWindow::on_actionEye_Diagram_triggered(bool checked)
         freqRespLayout1Widget->setVisible(false);
         freqRespLayout2Widget->setVisible(false);
         ui->actionFrequency_Response->setChecked(false);
+
+        ui->controller_iso->freqRespStatusMark->setVisible(false);
+        ui->controller_iso->freqRespStatusLabel->setVisible(false);
+        ui->controller_iso->fSpaceLabel->setVisible(false);
     }
 
     ui->scopeGroup_CH2->setDisabled(false);
