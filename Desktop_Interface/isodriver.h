@@ -70,6 +70,8 @@ public:
 #if QCP_VER == 1
     QCPItemText *cursorLabel;
     QCPItemText *fSpaceLabel;
+    QCPItemText *freqRespStatusLabel;
+    QCPItemText *freqRespStatusMark;
     QCPItemText *triggerFrequencyLabel;
 #endif
     genericUsbDriver *driver;

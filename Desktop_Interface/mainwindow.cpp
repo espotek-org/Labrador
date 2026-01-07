@@ -435,7 +435,7 @@ void MainWindow::initialisePlot()
     ui->scopeAxes->addItem(fSpaceLabel);
     fSpaceLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
     fSpaceLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
-    fSpaceLabel->position->setCoords(1.00, 1.04); // place position at center/top of axis rect
+    fSpaceLabel->position->setCoords(1.00, 1.04); 
     fSpaceLabel->setTextAlignment(Qt::AlignBottom|Qt::AlignRight);
     fSpaceLabel->setText("Cursor Label Here");
     fSpaceLabel->setClipToAxisRect(false);
@@ -444,6 +444,34 @@ void MainWindow::initialisePlot()
     fSpaceLabel->setPen(QPen(Qt::white));
     fSpaceLabel->setBrush(QBrush(Qt::black));
     fSpaceLabel->setVisible(false);
+
+    auto freqRespStatusLabel = new QCPItemText(ui->scopeAxes);
+    ui->scopeAxes->addItem(fSpaceLabel);
+    freqRespStatusLabel->setPositionAlignment(Qt::AlignVCenter|Qt::AlignRight);
+    freqRespStatusLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
+    freqRespStatusLabel->position->setCoords(0.05, 1.06); 
+    freqRespStatusLabel->setTextAlignment(Qt::AlignVCenter|Qt::AlignRight);
+    freqRespStatusLabel->setText("Status:");
+    freqRespStatusLabel->setClipToAxisRect(false);
+    freqRespStatusLabel->setFont(labelFont);
+    freqRespStatusLabel->setColor(Qt::white);
+    freqRespStatusLabel->setBrush(QBrush(Qt::black));
+    freqRespStatusLabel->setVisible(false);
+
+    QFont markFont = QFont(labelFont);
+    markFont.setPointSize(24);
+    auto freqRespStatusMark = new QCPItemText(ui->scopeAxes);
+    ui->scopeAxes->addItem(fSpaceLabel);
+    freqRespStatusMark->setPositionAlignment(Qt::AlignVCenter|Qt::AlignLeft);
+    freqRespStatusMark->position->setType(QCPItemPosition::ptAxisRectRatio);
+    freqRespStatusMark->position->setCoords(0.06, 1.055); 
+    freqRespStatusMark->setTextAlignment(Qt::AlignVCenter|Qt::AlignLeft);
+    freqRespStatusMark->setText("Mark Here");
+    freqRespStatusMark->setClipToAxisRect(false);
+    freqRespStatusMark->setFont(markFont);
+    freqRespStatusMark->setColor(Qt::white);
+    freqRespStatusMark->setBrush(QBrush(Qt::black));
+    freqRespStatusMark->setVisible(false);
 
     auto triggerFrequencyLabel = new QCPItemText(ui->scopeAxes);
     ui->scopeAxes->addItem(triggerFrequencyLabel);
@@ -462,6 +490,9 @@ void MainWindow::initialisePlot()
     ui->controller_iso->cursorLabel = cursorLabel;
     ui->controller_iso->triggerFrequencyLabel = triggerFrequencyLabel;
     ui->controller_iso->fSpaceLabel = fSpaceLabel;
+    ui->controller_iso->freqRespStatusLabel = freqRespStatusLabel;
+    ui->controller_iso->freqRespStatusMark = freqRespStatusMark;
+
 
     ui->scopeAxes->yAxis->setAutoTickCount(9);
     ui->scopeAxes->xAxis->setAutoTickCount(9);
@@ -2798,6 +2829,9 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->busSnifferGroup_CH2->setChecked(false);
         ui->scopeGroup_CH1->setChecked(true);
         ui->scopeGroup_CH2->setChecked(true);
+
+        if(ui->amplitudeValue_CH1->value() < 0.5)
+            QMessageBox::information(nullptr, "Notice", "Try increasing the amplitude of Signal Gen CH1 if the Frequency Response tool appears unresponsive.");
     }
     ui->scopeGroup_CH1->setCheckable(!checked);
     ui->scopeGroup_CH2->setCheckable(!checked);
@@ -2808,10 +2842,14 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
         ui->controller_iso->retickXAxis();
+        ui->controller_iso->freqRespStatusLabel->setVisible(true);
+        ui->controller_iso->freqRespStatusMark->setVisible(true);
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
         ui->controller_iso->fSpaceLabel->setVisible(false);
+        ui->controller_iso->freqRespStatusLabel->setVisible(false);
+        ui->controller_iso->freqRespStatusMark->setVisible(false);
         ui->scopeAxes->xAxis->setScaleType(QCPAxis::stLinear);
 
         ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
