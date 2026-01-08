@@ -7,12 +7,6 @@ assignees: ''
 
 ---
 
----
-name: Problem Report
-about: Create a Report to help us improve
----
-
-
 ### PROBLEM DESCRIPTION
 _A clear and concise description of what the problem is._
 
@@ -51,3 +45,5 @@ _Add any other context about the problem here._
 
 
 **(Please, remember to close the issue when the problem has been addressed)**
+
+<sub>**Tip**: [React](https://github.blog/news-insights/product-news/add-reactions-to-pull-requests-issues-and-comments/) with 👍 to help prioritize this issue. Please use comments to provide useful context, avoiding `+1` or `me too`, to help us triage it. Learn more [here](https://opentelemetry.io/community/end-user/issue-participation/).</sub>
