@@ -13,9 +13,9 @@ jobs:
   build-avr:
     runs-on: ubuntu-latest
     steps:
-      - name : Checkout repository
-        uses: actions/checkout@v4
-        uses: bazhenov/action-avr-make@v1.0
+#      - name : Checkout repository
+    - uses: actions/checkout@v4
+    - uses: bazhenov/action-avr-make@v1.0
 
 #      - name: Install GNU AVR tools and run make
 
