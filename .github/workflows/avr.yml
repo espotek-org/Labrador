@@ -1,0 +1,31 @@
+name: Build firmware
+
+on:
+  workflow_call
+  workflow_dispatch
+
+jobs:
+  build-avr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name : Checkout repository
+        uses: actions/checkout@master
+
+      - name: Install GNU AVR tools
+        uses: bazhenov/action-avr-make@v1.0
+
+      - name: compile using make
+        working-directory: AVR_Code/USB_BULK_TEST
+        run: |
+          make 0x02
+
+      - name: Upload hex artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-hex
+          path: AVR_Code/USB_BULK_TEST/labrafirm*hex
+          compression-level: 0
+          if-no-files-found: error
+          
+
