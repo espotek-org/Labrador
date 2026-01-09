@@ -1,16 +1,19 @@
 name: Build firmware
 
+permissions:
+  contents: read
+  pull-requests: write
+  
 on:
-  workflow_call
-  workflow_dispatch
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   build-avr:
     runs-on: ubuntu-latest
-
     steps:
       - name : Checkout repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: Install GNU AVR tools
         uses: bazhenov/action-avr-make@v1.0
