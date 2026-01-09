@@ -7,6 +7,7 @@ permissions:
 on:
   workflow_call:
   workflow_dispatch:
+  push:
 
 jobs:
   build-avr:
@@ -20,8 +21,7 @@ jobs:
 
       - name: compile using make
         working-directory: AVR_Code/USB_BULK_TEST
-        run: |
-          make 0x02
+        run: make 0x02
 
       - name: Upload hex artifacts
         uses: actions/upload-artifact@v4
