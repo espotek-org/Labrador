@@ -109,6 +109,9 @@ $(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o \
 $(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o \
 $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
+0x01: SUFFIX=0x01
+0x01: $(OUTPUT_FILE_PATH)
+
 $(SRC_DIR)/tiny_calibration.o: $(SRC_DIR)/tiny_calibration.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
@@ -213,9 +216,6 @@ $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o: $(SRC_DIR)/ASF/xmega/drivers/usb/
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
-
-0x01: SUFFIX=0x01
-0x01: $(OUTPUT_FILE_PATH)
 
 0x02: CFLAGS+=-DSINGLE_ENDPOINT_INTERFACE
 0x02: SUFFIX=0x02
