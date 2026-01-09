@@ -28,7 +28,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: asset-hex
-        path: AVR_Code/USB_BULK_TEST/labrafirm*hex
+        path: labrafirm*hex
         compression-level: 0
         if-no-files-found: error
           
