@@ -33,7 +33,7 @@ OUTPUT_FILE_PATH_AS_ARGS +=$(NAME).elf
 AVR_APP_PATH :=$$$AVR_APP_PATH$$$
 
 CC=avr-gcc
-SRC_DIR=./AVR_CODE/USB_BULK_TEST/src
+SRC_DIR=./AVR_Code/USB_BULK_TEST/src
 
 INCLUDES=-I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example" -I"$(SRC_DIR)/ASF/common/services/usb/udc" -I"$(SRC_DIR)/ASF/xmega/drivers/nvm" -I"$(SRC_DIR)/ASF/common/services/sleepmgr" -I"$(SRC_DIR)/ASF/common/services/clock" -I"$(SRC_DIR)/ASF/xmega/drivers/sleep" -I"$(SRC_DIR)/ASF/xmega/drivers/usb" -I"$(SRC_DIR)/ASF/xmega/drivers/cpu" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device" -I"$(SRC_DIR)/ASF/common/services/usb" -I"$(SRC_DIR)mon/applications/user_application/user_board/config" -I"$(SRC_DIR)/ASF/xmega/utils" -I"$(SRC_DIR)/config" -I"$(SRC_DIR)/ASF/common/boards" -I"$(SRC_DIR)/ASF/xmega/utils/preprocessor" -I"$(SRC_DIR)/ASF/common/utils" -I"$(SRC_DIR)" -I"$(SRC_DIR)/ASF/common/boards/user_board" -I"$(SRC_DIR)/ASF/common/services/ioport"
 
