@@ -224,11 +224,11 @@ $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o: $(SRC_DIR)/ASF/xmega/drivers/usb/
 $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER_SCRIPT_DEP)
 	@echo Building target: $@
 	$(CC) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -Wl,-Map=$(NAME)".map"  -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax 
-	$(AVRDIR)/bin/avr-objcopy -O ihex -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".hex"
-	$(AVRDIR)/bin/avr-objdump -h -S $(NAME)".elf" > $(NAME)".lss"
-	$(AVRDIR)/bin/avr-objcopy -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $(NAME)".elf" $(NAME)".eep" || exit 0
-	$(AVRDIR)/bin/avr-objcopy -O srec -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".srec"
-	$(AVRDIR)/bin/avr-size $(NAME)".elf"
+	avr-objcopy -O ihex -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".hex"
+	avr-objdump -h -S $(NAME)".elf" > $(NAME)".lss"
+	avr-objcopy -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $(NAME)".elf" $(NAME)".eep" || exit 0
+	avr-objcopy -O srec -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".srec"
+	avr-size $(NAME)".elf"
 	@echo Finished successfully: $(NAME)
 
 VARIANTS = 0x01 0x02
