@@ -19,6 +19,7 @@ jobs:
       - name: Install GNU AVR tools and run make
         working-directory: AVR_Code/USB_BULK_TEST
         uses: bazhenov/action-avr-make@v1.0
+        run: make
 
         #       in the future, separate the installation of the tools and the running of make
 #       - name: compile using make
