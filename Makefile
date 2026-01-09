@@ -32,183 +32,184 @@ OUTPUT_FILE_PATH =$(NAME).elf
 OUTPUT_FILE_PATH_AS_ARGS +=$(NAME).elf
 AVR_APP_PATH :=$$$AVR_APP_PATH$$$
 
-AVRDIR=
-CC=$(AVRDIR)/bin/avr-gcc
-INCLUDES=-I"./common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained" -I"./common/services/usb/class/vendor/device/example" -I"./src/ASF/common/services/usb/udc" -I"./src/ASF/xmega/drivers/nvm" -I"./src/ASF/common/services/sleepmgr" -I"./src/ASF/common/services/clock" -I"./src/ASF/xmega/drivers/sleep" -I"./src/ASF/xmega/drivers/usb" -I"./src/ASF/xmega/drivers/cpu" -I"./src/ASF/common/services/usb/class/vendor" -I"./src/ASF/common/services/usb/class/vendor/device" -I"./src/ASF/common/services/usb" -I"./common/applications/user_application/user_board/config" -I"./src/ASF/xmega/utils" -I"./src/config" -I"./src/ASF/common/boards" -I"./src/ASF/xmega/utils/preprocessor" -I"./src/ASF/common/utils" -I"./src" -I"./src/ASF/common/boards/user_board" -I"./src/ASF/common/services/ioport"
+CC=avr-gcc
+SRC_DIR=./AVR_CODE/USB_BULK_TEST/src
+
+INCLUDES=-I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example" -I"$(SRC_DIR)/ASF/common/services/usb/udc" -I"$(SRC_DIR)/ASF/xmega/drivers/nvm" -I"$(SRC_DIR)/ASF/common/services/sleepmgr" -I"$(SRC_DIR)/ASF/common/services/clock" -I"$(SRC_DIR)/ASF/xmega/drivers/sleep" -I"$(SRC_DIR)/ASF/xmega/drivers/usb" -I"$(SRC_DIR)/ASF/xmega/drivers/cpu" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor" -I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device" -I"$(SRC_DIR)/ASF/common/services/usb" -I"$(SRC_DIR)mon/applications/user_application/user_board/config" -I"$(SRC_DIR)/ASF/xmega/utils" -I"$(SRC_DIR)/config" -I"$(SRC_DIR)/ASF/common/boards" -I"$(SRC_DIR)/ASF/xmega/utils/preprocessor" -I"$(SRC_DIR)/ASF/common/utils" -I"$(SRC_DIR)" -I"$(SRC_DIR)/ASF/common/boards/user_board" -I"$(SRC_DIR)/ASF/common/services/ioport"
 
 CFLAGS=-std=gnu99 -ffunction-sections -mmcu=atxmega32a4u -fsigned-char -funsigned-bitfields -fdata-sections -fshort-enums -fno-strict-aliasing -fno-jump-tables -fpack-struct -Wall -O2 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" 
 NAME=labrafirm_$(SUFFIX)
 
 OBJS += \
-./src/tiny_calibration.o \
-./src/tiny_dig.o \
-./src/tiny_eeprom.o \
-./src/ASF/common/boards/user_board/init.o \
-./src/ASF/common/services/ioport/xmega/ioport_compat.o \
-./src/main.o \
-./src/tiny_adc.o \
-./src/tiny_dac.o \
-./src/tiny_dma.o \
-./src/tiny_timer.o \
-./src/tiny_uart.o \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
-./src/ASF/common/services/clock/xmega/sysclk.o \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
-./src/ASF/common/services/usb/udc/udc.o \
-./src/ASF/xmega/drivers/nvm/nvm.o \
-./src/ASF/xmega/drivers/nvm/nvm_asm.o \
-./src/ASF/xmega/drivers/cpu/ccp.o \
-./src/ASF/xmega/drivers/usb/usb_device.o
+$(SRC_DIR)/tiny_calibration.o \
+$(SRC_DIR)/tiny_dig.o \
+$(SRC_DIR)/tiny_eeprom.o \
+$(SRC_DIR)/ASF/common/boards/user_board/init.o \
+$(SRC_DIR)/ASF/common/services/ioport/xmega/ioport_compat.o \
+$(SRC_DIR)/main.o \
+$(SRC_DIR)/tiny_adc.o \
+$(SRC_DIR)/tiny_dac.o \
+$(SRC_DIR)/tiny_dma.o \
+$(SRC_DIR)/tiny_timer.o \
+$(SRC_DIR)/tiny_uart.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
+$(SRC_DIR)/ASF/common/services/clock/xmega/sysclk.o \
+$(SRC_DIR)/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
+$(SRC_DIR)/ASF/common/services/usb/udc/udc.o \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm.o \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o \
+$(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o \
+$(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
 C_DEPS_AS_ARGS += \
-./src/tiny_calibration.d \
-./src/tiny_dig.d \
-./src/tiny_eeprom.d \
-./src/ASF/common/boards/user_board/init.d \
-./src/ASF/common/services/ioport/xmega/ioport_compat.d \
-./src/main.d \
-./src/tiny_adc.d \
-./src/tiny_dac.d \
-./src/tiny_dma.d \
-./src/tiny_timer.d \
-./src/tiny_uart.d \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.d \
-./src/ASF/common/services/clock/xmega/sysclk.d \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.d \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.d \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.d \
-./src/ASF/common/services/usb/udc/udc.d \
-./src/ASF/xmega/drivers/nvm/nvm.d \
-./src/ASF/xmega/drivers/nvm/nvm_asm.d \
-./src/ASF/xmega/drivers/cpu/ccp.d \
-./src/ASF/xmega/drivers/usb/usb_device.d
+$(SRC_DIR)/tiny_calibration.d \
+$(SRC_DIR)/tiny_dig.d \
+$(SRC_DIR)/tiny_eeprom.d \
+$(SRC_DIR)/ASF/common/boards/user_board/init.d \
+$(SRC_DIR)/ASF/common/services/ioport/xmega/ioport_compat.d \
+$(SRC_DIR)/main.d \
+$(SRC_DIR)/tiny_adc.d \
+$(SRC_DIR)/tiny_dac.d \
+$(SRC_DIR)/tiny_dma.d \
+$(SRC_DIR)/tiny_timer.d \
+$(SRC_DIR)/tiny_uart.d \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.d \
+$(SRC_DIR)/ASF/common/services/clock/xmega/sysclk.d \
+$(SRC_DIR)/ASF/common/services/sleepmgr/xmega/sleepmgr.d \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor.d \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.d \
+$(SRC_DIR)/ASF/common/services/usb/udc/udc.d \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm.d \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.d \
+$(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.d \
+$(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.d
 
 OBJS_AS_ARGS += \
-./src/tiny_calibration.o \
-./src/tiny_dig.o \
-./src/tiny_eeprom.o \
-./src/ASF/common/boards/user_board/init.o \
-./src/ASF/common/services/ioport/xmega/ioport_compat.o \
-./src/main.o \
-./src/tiny_adc.o \
-./src/tiny_dac.o \
-./src/tiny_dma.o \
-./src/tiny_timer.o \
-./src/tiny_uart.o \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
-./src/ASF/common/services/clock/xmega/sysclk.o \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
-./src/ASF/common/services/usb/udc/udc.o \
-./src/ASF/xmega/drivers/nvm/nvm.o \
-./src/ASF/xmega/drivers/nvm/nvm_asm.o \
-./src/ASF/xmega/drivers/cpu/ccp.o \
-./src/ASF/xmega/drivers/usb/usb_device.o
+$(SRC_DIR)/tiny_calibration.o \
+$(SRC_DIR)/tiny_dig.o \
+$(SRC_DIR)/tiny_eeprom.o \
+$(SRC_DIR)/ASF/common/boards/user_board/init.o \
+$(SRC_DIR)/ASF/common/services/ioport/xmega/ioport_compat.o \
+$(SRC_DIR)/main.o \
+$(SRC_DIR)/tiny_adc.o \
+$(SRC_DIR)/tiny_dac.o \
+$(SRC_DIR)/tiny_dma.o \
+$(SRC_DIR)/tiny_timer.o \
+$(SRC_DIR)/tiny_uart.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
+$(SRC_DIR)/ASF/common/services/clock/xmega/sysclk.o \
+$(SRC_DIR)/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
+$(SRC_DIR)/ASF/common/services/usb/udc/udc.o \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm.o \
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o \
+$(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o \
+$(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
-./src/tiny_calibration.o: ./src/tiny_calibration.c
+$(SRC_DIR)/tiny_calibration.o: $(SRC_DIR)/tiny_calibration.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_dig.o: ./src/tiny_dig.c
+$(SRC_DIR)/tiny_dig.o: $(SRC_DIR)/tiny_dig.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_eeprom.o: ./src/tiny_eeprom.c
+$(SRC_DIR)/tiny_eeprom.o: $(SRC_DIR)/tiny_eeprom.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/boards/user_board/init.o: ./src/ASF/common/boards/user_board/init.c
+$(SRC_DIR)/ASF/common/boards/user_board/init.o: $(SRC_DIR)/ASF/common/boards/user_board/init.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/ioport/xmega/ioport_compat.o: ./src/ASF/common/services/ioport/xmega/ioport_compat.c
+$(SRC_DIR)/ASF/common/services/ioport/xmega/ioport_compat.o: $(SRC_DIR)/ASF/common/services/ioport/xmega/ioport_compat.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/main.o: ./src/main.c
+$(SRC_DIR)/main.o: $(SRC_DIR)/main.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_adc.o: ./src/tiny_adc.c
+$(SRC_DIR)/tiny_adc.o: $(SRC_DIR)/tiny_adc.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_dac.o: ./src/tiny_dac.c
+$(SRC_DIR)/tiny_dac.o: $(SRC_DIR)/tiny_dac.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_dma.o: ./src/tiny_dma.c
+$(SRC_DIR)/tiny_dma.o: $(SRC_DIR)/tiny_dma.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_timer.o: ./src/tiny_timer.c
+$(SRC_DIR)/tiny_timer.o: $(SRC_DIR)/tiny_timer.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/tiny_uart.o: ./src/tiny_uart.c
+$(SRC_DIR)/tiny_uart.o: $(SRC_DIR)/tiny_uart.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o: ./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.c
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o: $(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/clock/xmega/sysclk.o: ./src/ASF/common/services/clock/xmega/sysclk.c
+$(SRC_DIR)/ASF/common/services/clock/xmega/sysclk.o: $(SRC_DIR)/ASF/common/services/clock/xmega/sysclk.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o: ./src/ASF/common/services/sleepmgr/xmega/sleepmgr.c
+$(SRC_DIR)/ASF/common/services/sleepmgr/xmega/sleepmgr.o: $(SRC_DIR)/ASF/common/services/sleepmgr/xmega/sleepmgr.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o: ./src/ASF/common/services/usb/class/vendor/device/udi_vendor.c
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor.o: $(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o: ./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.c
+$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o: $(SRC_DIR)/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/common/services/usb/udc/udc.o: ./src/ASF/common/services/usb/udc/udc.c
+$(SRC_DIR)/ASF/common/services/usb/udc/udc.o: $(SRC_DIR)/ASF/common/services/usb/udc/udc.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/xmega/drivers/cpu/ccp.o: ./src/ASF/xmega/drivers/cpu/ccp.s
+$(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o: $(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.s
 	@echo Building file: $<
 	@$(CC) -x assembler-with-cpp -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/xmega/drivers/nvm/nvm.o: ./src/ASF/xmega/drivers/nvm/nvm.c
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm.o: $(SRC_DIR)/ASF/xmega/drivers/nvm/nvm.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/xmega/drivers/nvm/nvm_asm.o: ./src/ASF/xmega/drivers/nvm/nvm_asm.s
+$(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o: $(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.s
 	@echo Building file: $<
 	@$(CC) -x assembler-with-cpp -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
 
-./src/ASF/xmega/drivers/usb/usb_device.o: ./src/ASF/xmega/drivers/usb/usb_device.c
+$(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o: $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.c
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
