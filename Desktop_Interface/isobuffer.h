@@ -27,7 +27,9 @@ enum class TriggerType : uint8_t
 {
     Disabled,
     Rising,
-    Falling
+    Falling,
+    CH1SigGen,
+    CH2SigGen
 };
 
 enum class TriggerSeekState : uint8_t
@@ -99,6 +101,7 @@ public:
     void setTriggerLevel(double voltageLevel, uint16_t top, bool acCoupled);
     double getDelayedTriggerPoint(double delay);
     double getTriggerFrequencyHz();
+    void setSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize);
 
 // ---- MEMBER VARIABLES ----
 
@@ -154,11 +157,13 @@ private:
 	qulonglong m_fileIO_maxFileSize;
 	qulonglong m_fileIO_numBytesWritten;
 	unsigned int m_currentColumn = 0;
-    uint32_t m_lastTriggerDetlaT = 0;
+    double m_lastTriggerDeltaT = 0.0;
+    float bufferSamplesPerCH1WfCycle;
+    float bufferSamplesPerCH2WfCycle;
 
 	isoDriver* m_virtualParent;
 
-    void addTriggerPosition(uint32_t position);
+    void addTriggerPosition(uint32_t m_back, uint32_t position, int n_cycles);
 signals:
 	void fileIOinternalDisable();
 public slots:

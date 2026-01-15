@@ -66,6 +66,8 @@ private slots:
     void on_actionSnap_to_Cursors_triggered();
     void on_actionEnter_Manually_triggered();
 
+    void triggerChannelChanged(int newTriggerChannel);
+
     void connectDisplaySignals();
     void calibrateStage2();
     void calibrateStage3();

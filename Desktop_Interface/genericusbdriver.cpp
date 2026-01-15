@@ -253,6 +253,7 @@ void genericUsbDriver::sendFunctionGenData(functionGen::ChannelID channelID)
 			usbSendControl(0x40, 0xb2, timerPeriod, clkSetting, channelData.samples.size(), channelData.samples.data());
     }
 
+    this->sigGenFreqUpdated(channelID, clkSetting, timerPeriod, channelData.samples.size());
     return;
 
 }

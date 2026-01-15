@@ -166,6 +166,7 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(ui->psuSlider, SIGNAL(voltageChanged(double)), ui->controller_iso->driver, SLOT(setPsu(double)));
         connect(ui->controller_iso, SIGNAL(setGain(double)), ui->controller_iso->driver, SLOT(setGain(double)));
         connect(ui->controller_fg, &functionGenControl::functionGenToUpdate, ui->controller_iso->driver, &genericUsbDriver::setFunctionGen);
+        connect(ui->controller_iso->driver, &genericUsbDriver::sigGenFreqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
         connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 		connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 			// Force a trigger refresh
@@ -1525,6 +1526,7 @@ void MainWindow::reinitUsbStage2(void){
     connect(ui->psuSlider, SIGNAL(voltageChanged(double)), ui->controller_iso->driver, SLOT(setPsu(double)));
     connect(ui->controller_iso, SIGNAL(setGain(double)), ui->controller_iso->driver, SLOT(setGain(double)));
     connect(ui->controller_fg, &functionGenControl::functionGenToUpdate, ui->controller_iso->driver, &genericUsbDriver::setFunctionGen);
+    connect(ui->controller_iso->driver, &genericUsbDriver::sigGenFreqUpdated, ui->controller_iso, &isoDriver::newSigGenTriggerFreq);
     connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
 	connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
 		// Force a trigger refresh
@@ -2790,10 +2792,13 @@ void MainWindow::on_actionFrequency_Spectrum_triggered(bool checked)
         ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
     }
 
-    if (checked == true)
+    if (checked == true) {
         MAX_WINDOW_SIZE = 1<<17;
-    else
+        ui->controller_iso->showTriggerFrequencyLabel = false;
+    } else {
         MAX_WINDOW_SIZE = 10;
+        ui->controller_iso->showTriggerFrequencyLabel = true;
+    }
 }
 
 void MainWindow::on_actionFrequency_Response_triggered(bool checked)
@@ -2827,6 +2832,7 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled2);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled2);
         ui->controller_iso->retickXAxis();
+        ui->controller_iso->showTriggerFrequencyLabel = false;
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
@@ -2836,6 +2842,7 @@ void MainWindow::on_actionFrequency_Response_triggered(bool checked)
         ui->scopeAxes->xAxis->setNumberPrecision(defaultNumberPrecision);
         ui->scopeAxes->xAxis->setAutoTickCount(defaultAutoTickCount);
         ui->scopeAxes->xAxis->setNumberFormat(defaultNumberFormat);
+        ui->controller_iso->showTriggerFrequencyLabel = true;
     }
 }
 
@@ -2866,9 +2873,11 @@ void MainWindow::on_actionEye_Diagram_triggered(bool checked)
     if(checked){
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled3);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled3);
+        ui->controller_iso->showTriggerFrequencyLabel = false;
     }else{
         ui->cursorHoriCheck->setChecked(ui->controller_iso->horiCursorEnabled0);
         ui->cursorVertCheck->setChecked(ui->controller_iso->vertCursorEnabled0);
+        ui->controller_iso->showTriggerFrequencyLabel = true;
     }
 }
 #endif
@@ -2964,6 +2973,25 @@ void MainWindow::on_serialEncodingCheck_CH1_toggled(bool checked)
         ui->controller_fg->restore_waveform(ChannelID::CH1);
     }
 }
+
+void MainWindow::triggerChannelChanged(int newTriggerChannel){
+    if((newTriggerChannel==4)||(newTriggerChannel==5)) {
+        ui->triggerLevelValue->setEnabled(false);
+        ui->singleShotCheckBox->setEnabled(false);
+        ui->singleShotCheckBox->setChecked(false);
+#ifndef PLATFORM_ANDROID
+        ui->label_6->setEnabled(false);
+#endif
+    } else {
+        ui->triggerLevelValue->setEnabled(true);
+        ui->singleShotCheckBox->setEnabled(true);
+#ifndef PLATFORM_ANDROID
+        ui->label_6->setEnabled(true);
+#endif
+    }
+}
+
+
 
 void MainWindow::on_txuart_textChanged()
 {

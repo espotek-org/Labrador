@@ -778,6 +778,13 @@ void isoDriver::setTriggerLevel(double level)
     triggerStateChanged();
 }
 
+// channel ID here refers to the wf gen channels
+void isoDriver::newSigGenTriggerFreq(functionGen::ChannelID channelID, int clkSetting, int timerPeriod, int wfSize) {
+    internalBuffer375_CH1->setSigGenTriggerFreq(channelID, clkSetting, timerPeriod, wfSize);
+    internalBuffer750->setSigGenTriggerFreq(channelID, clkSetting, timerPeriod, wfSize);
+}
+
+
 void isoDriver::setSingleShotEnabled(bool enabled)
 {
     singleShotEnabled = enabled;
@@ -840,8 +847,10 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
     double triggerDelay = 0;
     if (triggerEnabled)
     {
-        triggerDelay = (triggerMode < 2) ? internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window
-                                         : internalBuffer_CH2->getDelayedTriggerPoint(display->window) - display->window;
+        if((triggerMode<2)||(triggerMode>=4))
+            triggerDelay = internalBuffer_CH1->getDelayedTriggerPoint(display->window) - display->window;
+        else
+            triggerDelay = internalBuffer_CH2->getDelayedTriggerPoint(display->window) - display->window;
 
         if (triggerDelay < 0)
             triggerDelay = 0;
@@ -1700,7 +1709,7 @@ void isoDriver::slowTimerTick(){
     update_CH1 = true;
     update_CH2 = true;
 
-    bool frequencyLabelVisible = false;
+    bool frequencyLabelValid = false;
 
     if (triggerEnabled)
     {
@@ -1716,11 +1725,15 @@ void isoDriver::slowTimerTick(){
         case 3:
             triggerFrequency = internalBuffer375_CH2->getTriggerFrequencyHz();
             break;
+        case 4:
+        case 5:
+            triggerFrequency = (driver->deviceMode == 6) ? internalBuffer750->getTriggerFrequencyHz() : internalBuffer375_CH1->getTriggerFrequencyHz();
+            break;
         }
 
         if (triggerFrequency > 0.)
         {
-            frequencyLabelVisible = true;
+            frequencyLabelValid = true;
             siprint triggerFreqSiprint("Hz", triggerFrequency);
             siprint periodSiprint("s", 1. / triggerFrequency);
 
@@ -1730,7 +1743,7 @@ void isoDriver::slowTimerTick(){
         qDebug() << triggerFrequency << "Hz";
     }
 
-    triggerFrequencyLabel->setVisible(frequencyLabelVisible);
+    triggerFrequencyLabel->setVisible(showTriggerFrequencyLabel&&frequencyLabelValid);
 }
 
 void isoDriver::setTopRange(double newTop)
@@ -2019,6 +2032,7 @@ void isoDriver::triggerStateChanged()
 {
     if (!triggerEnabled)
     {
+
         internalBuffer375_CH1->setTriggerType(TriggerType::Disabled);
         internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
         internalBuffer750->setTriggerType(TriggerType::Disabled);
@@ -2057,6 +2071,23 @@ void isoDriver::triggerStateChanged()
             internalBuffer750->setTriggerType(TriggerType::Disabled);
             break;
         }
+    // use the CH1 buffer to do the sig gen trigger timekeeping.  If there were a Ch. 2-only mode for the device,
+    // this practice could be problematic, but at present there is no Ch. 2-only mode.
+    // Also, in CH#SigGen below, the channel number refers to the sig gen channel
+        case 4:
+        {
+            internalBuffer375_CH1->setTriggerType(TriggerType::CH1SigGen);
+            internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
+            internalBuffer750->setTriggerType(TriggerType::CH1SigGen);
+            break;
+        }
+        case 5:
+        {
+            internalBuffer375_CH1->setTriggerType(TriggerType::CH2SigGen);
+            internalBuffer375_CH2->setTriggerType(TriggerType::Disabled);
+            internalBuffer750->setTriggerType(TriggerType::CH2SigGen);
+        }
+
     }
 }
 
