@@ -109,6 +109,8 @@ $(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o \
 $(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o \
 $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
+both: 01 02
+
 02: CFLAGS+=-DSINGLE_ENDPOINT_INTERFACE
 02: SUFFIX=02
 02: $(OUTPUT_FILE_PATH)

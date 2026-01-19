@@ -16,9 +16,37 @@ jobs:
     - name : Checkout repository
       uses: actions/checkout@v4
      
-    - uses: brentfpage/action-avr-make@master
+    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
       with:
         dir: AVR_Code
+        target: 01
+
+    - name: Upload variant 01 hex artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: asset-hex
+        path: labrafirm*01.hex
+        compression-level: 0
+        if-no-files-found: error
+
+    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+      with:
+        dir: AVR_Code
+        target: clean
+
+    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+      with:
+        dir: AVR_Code
+        target: 02
+
+    - name: Upload variant 02 hex artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: asset-hex
+        path: labrafirm*01.hex
+        compression-level: 0
+        if-no-files-found: error
+          
 
 #      - name: Install GNU AVR tools and run make
 
@@ -26,13 +54,4 @@ jobs:
 #       - name: compile using make
 #         working-directory: AVR_Code/USB_BULK_TEST
 #         run: make 0x02
-
-    - name: Upload hex artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: asset-hex
-        path: labrafirm*hex
-        compression-level: 0
-        if-no-files-found: error
-          
 
