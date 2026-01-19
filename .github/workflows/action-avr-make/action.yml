@@ -11,4 +11,4 @@ runs:
   using: docker
   image: docker://lpodkalicki/avr-toolchain
   entrypoint: make 
-  args: ['--file=$(dir)/Makefile']
+  args: ['--file=${{dir}}/Makefile']
