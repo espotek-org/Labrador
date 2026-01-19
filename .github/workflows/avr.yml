@@ -24,7 +24,7 @@ jobs:
     - name: Upload variant 01 hex artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: asset-hex
+        name: asset-hex-01
         path: labrafirm*01.hex
         compression-level: 0
         if-no-files-found: error
@@ -42,7 +42,7 @@ jobs:
     - name: Upload variant 02 hex artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: asset-hex
+        name: asset-hex-02
         path: labrafirm*02.hex
         compression-level: 0
         if-no-files-found: error
