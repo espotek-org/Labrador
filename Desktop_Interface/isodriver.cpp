@@ -1082,7 +1082,12 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             // If there is too much error in the least square fitting, discard current trace
             if (norm_rms1 > 0.1 || norm_rms2 > 2) {
                 err_cnt++;
+                freqRespStatusMark->setText("☒");
+                freqRespStatusMark->setColor(Qt::red);
             } else {
+                freqRespStatusMark->setText("☑");
+                freqRespStatusMark->setColor(Qt::green);
+
                 // Calculate gain, and phase difference
                 gain = amp2 / amp1;
                 phase_diff = phase2 - phase1;
@@ -2156,7 +2161,7 @@ void isoDriver::retickXAxis()
     if(display->logSpaceX) {
         if((upper_range/lower_range)>100.0) {
             axes->xAxis->setScaleLogBase(10.0);
-            axes->xAxis->setSubTickCount(9);
+            axes->xAxis->setSubTickCount(8);
             fSpaceLabel->setVisible(false);
             axes->xAxis->setNumberPrecision(0);
             axes->xAxis->setNumberFormat("gb");
