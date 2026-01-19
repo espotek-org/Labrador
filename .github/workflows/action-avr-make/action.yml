@@ -11,4 +11,4 @@ runs:
   using: docker
   image: docker://lpodkalicki/avr-toolchain
   entrypoint: make 
-  args: '-f AVR_Code/Makefile'
+  args: ['-f AVR_Code/Makefile']
