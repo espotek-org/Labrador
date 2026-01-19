@@ -16,7 +16,8 @@ jobs:
     - name : Checkout repository
       uses: actions/checkout@v4
      
-    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+    - name : make 01
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
       with:
         dir: AVR_Code
         target: '01'
@@ -29,12 +30,14 @@ jobs:
         compression-level: 0
         if-no-files-found: error
 
-    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+    - name : make clean
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
       with:
         dir: AVR_Code
         target: clean
 
-    - uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+    - name : make 02
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
       with:
         dir: AVR_Code
         target: '02'
@@ -46,12 +49,3 @@ jobs:
         path: labrafirm*02.hex
         compression-level: 0
         if-no-files-found: error
-          
-
-#      - name: Install GNU AVR tools and run make
-
-        #       in the future, separate the installation of the tools and the running of make
-#       - name: compile using make
-#         working-directory: AVR_Code/USB_BULK_TEST
-#         run: make 0x02
-
