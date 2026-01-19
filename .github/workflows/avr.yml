@@ -43,7 +43,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: asset-hex
-        path: labrafirm*01.hex
+        path: labrafirm*02.hex
         compression-level: 0
         if-no-files-found: error
           
