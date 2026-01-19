@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 #      - name : Checkout repository
-    - uses: action-avr-make
+    - uses: action-avr-make.yml
       with:
         dir: AVR_Code
 
