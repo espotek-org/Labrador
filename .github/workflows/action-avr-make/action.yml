@@ -1,0 +1,14 @@
+name: AVR make
+description: Build avr based project with avr toolchain
+author: Denis Bazhenov <dotsid@gmail.com>
+branding:
+  icon: terminal
+  color: black
+inputs:
+  dir:
+    description: directory in which to run make
+runs:
+  using: docker
+  image: docker://lpodkalicki/avr-toolchain
+  entrypoint: make 
+  args: -f AVR_Code/Makefile
