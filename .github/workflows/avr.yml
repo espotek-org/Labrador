@@ -16,7 +16,7 @@ jobs:
     - name : Checkout repository
       uses: actions/checkout@v4
      
-    - uses: ./.github/workflows/action-avr-make
+    - uses: brentfpage/action-avr-make
       with:
         dir: AVR_Code
 
