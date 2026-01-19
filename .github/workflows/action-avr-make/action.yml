@@ -7,6 +7,9 @@ branding:
 inputs:
   dir:
     description: directory in which to run make
+    default: '.'
+    required: false
+    type: string
 runs:
   using: docker
   image: docker://lpodkalicki/avr-toolchain
