@@ -109,14 +109,12 @@ $(SRC_DIR)/ASF/xmega/drivers/nvm/nvm_asm.o \
 $(SRC_DIR)/ASF/xmega/drivers/cpu/ccp.o \
 $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
-both: 01 02
+01: SUFFIX=01
+01: $(OUTPUT_FILE_PATH)
 
 02: CFLAGS+=-DSINGLE_ENDPOINT_INTERFACE
 02: SUFFIX=02
 02: $(OUTPUT_FILE_PATH)
-
-01: SUFFIX=01
-01: $(OUTPUT_FILE_PATH)
 
 $(SRC_DIR)/tiny_calibration.o: $(SRC_DIR)/tiny_calibration.c
 	@echo Building file: $<
