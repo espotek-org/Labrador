@@ -20,7 +20,6 @@ jobs:
       uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
-        target: '01'
 
     - name: Upload variant 01 hex artifacts
       uses: actions/upload-artifact@v4
