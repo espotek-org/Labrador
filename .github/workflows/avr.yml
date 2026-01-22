@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v4
      
     - name : make 01
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
         target: '01'
@@ -31,13 +31,13 @@ jobs:
         if-no-files-found: error
 
     - name : make clean
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
         target: clean
 
     - name : make 02
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir_and_for_selected_target
+      uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
         target: '02'
