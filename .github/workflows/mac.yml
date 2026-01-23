@@ -111,12 +111,18 @@ jobs:
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
-          qmake -config release
+          if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
+            qmake -config release
+          else
+            # for debugging
+            qmake -config debug  
+          fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
 
       - name: Code sign app bundle
         working-directory: Desktop_Interface
+        if: ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' )
         run: |
           # Find the signing identity
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
@@ -136,6 +142,7 @@ jobs:
 
       - name: Create and sign DMG
         working-directory: Desktop_Interface
+        if: ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' )
         run: |
           # Get the git hash for the filename
           GIT_HASH=$(git rev-parse --short HEAD)
@@ -166,6 +173,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        if: ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' )  
         run: |
           GIT_HASH=$(git rev-parse --short HEAD)
           DMG_PATH="Labrador-${GIT_HASH}.dmg"
@@ -188,6 +196,7 @@ jobs:
           spctl -a -vvv -t install "$DMG_PATH"
 
       - name: Upload artifacts
+        if: ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' )  
         uses: actions/upload-artifact@v4
         with:
           name: asset-dmg
