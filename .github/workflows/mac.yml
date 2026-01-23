@@ -78,7 +78,7 @@ jobs:
           fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
-          
+
       - name: Code sign app bundle
         working-directory: Desktop_Interface
         if: ( -e ${{env.CERTIFICATE_PATH}} )
