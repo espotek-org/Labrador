@@ -46,6 +46,9 @@ jobs:
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        # secrets are only provided in original repo
+        if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
+        working-directory: Desktop_Interface
         run: |
           # Create keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -67,12 +70,18 @@ jobs:
       - name: Build macOS app
         working-directory: Desktop_Interface
         run: |
-          qmake -config release
+          if ( -e ${{env.CERTIFICATE_PATH}} ); then
+            qmake -config release
+          else
+            # for debugging
+            qmake -config debug  
+          fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
-
+          
       - name: Code sign app bundle
         working-directory: Desktop_Interface
+        if: ( -e ${{env.CERTIFICATE_PATH}} )
         run: |
           # Find the signing identity
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
@@ -92,6 +101,7 @@ jobs:
 
       - name: Create and sign DMG
         working-directory: Desktop_Interface
+        if: ( -e ${{env.CERTIFICATE_PATH}} )
         run: |
           # Get the git hash for the filename
           GIT_HASH=$(git rev-parse --short HEAD)
@@ -122,6 +132,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        if: ( -e ${{env.CERTIFICATE_PATH}} )  
         run: |
           GIT_HASH=$(git rev-parse --short HEAD)
           DMG_PATH="Labrador-${GIT_HASH}.dmg"
