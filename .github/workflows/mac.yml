@@ -46,7 +46,7 @@ jobs:
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-        # secrets are only priced in original repo
+        # secrets are only provided in original repo
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         working-directory: Desktop_Interface
         run: |
@@ -72,14 +72,13 @@ jobs:
         run: |
           if ( -e ${{env.CERTIFICATE_PATH}} ); then
             qmake -config release
-            make -j$(sysctl -n hw.ncpu)
-            macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
           else
             # for debugging
             qmake -config debug  
-            make -j$(sysctl -n hw.ncpu)
-            macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
           fi
+          make -j$(sysctl -n hw.ncpu)
+          macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
+          
       - name: Code sign app bundle
         working-directory: Desktop_Interface
         if: ( -e ${{env.CERTIFICATE_PATH}} )
