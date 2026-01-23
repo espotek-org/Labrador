@@ -23,7 +23,6 @@
 # the suffix 01.  It is recommended that this line in globals.h be left
 # commented-out, which ensures that `make 01` and `make 02` work as
 # expected.
-EXECUTABLES :=
 LIB_DEP :=
 LIBS :=
 USER_OBJS :=
@@ -231,10 +230,11 @@ $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER
 	avr-size $(NAME)".elf"
 	@echo Finished successfully: $(NAME)
 
-VARIANTS = 01 02
-clean :
-	-rm -rf $(OBJS_AS_ARGS) $(EXECUTABLES)
+clean_o_d :
+	-rm -rf $(OBJS_AS_ARGS)
 	-rm -rf $(C_DEPS_AS_ARGS)
+VARIANTS = 01 02
+clean : clean_o_d
 	$(foreach SUFFIX,$(VARIANTS), \
 		rm -rf $(NAME).hex ; \
 		rm -rf $(NAME).lss ; \

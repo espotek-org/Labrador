@@ -20,20 +20,13 @@ jobs:
       uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
-
-    - name: Upload variant 01 hex artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: asset-hex-01
-        path: AVR_Code/labrafirm*01.hex
-        compression-level: 0
-        if-no-files-found: error
+        target: '01'
 
     - name : make clean
       uses: brentfpage/action-avr-make@run_make_in_selected_dir
       with:
         dir: AVR_Code
-        target: clean
+        target: clean_o_d
 
     - name : make 02
       uses: brentfpage/action-avr-make@run_make_in_selected_dir
@@ -41,10 +34,10 @@ jobs:
         dir: AVR_Code
         target: '02'
 
-    - name: Upload variant 02 hex artifacts
+    - name: Upload variant hex artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: asset-hex-02
-        path: AVR_Code/labrafirm*02.hex
+        name: asset-hex
+        path: AVR_Code/labrafirm*.hex
         compression-level: 0
         if-no-files-found: error
