@@ -23,6 +23,8 @@ jobs:
 #       - build-avr
   build-mac:
     uses: ./.github/workflows/mac.yml
+    with:
+      AVR_RUN_ID=${{ needs.build-avr.outputs.AVR_RUN_ID }}
     secrets: inherit
     needs:
       - build-avr
