@@ -40,7 +40,7 @@ jobs:
         dir: AVR_Code
         target: '02'
 
-    - name: Upload variant hex artifacts
+    - name: Upload hex artifacts
       uses: actions/upload-artifact@v4
       with:
         name: asset-hex
