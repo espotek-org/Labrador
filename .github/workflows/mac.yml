@@ -43,7 +43,7 @@ jobs:
 #           wget $HEX_URL
 
       - name: Download firmware from in-process continuous release
-        if: ${{github.event_name == workflow_call}}
+        if: ${{github.event_name == 'workflow_call'}}
         uses: actions/download-artifact@v4
         with:
           run-id: AVR_RUN_ID
