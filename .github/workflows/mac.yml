@@ -8,12 +8,12 @@ on:
   workflow_dispatch:
     inputs:
       AVR_RUN_ID:
-        required: true
+        required: false
         type: string
   workflow_call:
     inputs:
       AVR_RUN_ID:
-        required: true
+        required: false
         type: string
   push:
   pull_request:
