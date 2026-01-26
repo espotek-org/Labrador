@@ -7,9 +7,7 @@ permissions:
 on:
   workflow_call:
     outputs:
-      RUN_ID:
-        description: the run-id of the workflow run
-        value: ${{ jobs.build-hex.outputs.RUN_ID }}
+      output1: ${{ jobs.build-hex.outputs.RUN_ID }}
   workflow_dispatch:
   push:
 
@@ -47,4 +45,4 @@ jobs:
         if-no-files-found: error
 
     - name: Get workflow run ID
-      run: echo "RUN_ID=${{ github.run_id }}" >> $GITHUB_OUTPUT
+      run: echo "RUN_ID=${{ github.run_id }}" >> "$GITHUB_OUTPUT"

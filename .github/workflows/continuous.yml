@@ -28,8 +28,8 @@ jobs:
     steps:
       - name: process outputs from firmware workflow
         run: |
-          echo ${{ needs.build-avr.outputs.RUN_ID }}
-          AVR_RUN_ID=${{ needs.build-avr.outputs.RUN_ID }}
+          echo ${{ needs.build-avr.outputs.output1 }}
+          AVR_RUN_ID=${{ needs.build-avr.outputs.output1 }}
   build-mac:
     needs:
       - get-avr-run-id
