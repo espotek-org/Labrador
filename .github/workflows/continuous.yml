@@ -31,9 +31,9 @@ jobs:
 
       - name: run mac workflow
         uses: ./.github/workflows/mac.yml
-        secrets: inherit
         with:
           AVR_RUN_ID: AVR_RUN_ID
+    secrets: inherit
 #  build-windows:
 #    uses: ./.github/workflows/windows.yml
 #    secrets: inherit
