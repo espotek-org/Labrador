@@ -48,6 +48,6 @@ jobs:
         compression-level: 0
         if-no-files-found: error
 
-    - name: Get workflow run ID
+    - name: Prepare workflow run ID output
       id: step_get_run_id
       run: echo "RUN_ID=${{ github.run_id }}" >> "$GITHUB_OUTPUT"
