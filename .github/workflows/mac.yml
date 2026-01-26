@@ -28,8 +28,8 @@ jobs:
           gh api graphql -f query='query {repository ( owner : "espotek-org", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}'
           HEX_URL=$(gh api graphql -f query='query {repository ( owner : "espotek-org", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}' --jq '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]')
           wget $HEX_URL
-#         env:
-#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
 # better alternative to the graphql query below would be to somehow retrieve the run-id of the most recent continuous.yml workflow run, then download the hex asset from that using actions/download-artifact.
 # query at most 10 assets from the most recent continuous release (assume there are fewer than 10), find the one that includes 02.hex in the download url
