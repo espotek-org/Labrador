@@ -7,7 +7,7 @@ permissions:
 on:
   workflow_call:
     outputs:
-      output1:
+      firstword:
         description: the run-id of the workflow run
         value: ${{ jobs.build-hex.outputs.RUN_ID }}
   workflow_dispatch:
@@ -16,6 +16,8 @@ on:
 jobs:
   build-hex:
     runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.step_get_run_id.outputs.RUN_ID }}
     steps:
     - name : Checkout repository
       uses: actions/checkout@v4
@@ -47,4 +49,5 @@ jobs:
         if-no-files-found: error
 
     - name: Get workflow run ID
+      id: step_get_run_id
       run: echo "RUN_ID=${{ github.run_id }}" >> "$GITHUB_OUTPUT"
