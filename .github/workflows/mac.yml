@@ -25,8 +25,7 @@ jobs:
       - name: Download firmware from most recent continuous release
         if: ${{github.event_name != 'workflow_call'}}
         run: |
-          gh api graphql -f query='query {repository ( owner : "espotek-org", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}'
-          HEX_URL=$(gh api graphql -f query='query {repository ( owner : "espotek-org", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}' --jq '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]')
+          HEX_URL=$(gh api graphql -f query='query {repository ( owner : "espotek-org", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}' | jq '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]')
           wget $HEX_URL
         env:
           GH_TOKEN: ${{ github.token }}
