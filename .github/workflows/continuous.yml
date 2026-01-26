@@ -21,21 +21,21 @@ jobs:
 #     secrets: inherit
 #     needs:
 #       - build-avr
-  get-avr-run-id:
-    runs-on: ubuntu-latest
-    needs:
-      - build-avr
-    steps:
-      - name: process outputs from firmware workflow
-        run: |
-          echo ${{ needs.build-avr.outputs.firstword }}
-          AVR_RUN_ID=${{ needs.build-avr.outputs.firstword }}
+#  get-avr-run-id:
+#    runs-on: ubuntu-latest
+#    needs:
+#      - build-avr
+#    steps:
+#      - name: process outputs from firmware workflow
+#        run: |
+#          echo ${{ needs.build-avr.outputs.firstword }}
+#          AVR_RUN_ID=${{ needs.build-avr.outputs.firstword }}
   build-mac:
     needs:
-      - get-avr-run-id
+      - build-avr
     uses: ./.github/workflows/mac.yml
     with:
-      AVR_RUN_ID: AVR_RUN_ID
+      AVR_RUN_ID: ${{ needs.build-avr.outputs.firstword }}
     secrets: inherit
 
 #  build-windows:
