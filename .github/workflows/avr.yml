@@ -6,12 +6,17 @@ permissions:
   
 on:
   workflow_call:
+    outputs:
+      RUN_ID:
+        description: the run-id of the workflow run
+        value: ${{ jobs.build-avr.outputs.output1 }}
   workflow_dispatch:
   push:
 
 jobs:
   build-avr:
     runs-on: ubuntu-latest
+    echo
     steps:
     - name : Checkout repository
       uses: actions/checkout@v4
@@ -41,3 +46,6 @@ jobs:
         path: AVR_Code/labrafirm*.hex
         compression-level: 0
         if-no-files-found: error
+
+    - name: Get workflow run ID
+      run: echo "RUN_ID=${{ github.run_id }}" >> $GITHUB_OUTPUT

@@ -8,27 +8,39 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-android:
-    uses: ./.github/workflows/android.yml
+  build-avr:
+    uses: ./.github/workflows/avr.yml
     secrets: inherit
-  build-linux:
-    uses: ./.github/workflows/linux.yml
-    secrets: inherit
+#  build-android:
+#    uses: ./.github/workflows/android.yml
+#    secrets: inherit
+#    needs:
+#      - build-avr
+#   build-linux:
+#     uses: ./.github/workflows/linux.yml
+#     secrets: inherit
+#     needs:
+#       - build-avr
   build-mac:
     uses: ./.github/workflows/mac.yml
     secrets: inherit
-  build-windows:
-    uses: ./.github/workflows/windows.yml
-    secrets: inherit
+    needs:
+      - build-avr
+#  build-windows:
+#    uses: ./.github/workflows/windows.yml
+#    secrets: inherit
+#    needs:
+#      - build-avr
 
   release:
     permissions:
       contents: write
     needs:
-      - build-android
-      - build-linux
+      - build-avr
+#      - build-android
+#      - build-linux
       - build-mac
-      - build-windows
+#      - build-windows
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
