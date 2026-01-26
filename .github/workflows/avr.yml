@@ -7,7 +7,9 @@ permissions:
 on:
   workflow_call:
     outputs:
-      output1: ${{ jobs.build-hex.outputs.RUN_ID }}
+      output1:
+        description: the run-id of the workflow run
+        value: ${{ jobs.build-hex.outputs.RUN_ID }}
   workflow_dispatch:
   push:
 
