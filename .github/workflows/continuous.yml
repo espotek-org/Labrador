@@ -23,7 +23,7 @@ jobs:
 #       - build-avr
   build-mac:
     secrets: inherit
-    needs: 
+    needs:
       - build-avr
     steps:
       - name: process outputs from firmware workflow
