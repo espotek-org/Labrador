@@ -11,10 +11,6 @@ on:
         required: false
         type: string
   workflow_call:
-    inputs:
-      AVR_RUN_ID:
-        required: false
-        type: string
   push:
   pull_request:
   
@@ -29,6 +25,7 @@ jobs:
       - name: Download firmware from most recent continuous release
         if: ${{github.event_name != 'workflow_dispatch'}}
         run: |
+          echo ${{github.event_name}}
           mkdir asset-hex
           HEX_URL=$(gh api graphql -f query='query {repository ( owner : "brentfpage", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}' | jq -r '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]')
           wget --directory-prefix=asset-hex $HEX_URL
