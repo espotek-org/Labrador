@@ -23,19 +23,19 @@ jobs:
       uses: actions/checkout@v4
      
     - name : make 01
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir
+      uses: bazhenov/action-avr-make@v1.1
       with:
         dir: AVR_Code
         target: '01'
 
     - name : make clean
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir
+      uses: bazhenov/action-avr-make@v1.1
       with:
         dir: AVR_Code
         target: clean_o_d
 
     - name : make 02
-      uses: brentfpage/action-avr-make@run_make_in_selected_dir
+      uses: bazhenov/action-avr-make@v1.1
       with:
         dir: AVR_Code
         target: '02'
