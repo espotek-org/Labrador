@@ -9,7 +9,7 @@ on:
     outputs:
       firstword:
         description: the run-id of the workflow run
-        value: ${{ jobs.build-hex.outputs.RUN_ID }}
+        value: ${{ jobs.build-hex.outputs.output1 }}
   workflow_dispatch:
   push:
 
