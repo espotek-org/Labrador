@@ -26,13 +26,8 @@ jobs:
     needs:
       - build-avr
     steps:
-      - name: process outputs from firmware workflow
-        run: |
-          AVR_RUN_ID=${{ needs.build-avr.outputs.AVR_RUN_ID }}
       - name: run mac workflow
         uses: ./.github/workflows/mac.yml
-        with:
-          AVR_RUN_ID: AVR_RUN_ID
 #  build-windows:
 #    uses: ./.github/workflows/windows.yml
 #    secrets: inherit
