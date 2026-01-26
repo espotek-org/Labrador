@@ -25,10 +25,11 @@ jobs:
     secrets: inherit
     needs: build-avr
     steps:
-      - name: get hex workflow run id
+      - name: process outputs from firmware workflow
         run: |
           AVR_RUN_ID=${{ needs.build-avr.outputs.AVR_RUN_ID }}
-      - uses: ./.github/workflows/mac.yml
+      - name: run mac workflow
+        uses: ./.github/workflows/mac.yml
         with:
           AVR_RUN_ID: AVR_RUN_ID
 #  build-windows:
