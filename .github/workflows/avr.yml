@@ -14,7 +14,7 @@ on:
   push:
 
 jobs:
-  build-avr:
+  build-hex:
     runs-on: ubuntu-latest
     steps:
     - name : Checkout repository
