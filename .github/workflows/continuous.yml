@@ -22,7 +22,6 @@ jobs:
 #     needs:
 #       - build-avr
   build-mac:
-    secrets: inherit
     needs:
       - build-avr
     steps:
@@ -34,6 +33,7 @@ jobs:
         uses: ./.github/workflows/mac.yml
         with:
           AVR_RUN_ID: AVR_RUN_ID
+        secrets: inherit
 #  build-windows:
 #    uses: ./.github/workflows/windows.yml
 #    secrets: inherit
