@@ -59,7 +59,7 @@ jobs:
 
       - name: move firmware to appropriate directory
         run: |
-          mv *02.hex Desktop_Interface/resources/firmware
+          mv asset-hex/*02.hex Desktop_Interface/resources/firmware
 
       - name: Setup Homebrew dependencies
         run: |
