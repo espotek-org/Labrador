@@ -24,6 +24,7 @@ jobs:
   build-mac:
     secrets: inherit
     needs: build-avr
+    runs-on: macos-15-intel
     steps:
       - name: process outputs from firmware workflow
         run: |
