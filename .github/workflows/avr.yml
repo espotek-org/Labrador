@@ -16,7 +16,6 @@ on:
 jobs:
   build-avr:
     runs-on: ubuntu-latest
-    echo
     steps:
     - name : Checkout repository
       uses: actions/checkout@v4
