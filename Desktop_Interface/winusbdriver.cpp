@@ -120,8 +120,7 @@ void winUsbDriver::usbSendControl(uint8_t RequestType, uint8_t Request, uint16_t
     //Send the packet
     controlSuccess = UsbK_ControlTransfer(handle, setupPacket, controlBuffer, setupPacket.Length, &bytesTransferred, NULL);
     if (controlSuccess) {
-        // due to high frequency of execution this pollutes logging too much and was commented out
-        // qDebug("%d BYTES TRANSFERRED", bytesTransferred);
+        qDebug("%d BYTES TRANSFERRED", bytesTransferred);
     }
     else{
         errorCode = GetLastError();
