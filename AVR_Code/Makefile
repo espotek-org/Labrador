@@ -110,10 +110,12 @@ $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 
 01: SUFFIX=01
 01: $(OUTPUT_FILE_PATH)
+	@echo CFLAGS:$(CFLAGS)
 
 02: CFLAGS+=-DSINGLE_ENDPOINT_INTERFACE
 02: SUFFIX=02
 02: $(OUTPUT_FILE_PATH)
+	@echo CFLAGS:$(CFLAGS)
 
 $(SRC_DIR)/tiny_calibration.o: $(SRC_DIR)/tiny_calibration.c
 	@echo Building file: $<
