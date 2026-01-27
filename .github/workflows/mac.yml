@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download firmware from most recent continuous release
-        if: github.event.workflow == '.github/workflows/mac.yml' 
+        if: github.event.workflow != '.github/workflows/continuous.yml' 
         run: |
           echo ${{github.event_name}}
           mkdir asset-hex
