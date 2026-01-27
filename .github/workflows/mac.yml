@@ -11,6 +11,10 @@ on:
         required: true
         type: string
   workflow_call:
+    inputs:
+      AVR_RUN_ID:
+        required: true
+        type: string
   push:
   pull_request:
   
@@ -68,19 +72,19 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release "EXPECTED_FIRMWARE_VERSION=0x0007"
+          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build librademo
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release "EXPECTED_FIRMWARE_VERSION=0x0007"
+          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release "EXPECTED_FIRMWARE_VERSION=0x0007"
+          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
           make -j$(sysctl -n hw.ncpu)
 
       - name: Import code signing certificate
@@ -112,10 +116,10 @@ jobs:
         working-directory: Desktop_Interface
         run: |
           if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
-            qmake -config release "EXPECTED_FIRMWARE_VERSION=0x0007"
+            qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
           else
             # for debugging
-            qmake -config debug "EXPECTED_FIRMWARE_VERSION=0x0007"
+            qmake -config debug EXPECTED_FIRMWARE_VERSION=0x0007
           fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
