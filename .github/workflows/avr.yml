@@ -23,21 +23,24 @@ jobs:
       uses: actions/checkout@v4
      
     - name : make 01
-      uses: bazhenov/action-avr-make@v1.1
+      uses: brentfpage/action-avr-make@make-with-flags
       with:
         dir: AVR_Code
+        extra_cflags: '-DFIRMWARE_VERSION_ID=${{ vars.AVR_VER }}'
         target: '01'
 
     - name : make clean
-      uses: bazhenov/action-avr-make@v1.1
+      uses: brentfpage/action-avr-make@make-with-flags
       with:
         dir: AVR_Code
+        extra_cflags: ''
         target: clean_o_d
 
     - name : make 02
-      uses: bazhenov/action-avr-make@v1.1
+      uses: brentfpage/action-avr-make@make-with-flags
       with:
         dir: AVR_Code
+        extra_cflags: '-DFIRMWARE_VERSION_ID=${{ vars.AVR_VER }}'
         target: '02'
 
     - name: Upload hex artifacts
