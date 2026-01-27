@@ -39,7 +39,7 @@ INCLUDES=-I"$(SRC_DIR)/ASF/common/services/usb/class/vendor/device/example/atxme
 CFLAGS=-std=gnu99 -ffunction-sections -mmcu=atxmega32a4u -fsigned-char -funsigned-bitfields -fdata-sections -fshort-enums -fno-strict-aliasing -fno-jump-tables -fpack-struct -Wall -O2 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -DFIRMWARE_VERSION_ID=$(FIRMWARE_VERSION_ID)
 
 # NAME=labrafirm_$$_$(SUFFIX)
-SHORT_FIRMWARE_VERSION_ID := $(shell {FIRMWARE_VERSION_ID:2:4})
+SHORT_FIRMWARE_VERSION_ID := $(shell ${FIRMWARE_VERSION_ID:2:4})
 NAME=labrafirm_$(SHORT_FIRMWARE_VERSION_ID)_$(SUFFIX)
 
 OBJS += \
