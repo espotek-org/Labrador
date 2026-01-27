@@ -29,21 +29,21 @@ jobs:
         dir: AVR_Code
         target: '01'
       env:
-        FIRMWARE_VERSION_ID: '0x0007'
+        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
 
     - name : make clean
-      uses: brentfpage/action-avr-make@make-with-flags
+      uses: bazhenov/action-avr-make@v1.1
       with:
         dir: AVR_Code
-        extra_cflags: ''
         target: clean_o_d
 
     - name : make 02
-      uses: brentfpage/action-avr-make@make-with-flags
+      uses: bazhenov/action-avr-make@v1.1
       with:
         dir: AVR_Code
-        extra_cflags: '-DFIRMWARE_VERSION_ID=${{ vars.AVR_VER }}'
         target: '02'
+      env:
+        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
 
     - name: Upload hex artifacts
       uses: actions/upload-artifact@v4
