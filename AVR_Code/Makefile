@@ -40,7 +40,6 @@ CFLAGS=-std=gnu99 -ffunction-sections -mmcu=atxmega32a4u -fsigned-char -funsigne
 @echo CFLAGS:$(CFLAGS)
 
 NAME=labrafirm_$$(FIRMWARE_VERSION_ID:2:4)_$(SUFFIX)
-@echo NAME:$(NAME)
 
 OBJS += \
 $(SRC_DIR)/tiny_calibration.o \
@@ -119,6 +118,7 @@ $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o
 02: $(OUTPUT_FILE_PATH)
 
 $(SRC_DIR)/tiny_calibration.o: $(SRC_DIR)/tiny_calibration.c
+	@echo NAME:$(NAME)
 	@echo Building file: $<
 	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
 	@echo Finished building: $<
