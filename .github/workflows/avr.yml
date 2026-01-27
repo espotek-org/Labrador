@@ -29,7 +29,7 @@ jobs:
         dir: AVR_Code
         target: '01'
       env:
-        FIRMWARE_VERSION_ID: 0x0007
+        FIRMWARE_VERSION_ID: '0x0007'
 
     - name : make clean
       uses: brentfpage/action-avr-make@make-with-flags

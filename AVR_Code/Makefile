@@ -221,6 +221,7 @@ $(SRC_DIR)/ASF/xmega/drivers/usb/usb_device.o: $(SRC_DIR)/ASF/xmega/drivers/usb/
 	@echo Finished building: $<
 
 $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER_SCRIPT_DEP)
+	@echo CFLAGS: $(CFLAGS)
 	@echo Building target: $@
 	$(CC) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -Wl,-Map=$(NAME)".map"  -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax 
 	avr-objcopy -O ihex -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".hex"
