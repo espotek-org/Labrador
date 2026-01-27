@@ -32,6 +32,8 @@ equals(QCP_VER,"2"){
     message("Using QCP2 with OpenGL support")
 }
 
+DEFINES += "EXPECTED_FIRMWARE_VERSION={{EXPECTED_FIRMWARE_VERSION}}"
+
 include(ui_elements.pri)
 
 MOC_DIR = moc
