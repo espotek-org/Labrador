@@ -6,10 +6,6 @@ permissions:
   
 on:
   workflow_dispatch:
-    inputs:
-      AVR_RUN_ID:
-        required: true
-        type: string
   workflow_call:
     inputs:
       AVR_RUN_ID:
