@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download firmware from most recent continuous release
-        if: ${{github.event_name != 'workflow_dispatch'}}
+        if: github.event.workflow == '.github/workflows/mac.yml' 
         run: |
           echo ${{github.event_name}}
           mkdir asset-hex
@@ -52,7 +52,7 @@ jobs:
 # ' | jq -r '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]'
 
       - name: Download firmware from in-process continuous release
-        if: ${{github.event_name == 'workflow_dispatch'}}
+        if: github.event.workflow == '.github/workflows/continuous.yml' 
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ inputs.AVR_RUN_ID }}
