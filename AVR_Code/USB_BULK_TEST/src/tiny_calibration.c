@@ -10,6 +10,8 @@
 #include "tiny_adc.h"
 
 volatile unsigned char median_TRFCNT_delay = 255;
+volatile unsigned char cali_value_positive_gradient;
+volatile unsigned char cali_value_negative_gradient;
 
 void tiny_calibration_init(){
 		//Set up 48MHz DFLL for USB.
@@ -46,7 +48,7 @@ void tiny_calibration_init(){
 		return;
 }
 
-tiny_calibration_first_sof(){
+void tiny_calibration_first_sof(){
 		PR.PRPE &= 0b11111110;
 		TC_CALI.PER = 23999;
 		TC_CALI.CNT = 12000;
