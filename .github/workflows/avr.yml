@@ -1,0 +1,58 @@
+name: Build firmware
+
+permissions:
+  contents: read
+  pull-requests: write
+  
+on:
+  workflow_call:
+    outputs:
+      firstword:
+        description: the run-id of the workflow run
+        value: ${{ jobs.build-hex.outputs.output1 }}
+  workflow_dispatch:
+  push:
+
+
+jobs:
+  build-hex:
+    runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.step_get_run_id.outputs.RUN_ID }}
+    steps:
+    - name : Checkout repository
+      uses: actions/checkout@v4
+     
+    - name : make 01
+      uses: bazhenov/action-avr-make@v1.1
+      with:
+        dir: AVR_Code
+        target: '01'
+      env:
+        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
+
+    - name : make clean
+      uses: bazhenov/action-avr-make@v1.1
+      with:
+        dir: AVR_Code
+        target: clean_o_d
+
+    - name : make 02
+      uses: bazhenov/action-avr-make@v1.1
+      with:
+        dir: AVR_Code
+        target: '02'
+      env:
+        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
+
+    - name: Upload hex artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: asset-hex
+        path: AVR_Code/labrafirm*.hex
+        compression-level: 0
+        if-no-files-found: error
+
+    - name: Prepare workflow run ID output
+      id: step_get_run_id
+      run: echo "RUN_ID=${{ github.run_id }}" >> "$GITHUB_OUTPUT"

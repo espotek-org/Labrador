@@ -7,6 +7,10 @@ permissions:
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      AVR_RUN_ID:
+        required: true
+        type: string
   push:
   pull_request:
   
@@ -16,6 +20,42 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download firmware from most recent continuous release
+        if: github.event.workflow != '.github/workflows/continuous.yml' 
+        run: |
+          mkdir asset-hex
+          HEX_URL=$(gh api graphql -f query='query {repository ( owner : "brentfpage", name: "Labrador") {release ( tagName: "continuous" ) {releaseAssets(first:10) {nodes {downloadUrl}}}}}' | jq -r '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]')
+          wget --directory-prefix=asset-hex $HEX_URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+# better alternative to the graphql query above would be to somehow retrieve the run-id of the most recent continuous.yml workflow run, then download the hex asset associated with the run-id using actions/download-artifact.
+# query description: get at most 10 assets from the most recent continuous release (assume there are fewer than 10), find the one that includes 02.hex in the download url
+# prettified (ish) query:
+# query {\
+#         repository ( owner : "espotek-org", name: "Labrador") {\
+#           release ( tagName: "continuous" ) {\
+#             releaseAssets(first:10) {\
+#               nodes {\
+#                 downloadUrl\
+#               }\
+#             }\
+#           }\
+#         }\
+#       }\
+# ' | jq -r '.data.repository.release.releaseAssets.nodes[] | select(.downloadUrl| test("02.hex")) | .[]'
+
+      - name: Download firmware from in-process continuous release
+        if: github.event.workflow == '.github/workflows/continuous.yml' 
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.AVR_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: move firmware to appropriate directory
+        run: |
+          mv asset-hex/*02.hex Desktop_Interface/resources/firmware
 
       - name: Setup Homebrew dependencies
         run: |
@@ -27,19 +67,19 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ vars.AVR_VER }}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build librademo
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ vars.AVR_VER }}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ vars.AVR_VER }}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Import code signing certificate
@@ -71,10 +111,10 @@ jobs:
         working-directory: Desktop_Interface
         run: |
           if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
-            qmake -config release
+            qmake -config release EXPECTED_FIRMWARE_VERSION=${{ vars.AVR_VER }}
           else
             # for debugging
-            qmake -config debug  
+            qmake -config debug EXPECTED_FIRMWARE_VERSION=${{ vars.AVR_VER }}
           fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
