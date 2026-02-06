@@ -1530,8 +1530,9 @@ void MainWindow::reinitUsb(void){
     if(!(ui->controller_iso->driver->connected)){
         reinitUsbStage2();
     } else{
+        connect(ui->controller_iso->driver, SIGNAL(shutdownComplete()),
+            this, SLOT(reinitUsbStage2()), Qt::UniqueConnection);
         ui->controller_iso->driver->shutdownProcedure();
-        QTimer::singleShot(1000, this, SLOT(reinitUsbStage2()));
     }
 #endif
     qDebug() << "ReinitUsb Stage 1 complete";
