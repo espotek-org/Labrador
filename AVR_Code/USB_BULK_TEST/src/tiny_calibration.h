@@ -25,8 +25,8 @@ void tiny_calibration_synchronise_phase(unsigned int phase, unsigned int precisi
 extern volatile unsigned char calibration_values_found;
 extern volatile unsigned char median_TRFCNT_delay;
 
-volatile unsigned char cali_value_negative_gradient;
-volatile unsigned char cali_value_positive_gradient;
+extern volatile unsigned char cali_value_negative_gradient;
+extern volatile unsigned char cali_value_positive_gradient;
 
 
 #endif /* TINY_CALIBRATION_H_ */
