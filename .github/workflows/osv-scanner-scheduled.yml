@@ -17,4 +17,7 @@ permissions:
 
 jobs:
   scan-scheduled:
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.3"
+    # started to use v2.2.3 in mid Dec 2025 with positive results. 
+    # Due to quick development of action osv-scanner-reusable, try with latest version of v2
+    #uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.3"
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2"
