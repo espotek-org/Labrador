@@ -5,11 +5,11 @@
 #include "espospinbox.h"
 
 #if defined(PLATFORM_WINDOWS)
-#include "winusbdriver.h"
+    #include "winusbdriver.h"
 #elif defined(PLATFORM_ANDROID)
-#include "androidusbdriver.h"
+    #include "androidusbdriver.h"
 #else
-#include "unixusbdriver.h"
+    #include "unixusbdriver.h"
 #endif
 
 #include <algorithm>
@@ -23,10 +23,10 @@ namespace
    constexpr char kDocumentationUrl[] = "https://github.com/espotek-org/Labrador/wiki";
    constexpr char kPinoutUrl[] = "https://github.com/espotek-org/Labrador/wiki/Pinout";
    constexpr char kAboutString[] = "<h4>EspoTek Labrador</h4>"
-#ifdef GIT_HASH_SHORT
+    #ifdef GIT_HASH_SHORT
                                    "Continuous Release<br>"
                                    "Git hash: <a href='https://github.com/espotek-org/Labrador/commits/" QUOTE(GIT_HASH_SHORT) "'>" QUOTE(GIT_HASH_SHORT) "</a><br>"
-#endif
+    #endif
                                    "Website: <a href='http://espotek.com'>https://espotek.com</a><br>"
                                    "Contact email: <a href='mailto:admin@espotek.com'>admin@espotek.com</a>";
    constexpr char kOrganisationName[] = "EspoTek";
@@ -55,18 +55,19 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->psuDisplay->display("4.50");
 
-#if defined(PLATFORM_WINDOWS)
-    ui->controller_iso->setDriver(new winUsbDriver());
-#elif defined(PLATFORM_ANDROID)
-    ui->controller_iso->setDriver(new androidUsbDriver());
-#else
-    ui->controller_iso->setDriver(new unixUsbDriver());
-#endif
+    #if defined(PLATFORM_WINDOWS)
+        ui->controller_iso->setDriver(new winUsbDriver());
+    #elif defined(PLATFORM_ANDROID)
+        ui->controller_iso->setDriver(new androidUsbDriver());
+    #else
+        ui->controller_iso->setDriver(new unixUsbDriver());
+    #endif
+
     ui->controller_iso->setAxes(ui->scopeAxes);
 
-#ifndef DISABLE_SPECTRUM
-    ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
-#endif
+    #ifndef DISABLE_SPECTRUM
+        ui->controller_iso->freqValue_CH1 = ui->frequencyValue_CH1;
+    #endif
 
     ui->timeBaseSlider->setMaximum(10*log10(MAX_WINDOW_SIZE));
 
@@ -110,12 +111,13 @@ MainWindow::MainWindow(QWidget *parent) :
         console->setFont(font);
     }
 
-#ifndef PLATFORM_ANDROID
-    ui->kickstartIsoButton->setVisible(0);
-    ui->console1->setVisible(0);
-    ui->console2->setVisible(0);
-    ui->txuart->setVisible(0);
-#endif
+    #ifndef PLATFORM_ANDROID
+        // no terminal on Android
+        ui->kickstartIsoButton->setVisible(0);
+        ui->console1->setVisible(0);
+        ui->console2->setVisible(0);
+        ui->txuart->setVisible(0);
+    #endif
     ui->timeBaseSlider->setVisible(0);
 
     //ui->pausedLabel_CH2->setVisible(0);
@@ -124,14 +126,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     //Reset the device to ensure Labrador_libusbk gets handle!!
     #ifdef PLATFORM_WINDOWS
+        // ToDo: check this workaround for bug on Windows?
         //ui->controller_iso->driver->usbSendControl(0x40, 0xa7, 0, 0, 0, NULL);
         //reinitUsb();
         ui->controller_iso->driver->killOnConnect = true;
-    #endif
-    #ifdef PLATFORM_LINUX
-        reinitUsb();
-    #endif
-    #ifdef PLATFORM_MAC
+    #else
         reinitUsb();
     #endif
     #ifdef PLATFORM_ANDROID
@@ -1349,16 +1348,18 @@ void MainWindow::enableLabradorDebugging(bool enabled){
     ui->debugButton1->setVisible(enabled);
     ui->debugButton2->setVisible(enabled);
     ui->debugButton3->setVisible(enabled);
-#ifndef PLATFORM_ANDROID
-    ui->kickstartIsoButton->setVisible(enabled);
-#endif
+
+    #ifndef PLATFORM_ANDROID
+        ui->kickstartIsoButton->setVisible(enabled);
+    #endif
+
     ui->debugConsole->setVisible(enabled);
 
     if (enabled)
     {
         new Q_DebugStream(std::cout, ui->debugConsole); //Redirect Console output to QTextEdit
         Q_DebugStream::registerQDebugMessageHandler(); //Redirect qDebug() output to QTextEdit
-        qDebug() << "DEBUG MODE ACTIVE";
+        qDebug() << "DEBUG MODE Redirected to GUI Console!";
     }
 }
 
@@ -1528,6 +1529,7 @@ void MainWindow::reinitUsb(void){
     reinitUsbStage2();
 #else
     if(!(ui->controller_iso->driver->connected)){
+        // ToDo: check possible duplication on Windows?
         reinitUsbStage2();
     } else{
         ui->controller_iso->driver->shutdownProcedure();
@@ -1603,6 +1605,7 @@ void MainWindow::resetUsbState(void){
 
 
 #ifdef PLATFORM_ANDROID
+// ToDo: matching #endif is 300!!! lines down, needs refactoring to have a clear control flow!!
 //Should be called "High Resolution mode".  This function has been comandeered for Android devices with 1080p or higher resolutions.
 void MainWindow::on_actionOld_Person_Mode_triggered(bool checked)
 {
