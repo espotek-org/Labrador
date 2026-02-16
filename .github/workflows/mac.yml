@@ -15,6 +15,9 @@ on:
   pull_request:
   
 jobs:
+  retrieve_firmware_ver:
+      uses: ./.github/workflows/avr_ver_def.yml
+
   build-dmg:
     runs-on: macos-15-intel
     steps:
@@ -65,21 +68,27 @@ jobs:
           brew link libomp qt@5 --force
 
       - name: Build librador
+        needs:
+          - retrieve_firmware_ver
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build librademo
+        needs:
+          - retrieve_firmware_ver
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build basicdemo
+        needs:
+          - retrieve_firmware_ver
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Import code signing certificate
