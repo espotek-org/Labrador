@@ -15,8 +15,13 @@ on:
 
 
 jobs:
+  retrieve_firmware_ver:
+      uses: ./.github/workflows/avr_ver_def.yml
+
   build-hex:
     runs-on: ubuntu-latest
+    needs:
+      retrieve_firmware_ver
     outputs:
       output1: ${{ steps.step_get_run_id.outputs.RUN_ID }}
     steps:
@@ -29,7 +34,7 @@ jobs:
         dir: AVR_Code
         target: '01'
       env:
-        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
+        FIRMWARE_VERSION_ID: ${{ needs.retrieve_firmware_ver.outputs.firmware_ver }}
 
     - name : make clean
       uses: bazhenov/action-avr-make@v1.1
@@ -43,7 +48,7 @@ jobs:
         dir: AVR_Code
         target: '02'
       env:
-        FIRMWARE_VERSION_ID: ${{ vars.AVR_VER }}
+        FIRMWARE_VERSION_ID: ${{ needs.retrieve_firmware_ver.outputs.firmware_ver }}
 
     - name: Upload hex artifacts
       uses: actions/upload-artifact@v4
