@@ -72,7 +72,7 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver }}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build librademo
@@ -116,10 +116,10 @@ jobs:
         working-directory: Desktop_Interface
         run: |
           if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
-            qmake -config release EXPECTED_FIRMWARE_VERSION=0x0007
+            qmake -config release EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
           else
             # for debugging
-            qmake -config debug EXPECTED_FIRMWARE_VERSION=0x0007
+            qmake -config debug EXPECTED_FIRMWARE_VERSION=${{ needs.retrieve_firmware_ver.outputs.firmware_ver}}
           fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
