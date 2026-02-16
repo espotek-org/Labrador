@@ -9,5 +9,6 @@ on:
 
 jobs:
   define_ver:
+    runs-on: ubuntu-latest
     outputs:
       ver_firmware: 0x0007
