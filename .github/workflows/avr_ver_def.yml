@@ -2,6 +2,7 @@ name: Define the firmware version
 
 on:
   workflow_call:
-    firmware_ver:
-      description: the firmware version number 0x000N
-      value: 0x0007
+    outputs:
+      firmware_ver:
+        description: the firmware version number 0x000N
+        value: 0x0007
