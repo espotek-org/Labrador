@@ -5,4 +5,9 @@ on:
     outputs:
       firmware_ver:
         description: the firmware version number 0x000N
-        value: 0x0007
+        value: ${{jobs.define_ver.outputs.ver_firmware}}
+
+jobs:
+  define_ver:
+    outputs:
+      ver_firmware: 0x0007
