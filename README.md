@@ -12,8 +12,8 @@ Binary (executable) versions of the software are available for [download](https:
 For the documentation, please visit the [wiki](https://github.com/espotek-org/Labrador/wiki).
 
 ## Building from Source
-If you're looking to build from source but don't know where to start, Qt Creator is the easiest way to get your toes wet!
-https://www.qt.io/download-open-source/
+If you're looking to build from source but don't know where to start, Qt Creator is the easiest way to get your toes wet!  
+https://www.qt.io/download-open-source/  
 When installing, make sure you tick the box to install Qt 5.15 or later.
 
 Once it's installed, open `Desktop_Interface/Labrador.pro`, then Clean All -> Run `qmake` -> Build All.
@@ -66,7 +66,7 @@ There are community contributed 3D printable cases available at Thingiverse, cou
 * https://www.thingiverse.com/thing:3188243
 * https://www.thingiverse.com/thing:4705392
 
-Dave Messink has designed [a case that can be laser cut from 3mm plywood](https://github.com/espotek-org/Labrador/files/13813693/Re__Labrador_Case.1.zip).  The [binding posts](https://www.amazon.com/dp/B07YKYP8MN) and [cables](https://www.amazon.com/dp/B08KZGPTLM) he used are from Amazon.
+Dave Messink has designed [a case that can be laser cut from 3mm plywood](https://github.com/espotek-org/Labrador/files/13813693/Re__Labrador_Case.1.zip).  The [binding posts](https://www.amazon.com/dp/B07YKYP8MN) and [cables](https://www.amazon.com/dp/B08KZGPTLM) he used are from Amazon.  
 ![Top view](https://github.com/espotek-org/Labrador/assets/22040436/7245c645-ce89-41ae-a505-a47f29ab8875)
 ![Bottom view](https://github.com/espotek-org/Labrador/assets/22040436/7ac3882c-1c8f-4fad-9f9a-03112eef8ff8)
 
@@ -78,8 +78,8 @@ All Microcontroller software files, with the exception of those provided by Atme
 All hardware files (schematics, PCB) are licenced under [Creative Commons 4.0 (CC BY-NC-SA)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 # Collaboration
-If you want to submit a Pull Request, bug report, or feature request, please feel free to do so here at GitHub.
+If you want to submit a Pull Request, bug report, or feature request, please feel free to do so here at GitHub.  
 If you just want to say hello and remind me that people are actually using my product (or if you just don't want to make a GitHub account), please email admin@espotek.com
 
-Thanks to all.
+Thanks to all.  
 ~Chris
