@@ -1456,7 +1456,7 @@ void MainWindow::on_actionSnap_to_Cursors_triggered()
 void MainWindow::on_actionEnter_Manually_triggered()
 {
     ui->controller_iso->display->delay = 0;
-    scopeRangeEnterDialog dialog(this, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
+    scopeRangeEnterDialog dialog(this, true, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
     dialog.setModal(true);
     connect(&dialog, SIGNAL(yTopUpdated(double)), ui->controller_iso, SLOT(setTopRange(double)));
     connect(&dialog, SIGNAL(yBotUpdated(double)), ui->controller_iso, SLOT(setBotRange(double)));
@@ -1474,20 +1474,6 @@ void MainWindow::readSettingsFile(){
     double calibrate_gain_ch1 = settings->value("CalibrateGainCH1", R4/(R3+R4)).toDouble();
     double calibrate_gain_ch2 = settings->value("CalibrateGainCH2", R4/(R3+R4)).toDouble();
     psu_voltage_calibration_offset = settings->value("CalibratePsu", 0).toDouble();
-#ifndef PLATFORM_ANDROID
-    if (settings->value("ShowRangeDialog").toBool())
-    {
-        qDebug() << "ShowRangeDialog setting true";
-        ui->actionShow_Range_Dialog_on_Main_Page->setChecked(true);
-        on_actionShow_Range_Dialog_on_Main_Page_triggered(true);
-    }
-
-    if(settings->value("DarkModeEnabled").toBool())
-    {
-        ui->actionDark_Mode->setChecked(true);
-        setDarkMode(true);
-    }
-#endif
 
     daq_num_to_average = settings->value("daq_defaultAverage", 1).toInt();
     daq_max_file_size = settings->value("daq_defaultFileSize", 2048000000).toULongLong();
@@ -1516,6 +1502,19 @@ void MainWindow::readSettingsFile(){
         ui->offsetSpinBox_CH1->setValue(savedOffsetCH1);
     if (savedOffsetCH2 >= -20.0 && savedOffsetCH2 <= 20.0)
         ui->offsetSpinBox_CH2->setValue(savedOffsetCH2);
+
+    if (settings->value("ShowRangeDialog").toBool())
+    {
+        qDebug() << "ShowRangeDialog setting true";
+        ui->actionShow_Range_Dialog_on_Main_Page->setChecked(true);
+        on_actionShow_Range_Dialog_on_Main_Page_triggered(true);
+    }
+
+    if(settings->value("DarkModeEnabled").toBool())
+    {
+        ui->actionDark_Mode->setChecked(true);
+        setDarkMode(true);
+    }
 #endif
 
     //Change connection Type
