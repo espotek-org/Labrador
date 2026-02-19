@@ -1362,6 +1362,29 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QLabel" name="laOffsetLabel_CH1">
+             <property name="text">
+              <string>Offset</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="espoSpinBox" name="laOffsetSpinBox_CH1">
+             <property name="suffix">
+              <string>V</string>
+             </property>
+             <property name="decimals">
+              <number>2</number>
+             </property>
+             <property name="minimum">
+              <double>-20.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>20.000000000000000</double>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -1384,6 +1407,29 @@
             <widget class="QCheckBox" name="serialDecodingCheck_CH2">
              <property name="text">
               <string>Serial Decoding</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="laOffsetLabel_CH2">
+             <property name="text">
+              <string>Offset</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="espoSpinBox" name="laOffsetSpinBox_CH2">
+             <property name="suffix">
+              <string>V</string>
+             </property>
+             <property name="decimals">
+              <number>2</number>
+             </property>
+             <property name="minimum">
+              <double>-20.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>20.000000000000000</double>
              </property>
             </widget>
            </item>

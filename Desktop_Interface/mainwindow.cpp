@@ -270,6 +270,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->offsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH1(double)));
     connect(ui->offsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH2(double)));
 
+    connect(ui->laOffsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(digitalOffsetChanged_CH1(double)));
+    connect(ui->laOffsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(digitalOffsetChanged_CH2(double)));
+
     connect(ui->attenuationComboBox_CH1, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH1(int)));
     connect(ui->attenuationComboBox_CH2, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH2(int)));
 #endif
@@ -404,6 +407,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 #ifndef PLATFORM_ANDROID
     settings->setValue("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
     settings->setValue("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
+    settings->setValue("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
+    settings->setValue("LAOffsetCH2", ui->laOffsetSpinBox_CH2->value());
 #endif
     QMainWindow::closeEvent(event);
 }
@@ -1502,6 +1507,13 @@ void MainWindow::readSettingsFile(){
         ui->offsetSpinBox_CH1->setValue(savedOffsetCH1);
     if (savedOffsetCH2 >= -20.0 && savedOffsetCH2 <= 20.0)
         ui->offsetSpinBox_CH2->setValue(savedOffsetCH2);
+
+    double savedLAOffsetCH1 = settings->value("LAOffsetCH1", 0.0).toDouble();
+    double savedLAOffsetCH2 = settings->value("LAOffsetCH2", 0.0).toDouble();
+    if (savedLAOffsetCH1 >= -20.0 && savedLAOffsetCH1 <= 20.0)
+        ui->laOffsetSpinBox_CH1->setValue(savedLAOffsetCH1);
+    if (savedLAOffsetCH2 >= -20.0 && savedLAOffsetCH2 <= 20.0)
+        ui->laOffsetSpinBox_CH2->setValue(savedLAOffsetCH2);
 
     if (settings->value("ShowRangeDialog").toBool())
     {
