@@ -395,6 +395,19 @@ MainWindow::MainWindow(QWidget *parent) :
 
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    settings->setValue("ScopeTopRange", ui->controller_iso->display->topRange);
+    settings->setValue("ScopeBotRange", ui->controller_iso->display->botRange);
+    settings->setValue("ScopeTimeWindow", ui->controller_iso->display->window);
+    settings->setValue("ScopeDelay", ui->controller_iso->display->delay);
+#ifndef PLATFORM_ANDROID
+    settings->setValue("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
+    settings->setValue("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
+#endif
+    QMainWindow::closeEvent(event);
+}
+
 MainWindow::~MainWindow()
 {
     // delete ui;
@@ -1478,6 +1491,32 @@ void MainWindow::readSettingsFile(){
 
     daq_num_to_average = settings->value("daq_defaultAverage", 1).toInt();
     daq_max_file_size = settings->value("daq_defaultFileSize", 2048000000).toULongLong();
+
+    double savedTopRange = settings->value("ScopeTopRange", 2.5).toDouble();
+    double savedBotRange = settings->value("ScopeBotRange", -0.5).toDouble();
+    double savedTimeWindow = settings->value("ScopeTimeWindow", 0.1).toDouble();
+    double savedDelay = settings->value("ScopeDelay", 0.0).toDouble();
+
+    bool voltageRangeValid = savedTopRange > savedBotRange
+                          && savedTopRange >= -20.0 && savedTopRange <= 20.0
+                          && savedBotRange >= -20.0 && savedBotRange <= 20.0;
+    if (voltageRangeValid) {
+        ui->controller_iso->display->topRange = savedTopRange;
+        ui->controller_iso->display->botRange = savedBotRange;
+    }
+    if (savedTimeWindow > 0.0 && savedTimeWindow <= 1.0)
+        ui->controller_iso->display->window = savedTimeWindow;
+    if (savedDelay >= 0.0 && savedDelay <= 1.0)
+        ui->controller_iso->display->delay = savedDelay;
+
+#ifndef PLATFORM_ANDROID
+    double savedOffsetCH1 = settings->value("ScopeOffsetCH1", 0.0).toDouble();
+    double savedOffsetCH2 = settings->value("ScopeOffsetCH2", 0.0).toDouble();
+    if (savedOffsetCH1 >= -20.0 && savedOffsetCH1 <= 20.0)
+        ui->offsetSpinBox_CH1->setValue(savedOffsetCH1);
+    if (savedOffsetCH2 >= -20.0 && savedOffsetCH2 <= 20.0)
+        ui->offsetSpinBox_CH2->setValue(savedOffsetCH2);
+#endif
 
     //Change connection Type
     switch(connectionType){
