@@ -101,6 +101,8 @@ win32 {
 
     RC_ICONS = build_win/appicon.ico
 
+    CONFIG += console
+
     target.path = /
     lib_deploy.path = /
 
