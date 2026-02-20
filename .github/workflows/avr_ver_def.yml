@@ -1,0 +1,18 @@
+name: Define the firmware version
+
+on:
+  workflow_call:
+    outputs:
+      firmware_ver:
+        description: the firmware version number 0x000N
+        value: ${{jobs.dummy_job.outputs.ver_firmware}}
+
+jobs:
+  dummy_job:
+    runs-on: ubuntu-latest
+    outputs:
+      ver_firmware: ${{ steps.dummy_step_id.outputs.AVR_VER }}
+    steps:
+    - name: export avr_ver
+      id: dummy_step_id
+      run: echo "AVR_VER=0x0007" >> "$GITHUB_OUTPUT"
