@@ -241,10 +241,6 @@
     <ROW File="Qt5PrintSupport.dll_1" Component_="Qt5PrintSupport.dll_1" FileName="QT5PRI~1.DLL|Qt5PrintSupport.dll" Attributes="0" SourcePath="bin32\Qt5PrintSupport.dll" SelfReg="false"/>
     <ROW File="libfftw33.dll" Component_="libfftw33.dll" FileName="LIBFFT~1.DLL|libfftw3-3.dll" Attributes="0" SourcePath="bin32\libfftw3-3.dll" SelfReg="false"/>
     <ROW File="libfftw33.dll_1" Component_="libfftw33.dll_1" FileName="LIBFFT~1.DLL|libfftw3-3.dll" Attributes="0" SourcePath="bin64\libfftw3-3.dll" SelfReg="false"/>
-    <ROW File="labrafirm_0007_01.hex" Component_="flash.bat" FileName="LABRA~10.HEX|labrafirm_0007_01.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0007_01.hex" SelfReg="false"/>
-    <ROW File="labrafirm_0007_02.hex" Component_="flash.bat" FileName="LABRA~11.HEX|labrafirm_0007_02.hex" Attributes="0" SourcePath="bin64\firmware\labrafirm_0007_02.hex" SelfReg="false"/>
-    <ROW File="labrafirm_0007_01.hex_1" Component_="flash.bat_1" FileName="LABRA~10.HEX|labrafirm_0007_01.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0007_01.hex" SelfReg="false"/>
-    <ROW File="labrafirm_0007_02.hex_1" Component_="flash.bat_1" FileName="LABRA~11.HEX|labrafirm_0007_02.hex" Attributes="0" SourcePath="bin32\firmware\labrafirm_0007_02.hex" SelfReg="false"/>
     <ROW File="qt_tr.qm" Component_="qt_ar.qm" FileName="qt_tr.qm" Attributes="0" SourcePath="bin64\translations\qt_tr.qm" SelfReg="false"/>
     <ROW File="qt_zh_TW.qm" Component_="qt_ar.qm" FileName="qt_zh_TW.qm" Attributes="0" SourcePath="bin64\translations\qt_zh_TW.qm" SelfReg="false"/>
     <ROW File="qt_tr.qm_1" Component_="qt_ar.qm_1" FileName="qt_tr.qm" Attributes="0" SourcePath="bin32\translations\qt_tr.qm" SelfReg="false"/>
