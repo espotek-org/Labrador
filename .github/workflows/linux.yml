@@ -20,7 +20,7 @@ on:
 
 env:
   # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
-  # ToDo: add secret for privilidged tasks
+  # ToDo: when required, add secrets for privilidged tasks here
   
 jobs:
   build-appimage:
