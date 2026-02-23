@@ -3,12 +3,25 @@ permissions:
   contents: read
   pull-requests: write
   
-on:
+on: 
   workflow_dispatch:
   workflow_call:
+
   push:
+    branches:
+      - master
+      - main
+
   pull_request:
-  
+    branches:
+      - master
+      - main
+
+env:
+  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  # AI = AdvancedInstaller
+  AI_KEY: ${{ secrets.AI_KEY }}
+
 jobs:
   build-windows:
     runs-on: windows-2022
@@ -112,8 +125,6 @@ jobs:
           del ai167.msi
 
       - name: Register Advanced Installer
-        env:
-          AI_KEY: ${{ secrets.AI_KEY }}
         if: env.AI_KEY != ''
         shell: cmd
         run: |
