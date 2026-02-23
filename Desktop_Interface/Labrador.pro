@@ -106,6 +106,9 @@ win32 {
 
     firmware.path = /firmware
     firmware.files = $$files(resources/firmware/labrafirm*)
+    # Windows special for firmware update
+    firmware.files += $$files(resources/firmware/*.bat)
+    firmware.files += $$files(resources/firmware/*.exe)
 
     waveforms.path = /waveforms
     waveforms.files = $$files(resources/waveforms/*)
