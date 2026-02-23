@@ -270,6 +270,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->offsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH1(double)));
     connect(ui->offsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH2(double)));
 
+    connect(ui->laOffsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(digitalOffsetChanged_CH1(double)));
+    connect(ui->laOffsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(digitalOffsetChanged_CH2(double)));
+
     connect(ui->attenuationComboBox_CH1, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH1(int)));
     connect(ui->attenuationComboBox_CH2, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH2(int)));
 #endif
@@ -393,6 +396,21 @@ MainWindow::MainWindow(QWidget *parent) :
     eyeDiagramLayoutWidget->setVisible(false);
 #endif
 
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    settings->setValue("ScopeTopRange", ui->controller_iso->display->topRange);
+    settings->setValue("ScopeBotRange", ui->controller_iso->display->botRange);
+    settings->setValue("ScopeTimeWindow", ui->controller_iso->display->window);
+    settings->setValue("ScopeDelay", ui->controller_iso->display->delay);
+#ifndef PLATFORM_ANDROID
+    settings->setValue("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
+    settings->setValue("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
+    settings->setValue("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
+    settings->setValue("LAOffsetCH2", ui->laOffsetSpinBox_CH2->value());
+#endif
+    QMainWindow::closeEvent(event);
 }
 
 MainWindow::~MainWindow()
@@ -1443,7 +1461,7 @@ void MainWindow::on_actionSnap_to_Cursors_triggered()
 void MainWindow::on_actionEnter_Manually_triggered()
 {
     ui->controller_iso->display->delay = 0;
-    scopeRangeEnterDialog dialog(this, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
+    scopeRangeEnterDialog dialog(this, true, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
     dialog.setModal(true);
     connect(&dialog, SIGNAL(yTopUpdated(double)), ui->controller_iso, SLOT(setTopRange(double)));
     connect(&dialog, SIGNAL(yBotUpdated(double)), ui->controller_iso, SLOT(setBotRange(double)));
@@ -1461,7 +1479,42 @@ void MainWindow::readSettingsFile(){
     double calibrate_gain_ch1 = settings->value("CalibrateGainCH1", R4/(R3+R4)).toDouble();
     double calibrate_gain_ch2 = settings->value("CalibrateGainCH2", R4/(R3+R4)).toDouble();
     psu_voltage_calibration_offset = settings->value("CalibratePsu", 0).toDouble();
+
+    daq_num_to_average = settings->value("daq_defaultAverage", 1).toInt();
+    daq_max_file_size = settings->value("daq_defaultFileSize", 2048000000).toULongLong();
+
+    double savedTopRange = settings->value("ScopeTopRange", 2.5).toDouble();
+    double savedBotRange = settings->value("ScopeBotRange", -0.5).toDouble();
+    double savedTimeWindow = settings->value("ScopeTimeWindow", 0.1).toDouble();
+    double savedDelay = settings->value("ScopeDelay", 0.0).toDouble();
+
+    bool voltageRangeValid = savedTopRange > savedBotRange
+                          && savedTopRange >= -20.0 && savedTopRange <= 20.0
+                          && savedBotRange >= -20.0 && savedBotRange <= 20.0;
+    if (voltageRangeValid) {
+        ui->controller_iso->display->topRange = savedTopRange;
+        ui->controller_iso->display->botRange = savedBotRange;
+    }
+    if (savedTimeWindow > 0.0 && savedTimeWindow <= 1.0)
+        ui->controller_iso->display->window = savedTimeWindow;
+    if (savedDelay >= 0.0 && savedDelay <= 1.0)
+        ui->controller_iso->display->delay = savedDelay;
+
 #ifndef PLATFORM_ANDROID
+    double savedOffsetCH1 = settings->value("ScopeOffsetCH1", 0.0).toDouble();
+    double savedOffsetCH2 = settings->value("ScopeOffsetCH2", 0.0).toDouble();
+    if (savedOffsetCH1 >= -20.0 && savedOffsetCH1 <= 20.0)
+        ui->offsetSpinBox_CH1->setValue(savedOffsetCH1);
+    if (savedOffsetCH2 >= -20.0 && savedOffsetCH2 <= 20.0)
+        ui->offsetSpinBox_CH2->setValue(savedOffsetCH2);
+
+    double savedLAOffsetCH1 = settings->value("LAOffsetCH1", 0.0).toDouble();
+    double savedLAOffsetCH2 = settings->value("LAOffsetCH2", 0.0).toDouble();
+    if (savedLAOffsetCH1 >= -20.0 && savedLAOffsetCH1 <= 20.0)
+        ui->laOffsetSpinBox_CH1->setValue(savedLAOffsetCH1);
+    if (savedLAOffsetCH2 >= -20.0 && savedLAOffsetCH2 <= 20.0)
+        ui->laOffsetSpinBox_CH2->setValue(savedLAOffsetCH2);
+
     if (settings->value("ShowRangeDialog").toBool())
     {
         qDebug() << "ShowRangeDialog setting true";
@@ -1475,9 +1528,6 @@ void MainWindow::readSettingsFile(){
         setDarkMode(true);
     }
 #endif
-
-    daq_num_to_average = settings->value("daq_defaultAverage", 1).toInt();
-    daq_max_file_size = settings->value("daq_defaultFileSize", 2048000000).toULongLong();
 
     //Change connection Type
     switch(connectionType){
@@ -1530,8 +1580,9 @@ void MainWindow::reinitUsb(void){
     if(!(ui->controller_iso->driver->connected)){
         reinitUsbStage2();
     } else{
+        connect(ui->controller_iso->driver, SIGNAL(shutdownComplete()),
+            this, SLOT(reinitUsbStage2()), Qt::UniqueConnection);
         ui->controller_iso->driver->shutdownProcedure();
-        QTimer::singleShot(1000, this, SLOT(reinitUsbStage2()));
     }
 #endif
     qDebug() << "ReinitUsb Stage 1 complete";

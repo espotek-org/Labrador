@@ -977,6 +977,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         broadcastStats(0);
     } else if (CH1_mode == 2) {
         CH1 = digitalConvert(readData_CH1);
+        for (int i = 0; i < CH1.size(); ++i)
+            CH1[i] += m_digitalOffset_CH1;
     } else if (CH1_mode == -2) {
         CH1 = fileStreamConvert(readDataFile);
     }
@@ -1004,6 +1006,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         broadcastStats(1);
     } else if (CH2_mode == 2) {
         CH2 = digitalConvert(readData_CH2);
+        for (int i = 0; i < CH2.size(); ++i)
+            CH2[i] += m_digitalOffset_CH2;
     }
 
 
@@ -2073,6 +2077,16 @@ void isoDriver::offsetChanged_CH1(double newOffset)
 void isoDriver::offsetChanged_CH2(double newOffset)
 {
     m_offset_CH2 = newOffset;
+}
+
+void isoDriver::digitalOffsetChanged_CH1(double newOffset)
+{
+    m_digitalOffset_CH1 = newOffset;
+}
+
+void isoDriver::digitalOffsetChanged_CH2(double newOffset)
+{
+    m_digitalOffset_CH2 = newOffset;
 }
 
 void isoDriver::attenuationChanged_CH1(int attenuationIndex)

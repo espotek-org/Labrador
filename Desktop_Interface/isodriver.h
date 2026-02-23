@@ -194,6 +194,8 @@ private:
     int triggerMode = 0;
     double m_offset_CH1 = 0;
     double m_offset_CH2 = 0;
+    double m_digitalOffset_CH1 = 0;
+    double m_digitalOffset_CH2 = 0;
     double m_attenuation_CH1 = 1;
     double m_attenuation_CH2 = 1;
     //Pure MM++ related variables
@@ -328,6 +330,8 @@ public slots:
 	void hideCH2(bool enable);
     void offsetChanged_CH1(double newOffset);
     void offsetChanged_CH2(double newOffset);
+    void digitalOffsetChanged_CH1(double newOffset);
+    void digitalOffsetChanged_CH2(double newOffset);
     void attenuationChanged_CH1(int attenuationIndex);
     void attenuationChanged_CH2(int attenuationIndex);
     void setHexDisplay_CH1(bool enabled);

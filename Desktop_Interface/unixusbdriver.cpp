@@ -1,6 +1,8 @@
 #include "unixusbdriver.h"
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QMessageBox>
+#include <QMutexLocker>
 #include <QStandardPaths>
 
 unixUsbDriver::unixUsbDriver(QWidget *parent) : genericUsbDriver(parent)
@@ -14,42 +16,89 @@ unixUsbDriver::unixUsbDriver(QWidget *parent) : genericUsbDriver(parent)
 
 unixUsbDriver::~unixUsbDriver(void){
     qDebug() << "\n\nunixUsbDriver destructor ran!";
-    //unixDriverDeleteMutex.lock();
-    if(connected){
-		if (workerThread)
-			{
-			workerThread->deleteLater();
-			while(workerThread->isRunning()){
-				workerThread->quit();
-				qDebug() << "isRunning?" << workerThread->isFinished();
-				QThread::msleep(100);
-			}
-		}
-		if (isoHandler)
-	        delete(isoHandler);
-        //delete(workerThread);
-        qDebug() << "THREAD Gone!";
 
-        for (int i=0; i<NUM_FUTURE_CTX; i++){
-            for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
-				if (isoCtx[k][i])
-	                libusb_free_transfer(isoCtx[k][i]);
+    shutdownMode = true;
+    if(isoTimer){
+        isoTimer->stop();
+    }
+    if(recoveryTimer){
+        recoveryTimer->stop();
+    }
+
+    if(!shutdownInitiated){
+        shutdownInitiated = true;
+        cancelIsoTransfers();
+    }
+    if(isoHandler){
+        isoHandler->pendingTransfers = &shutdownCallbacksPending;
+        isoHandler->stopTime.store(true);
+    }
+
+    QElapsedTimer shutdownTimer;
+    shutdownTimer.start();
+    while((shutdownCallbacksPending.load() > 0) && (shutdownTimer.elapsed() < 3000)){
+        QThread::msleep(10);
+    }
+
+    if(workerThread){
+        workerThread->quit();
+        if(!workerThread->wait(2000)){
+            qDebug() << "Timed out waiting for libusb worker thread to stop. Forcing shutdown.";
+            shutdownCallbacksPending.store(0);
+            if(isoHandler){
+                isoHandler->stopTime.store(true);
+            }
+            workerThread->quit();
+            if(!workerThread->wait(1000)){
+                qDebug() << "Worker thread did not stop. Terminating thread.";
+                workerThread->terminate();
+                workerThread->wait(1000);
             }
         }
-        qDebug() << "Transfers freed.";
+    }
+    if(isoHandler){
+        delete(isoHandler);
+        isoHandler = nullptr;
+    }
+    if(workerThread){
+        delete(workerThread);
+        workerThread = nullptr;
+    }
+    qDebug() << "THREAD Gone!";
+
+    for (int i=0; i<NUM_FUTURE_CTX; i++){
+        for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
+            if (isoCtx[k][i]){
+                libusb_free_transfer(isoCtx[k][i]);
+                isoCtx[k][i] = NULL;
+            }
+        }
+    }
+    qDebug() << "Transfers freed.";
+
+    for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
+        if(midBuffer_current[k]){
+            free(midBuffer_current[k]);
+            midBuffer_current[k] = nullptr;
+        }
+        if(midBuffer_prev[k]){
+            free(midBuffer_prev[k]);
+            midBuffer_prev[k] = nullptr;
+        }
     }
 
     if(handle != NULL){
-    libusb_release_interface(handle, 0);
+        libusb_release_interface(handle, 0);
         qDebug() << "Interface released";
         libusb_close(handle);
         qDebug() << "Device Closed";
+        handle = NULL;
     }
     if(ctx != NULL){
         libusb_exit(ctx);
         qDebug() << "Libusb exited";
+        ctx = NULL;
     }
-    //unixDriverDeleteMutex.unlock();
     qDebug() << "unixUsbDriver destructor completed!\n\n";
 }
 
@@ -121,19 +170,18 @@ void unixUsbDriver::usbSendControl(uint8_t RequestType, uint8_t Request, uint16_
 
 //Callback on iso transfer complete.
 static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
+    isoTransferUserData *transferData = static_cast<isoTransferUserData *>(transfer->user_data);
+
     tcBlockMutex.lock();
-    //int number = ((tcBlock *)transfer->user_data)->number;
-    //bool completed = ((tcBlock *)transfer->user_data)->completed;
-
-    //qDebug() << "CALLBACK" << number;
-    //qDebug() << completed;
-
-    if(transfer->status!=LIBUSB_TRANSFER_CANCELLED){
-        ((tcBlock *)transfer->user_data)->completed = true;
-        ((tcBlock *)transfer->user_data)->timeReceived = QDateTime::currentMSecsSinceEpoch();
+    if((transferData != nullptr) && (transferData->transferBlock != nullptr) && (transfer->status != LIBUSB_TRANSFER_CANCELLED)){
+        transferData->transferBlock->completed = true;
+        transferData->transferBlock->timeReceived = QDateTime::currentMSecsSinceEpoch();
     }
-    //qDebug() << ((tcBlock *)transfer->user_data)->timeReceived;
     tcBlockMutex.unlock();
+
+    if((transferData != nullptr) && (transferData->owner != nullptr)){
+        transferData->owner->noteShutdownTransferCallback(transferData->endpoint, transferData->context);
+    }
     return;
 }
 
@@ -145,7 +193,11 @@ int unixUsbDriver::usbIsoInit(void){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
             transferCompleted[k][n].number = (k * ISO_PACKETS_PER_CTX) + n;
             transferCompleted[k][n].completed = false;
-            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, (void*)&transferCompleted[k][n], 4000);
+            transferUserData[k][n].transferBlock = &transferCompleted[k][n];
+            transferUserData[k][n].owner = this;
+            transferUserData[k][n].endpoint = k;
+            transferUserData[k][n].context = n;
+            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, (void*)&transferUserData[k][n], 4000);
             libusb_set_iso_packet_lengths(isoCtx[k][n], ISO_PACKET_SIZE);
         }
     }
@@ -185,6 +237,7 @@ int unixUsbDriver::usbIsoInit(void){
     workerThread = new QThread();
 
     isoHandler->ctx = ctx;
+    isoHandler->pendingTransfers = &shutdownCallbacksPending;
     isoHandler->moveToThread(workerThread);
     connect(workerThread, SIGNAL(started()), isoHandler, SLOT(handle()));
 
@@ -276,20 +329,14 @@ void unixUsbDriver::isoTimerTick(void){
     for(unsigned char k=0; k<NUM_ISO_ENDPOINTS;k++){
         transferCompleted[k][earliest].completed = false;
         if(shutdownMode){
-            error = libusb_cancel_transfer(isoCtx[k][earliest]);
-            numCancelled++;
-            qDebug() << "Cancelled" << earliest << k;
-            qDebug() << "Total Cancelled =" << numCancelled;
-            if(numCancelled == (NUM_FUTURE_CTX * NUM_ISO_ENDPOINTS)){
-                isoHandler->stopTime = true;
-            }
+            continue;
         }else{
             error = libusb_submit_transfer(isoCtx[k][earliest]);
-        }
-        if(error){
-            qDebug() << (shutdownMode ? "libusb_cancel_transfer FAILED" : "libusb_submit_transfer FAILED");
+            if(error){
+                qDebug() << "libusb_submit_transfer FAILED";
             qDebug() << "ERROR" << libusb_error_name(error);
-        } //else qDebug() << "isoCtx submitted successfully!";
+            } //else qDebug() << "isoCtx submitted successfully!";
+        }
     }
 
     tcBlockMutex.unlock();
@@ -322,16 +369,141 @@ bool unixUsbDriver::allEndpointsComplete(int n){
     }
     return true;
 }
+//this is for noting that the shutdown transfer callback has been called.
+//it clears the cancelPending flag for the relevant transfer, and reduces the count of pending callbacks.
+void unixUsbDriver::noteShutdownTransferCallback(unsigned char endpoint, int context){
+    //if shutdownMode isn't true, then we aren't in shutdown
+    //and we dont need to track pending callbacks, or worry about cancelPending flags.
+    if(!shutdownMode){
+        return;
+    }
+    //shutdownStateMutex is used to protect 
+    //cancelPending and shutdownCallbacksPending, 
+    //which are shared between the main thread and the libusb callback thread.
+    QMutexLocker locker(&shutdownStateMutex);
 
+    //if there isn't a pending cancel for this transfer, then we don't need to do anything.
+    if(!cancelPending[endpoint][context]){
+        return;
+    }
+    //Clear the cancelPending flag for this transfer, since the callback has now been called.
+    cancelPending[endpoint][context] = false;
+    //Reduce the count of pending callbacks. 
+    int pending = shutdownCallbacksPending.load();
+    //pending should never be below zero, but just in case, we check before we reduce it.
+    if(pending > 0){
+        shutdownCallbacksPending.store(pending - 1);
+    }
+}
+
+//cancels all pending iso transfers.  Returns the number of successful transfer cancellations
+int unixUsbDriver::cancelIsoTransfers(void){
+    int pendingCallbacks = 0;
+    {
+        //clear all cancelPending flags and reset shutdownCallbacksPending to 0
+        QMutexLocker locker(&shutdownStateMutex);
+        shutdownCallbacksPending.store(0);
+        for (int i=0; i<NUM_FUTURE_CTX; i++){
+            for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
+                cancelPending[k][i] = false;
+            }
+        }
+    }
+    //cancel all transfers.  If a transfer is successfully cancelled, then we increment pendingCallbacks
+    for (int i=0; i<NUM_FUTURE_CTX; i++){
+        for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
+            if(!isoCtx[k][i]){
+                continue;
+            }
+
+            {
+                QMutexLocker locker(&shutdownStateMutex);
+                if(cancelPending[k][i]){
+                    continue;
+                }
+                cancelPending[k][i] = true;
+                shutdownCallbacksPending.fetch_add(1);
+            }
+            //indicates if an error occurred while trying to cancel the transfer
+            int error = libusb_cancel_transfer(isoCtx[k][i]);
+            if(error == 0){
+                pendingCallbacks++;
+                continue;
+            }
+
+            {
+                QMutexLocker locker(&shutdownStateMutex);
+                if(cancelPending[k][i]){
+                    cancelPending[k][i] = false;
+                    int pending = shutdownCallbacksPending.load();
+                    if(pending > 0){
+                        shutdownCallbacksPending.store(pending - 1);
+                    }
+                }
+            }
+            //special case for device not found / disconnected
+            //If the device is disconnected, then the transfers should already be cancelled
+            if((error != LIBUSB_ERROR_NOT_FOUND) && (error != LIBUSB_ERROR_NO_DEVICE)){
+                qDebug() << "libusb_cancel_transfer FAILED";
+                qDebug() << "ERROR" << libusb_error_name(error);
+            }
+        }
+    }
+
+    return pendingCallbacks;
+}
+
+//rebuilt the shutdown procedure to be more robust.  
+//It now stops the timers, then cancels the iso transfers
+//it has a backup timer to poll until the shutdown can be completed  
 void unixUsbDriver::shutdownProcedure(){
     shutdownMode = true;
+    if(isoTimer){
+        isoTimer->stop();
+    }
+    if(recoveryTimer){
+        recoveryTimer->stop();
+    }
+
+    if(!shutdownInitiated){
+        shutdownInitiated = true;
+        cancelIsoTransfers();
+    }
+
+    if(isoHandler){
+        isoHandler->pendingTransfers = &shutdownCallbacksPending;
+        isoHandler->stopTime.store(true);
+    }
+
     QTimer::singleShot(500, this, SLOT(backupCleanup()));
 }
 
 //On physical disconnect, isoTimerTick will not assert stopTime.  Hence this duct-tape function.
 void unixUsbDriver::backupCleanup(){
-	if (isoHandler)
-	    isoHandler->stopTime = true;
+    if(shutdownSignalSent){
+        return;
+    }
+
+    if(isoHandler){
+        isoHandler->pendingTransfers = &shutdownCallbacksPending;
+        isoHandler->stopTime.store(true);
+    }
+    //recursively call backupCleanup every 50ms until shutdownComplete can be emitted safely  
+    if(shutdownCallbacksPending.load() > 0){
+        QTimer::singleShot(50, this, SLOT(backupCleanup()));
+        return;
+    }
+    //check to make sure the worker thread has stopped before emitting shutdownComplete
+    //recursively call backupCleanup every 50ms until the worker thread has stopped
+    if(workerThread && workerThread->isRunning()){
+        workerThread->quit();
+        QTimer::singleShot(50, this, SLOT(backupCleanup()));
+        return;
+    }
+
+    shutdownSignalSent = true;
+    connectedStatus(false);
+    emit shutdownComplete();
 }
 
 int unixUsbDriver::flashFirmware(void){
