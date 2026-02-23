@@ -4,13 +4,22 @@ permissions:
   contents: read
   pull-requests: write
   
-on:
+on: 
   workflow_dispatch:
   workflow_call:
+
   push:
+    branches:
+      - master
+      - main
+
   pull_request:
+    branches:
+      - master
+      - main
 
 env:
+  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
   MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
   MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
 
@@ -47,10 +56,6 @@ jobs:
           make -j$(sysctl -n hw.ncpu)
 
       - name: Import code signing certificate
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-        # secrets are only provided in original repo
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         working-directory: Desktop_Interface
         run: |
