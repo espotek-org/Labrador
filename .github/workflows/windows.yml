@@ -20,7 +20,9 @@ on:
 env:
   # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
   # AI = AdvancedInstaller
-  AI_KEY: ${{ secrets.AI_KEY }}
+  # ToDo: Chris, please create new secret WINDOWS_AdvancedInstaller_KEY with content of current AI_KEY
+  #WINDOWS_AdvancedInstaller_KEY: ${{ secrets.WINDOWS_AdvancedInstaller_KEY }}
+  WINDOWS_AdvancedInstaller_KEY: ${{ secrets.AI_KEY }}
 
 jobs:
   build-windows:
@@ -125,10 +127,10 @@ jobs:
           del ai167.msi
 
       - name: Register Advanced Installer
-        if: env.AI_KEY != ''
+        if: env.WINDOWS_AdvancedInstaller_KEY != ''
         shell: cmd
         run: |
-          "C:/Program Files (x86)/Caphyon/Advanced Installer 16.7/bin/x86/AdvancedInstaller.com" /register %AI_KEY%
+          "C:/Program Files (x86)/Caphyon/Advanced Installer 16.7/bin/x86/AdvancedInstaller.com" /register %WINDOWS_AdvancedInstaller_KEY%
 
       - name: Build installer
         shell: cmd
