@@ -107,7 +107,10 @@ win32 {
     lib_deploy.path = /
 
     firmware.path = /firmware
-    firmware.files = $$files(resources/firmware/*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
+    # Windows special for firmware update
+    firmware.files += $$files(resources/firmware/*.bat)
+    firmware.files += $$files(resources/firmware/*.exe)
 
     waveforms.path = /waveforms
     waveforms.files = $$files(resources/waveforms/*)
@@ -166,7 +169,7 @@ unix:!android:!macx {
     lib_deploy.files += build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
-    firmware.files += $$files(resources/firmware/labrafirm*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = $$PREFIX/share/EspoTek/Labrador/waveforms
     waveforms.files += $$files(resources/waveforms/*)
@@ -304,7 +307,7 @@ android {
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
 
     firmware.path = /assets/firmware
-    firmware.files = resources/firmware/labrafirm_0007_02.hex
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = /assets/waveforms
     waveforms.files = $$files(resources/waveforms/*)
