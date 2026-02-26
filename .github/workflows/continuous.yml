@@ -8,27 +8,48 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-firmware:
+    uses: ./.github/workflows/firmware.yml
+    secrets: inherit
   build-android:
+    needs:
+      - build-firmware
     uses: ./.github/workflows/android.yml
+    with:
+      FIRMWARE_RUN_ID: ${{ needs.build-firmware.outputs.run_id }}
     secrets: inherit
   build-linux:
+    needs:
+      - build-firmware
     uses: ./.github/workflows/linux.yml
+    with:
+      FIRMWARE_RUN_ID: ${{ needs.build-firmware.outputs.run_id }}
     secrets: inherit
   build-mac:
+    needs:
+      - build-firmware
     uses: ./.github/workflows/mac.yml
+    with:
+      FIRMWARE_RUN_ID: ${{ needs.build-firmware.outputs.run_id }}
     secrets: inherit
-  build-windows:
-    uses: ./.github/workflows/windows.yml
-    secrets: inherit
+
+#  build-windows:
+#    needs:
+#      - build-firmware
+#    uses: ./.github/workflows/windows.yml
+#    with:
+#      FIRMWARE_RUN_ID: ${{ needs.build-firmware.outputs.run_id }}
+#    secrets: inherit
 
   release:
     permissions:
       contents: write
     needs:
+      - build-firmware
       - build-android
       - build-linux
       - build-mac
-      - build-windows
+#      - build-windows
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:

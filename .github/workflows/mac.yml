@@ -7,7 +7,10 @@ permissions:
 on: 
   workflow_dispatch:
   workflow_call:
-
+    inputs:
+      FIRMWARE_RUN_ID:
+        required: true
+        type: string
   push:
     branches:
       - master
@@ -30,6 +33,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Define firmware version
+        id: define_firmware_version
+        uses: ./.github/actions/define-firmware-ver-action
+
+      - name: Download firmware
+        id: download_firmware
+        uses: ./.github/actions/download-firmware-action
+        with:
+          FIRMWARE_VARIANT: '02'
+          FIRMWARE_RUN_ID: ${{ github.event.workflow == './github/workflows/continuous.yml' && inputs.FIRMWARE_RUN_ID || ''}} # for grabbing the firmware from an in-process continuous release
+
       - name: Setup Homebrew dependencies
         run: |
           brew update
@@ -40,19 +54,19 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build librademo
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver}}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver}}
           make -j$(sysctl -n hw.ncpu)
 
       - name: Import code signing certificate
@@ -80,10 +94,10 @@ jobs:
         working-directory: Desktop_Interface
         run: |
           if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
-            qmake -config release
+            qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver}}
           else
             # for debugging
-            qmake -config debug  
+            qmake -config debug EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver}}
           fi
           make -j$(sysctl -n hw.ncpu)
           macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/

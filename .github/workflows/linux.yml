@@ -7,6 +7,10 @@ permissions:
 on: 
   workflow_dispatch:
   workflow_call:
+    inputs:
+      FIRMWARE_RUN_ID:
+        required: true
+        type: string
 
   push:
     branches:
@@ -37,6 +41,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Define firmware version
+        id: define_firmware_version
+        uses: ./.github/actions/define-firmware-ver-action
+
+      - name: Download firmware
+        id: download_firmware
+        uses: ./.github/actions/download-firmware-action
+        with:
+          FIRMWARE_VARIANT: '02'
+          FIRMWARE_RUN_ID: ${{ github.event.workflow == './github/workflows/continuous.yml' && inputs.FIRMWARE_RUN_ID || ''}} # for grabbing the firmware from an in-process continuous release
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -46,24 +61,25 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build librademo
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build AppImage
         working-directory: Desktop_Interface
         run: |
+          export EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           ./make_appimage
 
       - name: Upload artifacts
@@ -88,6 +104,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Define firmware version
+        id: define_firmware_version
+        uses: ./.github/actions/define-firmware-ver-action
+
+      - name: Download firmware
+        id: download_firmware
+        uses: ./.github/actions/download-firmware-action
+        with:
+          FIRMWARE_VARIANT: '02'
+#          FIRMWARE_RUN_ID: ${{ inputs.FIRMWARE_RUN_ID }} # for grabbing the firmware from an in-process continuous release
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -97,24 +124,25 @@ jobs:
       - name: Build librador
         working-directory: Librador_API/___librador/librador
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build librademo
         working-directory: Librador_API/___librador/librademo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
         run: |
-          qmake -config release
+          qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           make -j$(nproc)
 
       - name: Build Debian package
         working-directory: Desktop_Interface
         run: |
+          export EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
           DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage -b
           mv ../espotek-labrador*.deb ../Labrador-$(git rev-parse --short HEAD)-${{ matrix.arch }}.deb
 

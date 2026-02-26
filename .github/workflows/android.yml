@@ -7,6 +7,10 @@ permissions:
 on: 
   workflow_dispatch:
   workflow_call:
+    inputs:
+      FIRMWARE_RUN_ID:
+        required: true
+        type: string
 
   push:
     branches:
@@ -30,6 +34,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Define firmware version
+        id: define_firmware_version
+        uses: ./.github/actions/define-firmware-ver-action
+
+      - name: Download firmware
+        id: download_firmware
+        uses: ./.github/actions/download-firmware-action
+        with:
+          FIRMWARE_VARIANT: '02'
+          FIRMWARE_RUN_ID: ${{ github.event.workflow == './github/workflows/continuous.yml' && inputs.FIRMWARE_RUN_ID || ''}} # for grabbing the firmware from an in-process continuous release
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -74,13 +89,13 @@ jobs:
           export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/21.3.6528147"
           APK_BASENAME="Labrador-$(git rev-parse --short HEAD)"
           if [ -e cert.cer ] && [ -e cert.p8 ]; then
-            qmake -config release
+            qmake -config release EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
             make -j$(nproc)
             make INSTALL_ROOT=android-build install
             JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-Labrador-deployment-settings.json --output android-build --aab --android-platform android-31 --verbose --gradle --release
             ${ANDROID_SDK_ROOT}/build-tools/31.0.0/apksigner sign --in android-build/build/outputs/apk/release/android-build-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
           else
-            qmake -config debug
+            qmake -config debug EXPECTED_FIRMWARE_VERSION=${{ steps.define_firmware_version.outputs.firmware_ver }}
             make -j$(nproc)
             make INSTALL_ROOT=android-build install
             JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-Labrador-deployment-settings.json --output android-build --aab --android-platform android-31 --verbose --gradle
