@@ -1,5 +1,6 @@
 #include "winusbdriver.h"
 #include <QApplication>
+#include <QElapsedTimer>
 #include <qprocess.h>
 #include <QMessageBox>
 
@@ -18,9 +19,9 @@ winUsbDriver::~winUsbDriver(void){
         for(int n=0;n<NUM_FUTURE_CTX;n++){
             IsoK_Free(isoCtx[k][n]);
         }
-        for(int i=0;i<MAX_OVERLAP;i++){
-            OvlK_Release(ovlkHandle[k][i]);
-        }
+        for(int i=0;i<MAX_OVERLAP;i++){     //note: MAX_OVERLAP will cause a potential out of bounds warning from the compiler
+            OvlK_Release(ovlkHandle[k][i]); //but MAX_OVERLAP depends on NUM_FUTURE_CTX and NUM_ISO_ENDPOINTS, so its fine.
+        }                                   //By definition it should be impossible to index out of bounds.
         UsbK_FlushPipe(handle, pipeID[k]);
         UsbK_AbortPipe(handle, pipeID[k]);
     }
@@ -60,7 +61,8 @@ unsigned char winUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
     LstK_FindByVidPid(deviceList, VIDin, PIDin, &deviceInfo);
     LstK_Free(deviceList);
     if (deviceInfo == NULL){
-        qDebug("Could not find device VID = %04X, PID = %04X", VIDin, PIDin);
+        //I nitpicked this formatting so the compiler wont whine about the qDebug format type mismatch
+        qDebug() << "Could not find device VID = " << QString::number(VIDin, 16) << ", PID = " << QString::number(PIDin, 16);
         return 2;
     }
 
@@ -68,9 +70,10 @@ unsigned char winUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
     success = UsbK_Init(&handle, deviceInfo);
     if (!success){
         ec = GetLastError();
-        qDebug("UsbK_Init failed. ErrorCode: %08Xh", ec);
+        //I nitpicked this formatting so the compiler wont whine about the qDebug format type mismatch
+        qDebug() << "UsbK_Init failed. ErrorCode: " << QString::number(ec, 16);
         return 3;
-    } else qDebug("Device opened successfully!");
+    } else qDebug() << "Device opened successfully!";
 
     if (handle == NULL){
         return 4; //Unkown error, only exists on 32 bit???
@@ -212,6 +215,11 @@ void winUsbDriver::isoTimerTick(void){
     //Finally, it should signal upTick() so that isoDriver knows it can draw a new frame.
 
     timerCount++;
+
+    if(shutdownRequested){
+        return;
+    }
+
     char subString[3] = "th";
     if(timerCount%10 == 1) strcpy(subString, "st");
     if(timerCount%10 == 2) strcpy(subString, "nd");
@@ -270,6 +278,9 @@ void winUsbDriver::isoTimerTick(void){
 
     //Setup transfer for resubmission
     for(unsigned char k=0; k<NUM_ISO_ENDPOINTS; k++){
+        if(shutdownRequested){
+            continue;
+        }
         //Apparently reusing before resubmitting is a bad idea???
 
         /*UINT oldStart = isoCtx[k][earliest]->StartFrame;
@@ -321,6 +332,64 @@ void winUsbDriver::recoveryTick(){
 }
 
 void winUsbDriver::shutdownProcedure(){
+    if(shutdownRequested){
+        return;
+    }
+    shutdownRequested = true;
+
+    // 1) Stop timers so no new work is scheduled.
+    // 2) Abort + flush pipes to force outstanding overlapped requests to complete.
+    // 3) Poll for completion with a timeout.
+    // 4) Emit shutdownComplete once it's safe for MainWindow to delete this driver.
+    qDebug() << "winUsbDriver::shutdownProcedure begin";
+
+    if(isoTimer){
+        isoTimer->stop();
+    }
+    if(recoveryTimer){
+        recoveryTimer->stop();
+    }
+
+    if(handle){
+        for (unsigned char k=0; k<NUM_ISO_ENDPOINTS; k++){
+            UsbK_AbortPipe(handle, pipeID[k]);
+            UsbK_FlushPipe(handle, pipeID[k]);
+        }
+    }
+
+    // Drain outstanding overlapped requests.
+    QElapsedTimer drainTimer;
+    drainTimer.start();
+    constexpr qint64 kDrainTimeoutMs = 3000;
+    bool allComplete = false;
+    while(!allComplete && (drainTimer.elapsed() < kDrainTimeoutMs)){
+        allComplete = true;
+        for (unsigned char k=0; k<NUM_ISO_ENDPOINTS; k++){
+            for(int n=0; n<NUM_FUTURE_CTX; n++){
+                if(ovlkHandle[k][n] && !OvlK_IsComplete(ovlkHandle[k][n])){
+                    allComplete = false;
+                    break;
+                }
+            }
+            if(!allComplete){
+                break;
+            }
+        }
+        if(!allComplete){
+            QThread::msleep(10);
+        }
+    }
+
+    if(!allComplete){
+        qDebug() << "winUsbDriver::shutdownProcedure timed out waiting for overlapped completion";
+    }
+
+    if(!shutdownCompleteSent){
+        shutdownCompleteSent = true;
+        connected = false;
+        connectedStatus(false);
+        emit shutdownComplete();
+    }
     return;
 }
 
