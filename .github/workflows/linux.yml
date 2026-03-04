@@ -4,11 +4,23 @@ permissions:
   contents: read
   pull-requests: write
   
-on:
+on: 
   workflow_dispatch:
   workflow_call:
+
   push:
+    branches:
+      - master
+      - main
+
   pull_request:
+    branches:
+      - master
+      - main
+      
+#env:
+  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  # ToDo: when required, add secrets for privilidged tasks here
   
 jobs:
   build-appimage:

@@ -4,12 +4,26 @@ permissions:
   contents: read
   pull-requests: write
   
-on:
+on: 
   workflow_dispatch:
   workflow_call:
+
   push:
+    branches:
+      - master
+      - main
+
   pull_request:
-  
+    branches:
+      - master
+      - main
+
+env:
+  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  ANDROID_CERTIFICATE_BASE64: ${{ secrets.ANDROID_CERTIFICATE_BASE64 }}
+  ANDROID_PRIVATE_KEY_BASE64: ${{ secrets.ANDROID_PRIVATE_KEY_BASE64 }}
+
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -44,9 +58,6 @@ jobs:
       # openssl pkcs12 -in path/to/.keystore -info -noenc
 
       - name: Install certificate and private key
-        env:
-          ANDROID_CERTIFICATE_BASE64: ${{ secrets.ANDROID_CERTIFICATE_BASE64 }}
-          ANDROID_PRIVATE_KEY_BASE64: ${{ secrets.ANDROID_PRIVATE_KEY_BASE64 }}
         if: env.ANDROID_PRIVATE_KEY_BASE64 != '' && env.ANDROID_CERTIFICATE_BASE64 != ''
         working-directory: Desktop_Interface
         run: |

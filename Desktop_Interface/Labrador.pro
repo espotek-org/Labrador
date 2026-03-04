@@ -101,11 +101,16 @@ win32 {
 
     RC_ICONS = build_win/appicon.ico
 
+    CONFIG += console
+
     target.path = /
     lib_deploy.path = /
 
     firmware.path = /firmware
-    firmware.files = $$files(resources/firmware/*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
+    # Windows special for firmware update
+    firmware.files += $$files(resources/firmware/*.bat)
+    firmware.files += $$files(resources/firmware/*.exe)
 
     waveforms.path = /waveforms
     waveforms.files = $$files(resources/waveforms/*)
@@ -164,7 +169,7 @@ unix:!android:!macx {
     lib_deploy.files += build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
-    firmware.files += $$files(resources/firmware/labrafirm*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = $$PREFIX/share/EspoTek/Labrador/waveforms
     waveforms.files += $$files(resources/waveforms/*)
@@ -222,7 +227,9 @@ macx {
     INCLUDEPATH += $$system(brew --prefix)/include
     INCLUDEPATH += $$system(brew --prefix)/include/eigen3
     INCLUDEPATH += $$system(brew --prefix)/include/libusb-1.0
+    INCLUDEPATH += $$system(brew --prefix libomp)/include
     LIBS += -L$$system(brew --prefix)/lib -lusb-1.0
+    LIBS += -L$$system(brew --prefix libomp)/lib
 
     QMAKE_LFLAGS += "-undefined dynamic_lookup"
 }
@@ -300,7 +307,7 @@ android {
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
 
     firmware.path = /assets/firmware
-    firmware.files = resources/firmware/labrafirm_0007_02.hex
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = /assets/waveforms
     waveforms.files = $$files(resources/waveforms/*)

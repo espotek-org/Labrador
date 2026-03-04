@@ -53,10 +53,10 @@ o1buffer *internal_o1_buffer_750;
 static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     //Thread mutex??
     //printf("Copy the data...\n");
+    buffer_read_write_mutex.lock();
     for(int i=0;i<transfer->num_iso_packets;i++){
         unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
         //TODO: a switch statement here to handle all the modes.
-        buffer_read_write_mutex.lock();
         switch(deviceMode){
         case 0:
             internal_o1_buffer_375_CH1->addVector((char*) packetPointer, 375);
@@ -83,8 +83,8 @@ static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
             internal_o1_buffer_375_CH1->addVector((short*) packetPointer, 375);
             break;
         }
-        buffer_read_write_mutex.unlock();
     }
+    buffer_read_write_mutex.unlock();
     //printf("Re-arm the endpoint...\n");
     if(usb_iso_needs_rearming()){
         int error = libusb_submit_transfer(transfer);
