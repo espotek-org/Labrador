@@ -19,9 +19,9 @@ winUsbDriver::~winUsbDriver(void){
         for(int n=0;n<NUM_FUTURE_CTX;n++){
             IsoK_Free(isoCtx[k][n]);
         }
-        for(int i=0;i<MAX_OVERLAP;i++){     //note: MAX_OVERLAP will cause a potential out of bounds warning from the compiler
-            OvlK_Release(ovlkHandle[k][i]); //but MAX_OVERLAP depends on NUM_FUTURE_CTX and NUM_ISO_ENDPOINTS, so its fine.
-        }                                   //By definition it should be impossible to index out of bounds.
+        for(int i=0;i<NUM_FUTURE_CTX;i++){
+            OvlK_Release(ovlkHandle[k][i]);
+        }
         UsbK_FlushPipe(handle, pipeID[k]);
         UsbK_AbortPipe(handle, pipeID[k]);
     }
@@ -271,7 +271,6 @@ void winUsbDriver::isoTimerTick(void){
     if(framePhaseError){
         #ifndef WINDOWS_32_BIT
         qDebug("Frame phase error of %d", framePhaseError);
-        killMe();
         #endif
     }
 

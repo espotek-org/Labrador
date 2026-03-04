@@ -93,7 +93,11 @@ protected:
     //Generic Vars
     //bufferControl *bufferPtr = NULL;
     QTimer *psuTimer = nullptr;
+#ifdef PLATFORM_WINDOWS
+    unsigned char pipeID[NUM_ISO_ENDPOINTS];
+#else
     unsigned char pipeID[3];
+#endif
     QTimer *isoTimer = nullptr;
     QTimer *connectTimer = nullptr;
     QTimer *recoveryTimer;
