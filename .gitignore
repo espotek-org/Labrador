@@ -64,3 +64,5 @@ Desktop_Interface/tools/
 Desktop_Interface/tools/windows_toolchain/
 *.ps1
 *.md
+.github
+.gitignore
