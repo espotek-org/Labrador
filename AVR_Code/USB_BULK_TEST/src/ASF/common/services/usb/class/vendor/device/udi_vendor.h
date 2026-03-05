@@ -243,7 +243,7 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 
 //! Interface descriptor structure for vendor Class interface
 typedef struct {
-	//usb_iface_desc_t iface0;
+	usb_iface_desc_t iface0;
 	usb_iface_desc_t iface1;
 #if UDI_VENDOR_EPS_SIZE_INT_FS
 	usb_ep_desc_t ep_interrupt_in;
@@ -284,7 +284,7 @@ typedef struct {
 
 //! Content of vendor interface descriptor for all speeds
 #define UDI_VENDOR_DESC      \
-	/*.iface0.bLength            = sizeof(usb_iface_desc_t),\
+	.iface0.bLength            = sizeof(usb_iface_desc_t),\
 	.iface0.bDescriptorType    = USB_DT_INTERFACE,\
 	.iface0.bInterfaceNumber   = UDI_VENDOR_IFACE_NUMBER,\
 	.iface0.bAlternateSetting  = 0,\
@@ -293,10 +293,10 @@ typedef struct {
 	.iface0.bInterfaceSubClass = VENDOR_SUBCLASS,\
 	.iface0.bInterfaceProtocol = VENDOR_PROTOCOL,\
 	.iface0.iInterface         = UDI_VENDOR_STRING_ID,\
-	*/.iface1.bLength            = sizeof(usb_iface_desc_t),\
+	.iface1.bLength            = sizeof(usb_iface_desc_t),\
 	.iface1.bDescriptorType    = USB_DT_INTERFACE,\
 	.iface1.bInterfaceNumber   = UDI_VENDOR_IFACE_NUMBER,\
-	.iface1.bAlternateSetting  = 0,\
+	.iface1.bAlternateSetting  = 1,\
 	.iface1.bNumEndpoints      = UDI_VENDOR_EP_NB,\
 	.iface1.bInterfaceClass    = VENDOR_CLASS,\
 	.iface1.bInterfaceSubClass = VENDOR_SUBCLASS,\
