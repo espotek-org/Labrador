@@ -69,7 +69,11 @@ genericUsbDriver::genericUsbDriver(QWidget *parent) : QLabel(parent)
         //qDebug() << k;
         //qDebug() << NUM_ISO_ENDPOINTS;
         pipeID[k] = 0x81+k;
+#ifdef PLATFORM_WINDOWS
+        qDebug() << "pipeID" << k << "=" << static_cast<int>(pipeID[k]);
+#else
         qDebug() << "pipeID" << k << "=" << pipeID[k];
+#endif
     }
 
     connectTimer = new QTimer();
