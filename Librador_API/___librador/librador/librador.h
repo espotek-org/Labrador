@@ -10,6 +10,8 @@
 LIBRADORSHARED_EXPORT int librador_init();
 LIBRADORSHARED_EXPORT int librador_exit();
 LIBRADORSHARED_EXPORT int librador_setup_usb();
+LIBRADORSHARED_EXPORT int librador_setup_usb_control();
+LIBRADORSHARED_EXPORT int librador_setup_usb_iso();
 LIBRADORSHARED_EXPORT int librador_reset_usb();
 //Control
 //a0
