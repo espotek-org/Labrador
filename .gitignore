@@ -63,3 +63,4 @@ Desktop_Interface/build_test_win_custom/
 Desktop_Interface/tools/
 Desktop_Interface/tools/windows_toolchain/
 *.ps1
+*.md
