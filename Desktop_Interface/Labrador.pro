@@ -33,6 +33,7 @@ equals(QCP_VER,"2"){
 }
 
 include(ui_elements.pri)
+!win32: include(../libdfuprog/libdfuprog.pri)
 
 MOC_DIR = moc
 RCC_DIR = qrc
@@ -161,12 +162,6 @@ unix:!android:!macx {
 
     isEmpty(PREFIX): PREFIX = /usr/local
     target.path = $$PREFIX/bin
-    lib_deploy.path = $$PREFIX/lib
-
-    #libdfuprog include
-    INCLUDEPATH += build_linux/libdfuprog/include
-    LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
-    lib_deploy.files += build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
     firmware.files = $$files(resources/firmware/labrafirm*)
@@ -190,7 +185,6 @@ unix:!android:!macx {
     udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
 
     INSTALLS += target
-    INSTALLS += lib_deploy
     INSTALLS += firmware
     INSTALLS += waveforms
     INSTALLS += udev
@@ -219,10 +213,6 @@ macx {
     QMAKE_BUNDLE_DATA += firmware waveforms
     QMAKE_TARGET_BUNDLE_PREFIX = com.EspoTek
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
-
-    #libdfuprog dylib include
-    INCLUDEPATH += build_mac/libdfuprog/include
-    LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
 
     INCLUDEPATH += $$system(brew --prefix)/include
     INCLUDEPATH += $$system(brew --prefix)/include/eigen3
@@ -314,9 +304,6 @@ android {
 
     INSTALLS += firmware waveforms
 
-    #libdfuprog include
-    INCLUDEPATH += build_android/libdfuprog/include
-
     # Frequency spectrum/response disabled for now, needs UI and supporting libraries
     DEFINES += DISABLE_SPECTRUM
     SOURCES -= asyncdft.cpp
@@ -329,10 +316,6 @@ android {
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
-
-    #libdfuprog library
-    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/libdfuprog/lib/$${abi} -ldfuprog-0.9
-    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/$${abi}/libdfuprog-0.9.so
 
     #liblog library
     for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/liblog/lib/$${abi} -llog

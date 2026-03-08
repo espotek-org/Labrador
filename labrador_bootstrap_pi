@@ -34,7 +34,6 @@ cd labrador/Desktop_Interface
 QT_SELECT=qt5 qmake
 make
 sudo make install
-sudo ldconfig
 
 # Cleanup
 rm -rf labrador

@@ -13,14 +13,6 @@
           inherit system;
         };
 
-        # Map Nix system to Qt arch naming
-        qtArch = {
-          "x86_64-linux" = "x86_64";
-          "aarch64-linux" = "arm64";
-          "i686-linux" = "i386";
-          "armv7l-linux" = "arm";
-        }.${system} or "x86_64";
-
       in
       {
         devShells.default = pkgs.mkShell {
@@ -71,9 +63,6 @@
             echo "Or use 'nix build' from repo root for a proper package."
             echo ""
 
-            # Ensure the bundled libdfuprog can be found
-            export LD_LIBRARY_PATH="$PWD/Desktop_Interface/build_linux/libdfuprog/lib/${qtArch}:$LD_LIBRARY_PATH"
-
             # Help Qt find plugins
             export QT_PLUGIN_PATH="${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.qtPluginPrefix}"
 
@@ -107,12 +96,6 @@
           # Patch the .pro file to use system libraries and skip udev rules installation
           preConfigure = ''
             cd Desktop_Interface
-
-            # Create a library path for the bundled libdfuprog
-            mkdir -p $out/lib
-
-            # Copy the appropriate libdfuprog for this architecture
-            cp build_linux/libdfuprog/lib/${qtArch}/libdfuprog-0.9.so $out/lib/
           '';
 
           configurePhase = ''
@@ -153,11 +136,6 @@
             cp build_linux/espotek-labrador.desktop $out/share/applications/
 
             runHook postInstall
-          '';
-
-          # Wrap the executable to find libdfuprog
-          preFixup = ''
-            qtWrapperArgs+=(--prefix LD_LIBRARY_PATH : "$out/lib")
           '';
 
           meta = with pkgs.lib; {
