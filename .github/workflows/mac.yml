@@ -55,6 +55,12 @@ jobs:
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
 
+      - name: Build libdfuprog
+        working-directory: libdfuprog
+        run: |
+          qmake -config release
+          make -j$(sysctl -n hw.ncpu)
+
       - name: Import code signing certificate
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         working-directory: Desktop_Interface

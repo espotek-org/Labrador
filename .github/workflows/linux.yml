@@ -61,6 +61,12 @@ jobs:
           qmake -config release
           make -j$(nproc)
 
+      - name: Build libdfuprog
+        working-directory: libdfuprog
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
       - name: Build AppImage
         working-directory: Desktop_Interface
         run: |
@@ -108,6 +114,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(nproc)

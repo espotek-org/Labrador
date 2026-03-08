@@ -25,7 +25,6 @@ Streamlined build scripts for individual Linux (including Raspberry Pi) and macO
 QT_SELECT=qt5 qmake
 make
 sudo make install
-sudo ldconfig
 ```
 after which the command `labrador` launches the app.
 
