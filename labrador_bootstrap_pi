@@ -27,7 +27,7 @@ cd /tmp
 
 # Clone the latest version of Labrador
 rm -rf labrador
-git clone --depth 1 https://github.com/espotek-org/labrador
+git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/espotek-org/labrador
 
 # Build labrador
 cd labrador/Desktop_Interface
