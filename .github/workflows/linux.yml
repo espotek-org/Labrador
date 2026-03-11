@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: |
@@ -57,6 +59,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(nproc)
@@ -87,6 +95,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: |
@@ -108,6 +118,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(nproc)
