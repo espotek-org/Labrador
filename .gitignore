@@ -61,11 +61,3 @@ Labrador.app
 # Nix
 result
 Desktop_Interface/_install/
-Desktop_Interface/run_test_win/
-Desktop_Interface/build_test_win_custom/
-Desktop_Interface/tools/
-Desktop_Interface/tools/windows_toolchain/
-*.ps1
-*.md
-.github
-.gitignore
