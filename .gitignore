@@ -30,6 +30,7 @@ Desktop_Interface/debug
 Desktop_Interface/release
 !Desktop_Interface/resources/firmware/dfu-programmer.exe
 *.o
+*.a
 *.so
 *.so.*
 *.deb
@@ -39,6 +40,8 @@ Desktop_Interface/release
 Thumbs.db
 pinout.png
 *.mex
+
+libdfuprog/Makefile*
 
 Librador_API/___librador/MATLAB_Octave/octave-workspace
 

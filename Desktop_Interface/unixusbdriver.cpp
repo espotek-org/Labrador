@@ -529,8 +529,7 @@ int unixUsbDriver::flashFirmware(void){
     //Run stage 1, until there's a success
     do {
         QThread::msleep(200);
-        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force");
-        exit_code = dfuprog_virtual_cmd(command);
+        exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u erase --force");
         QApplication::processEvents();
     } while (exit_code);
 
@@ -542,8 +541,7 @@ int unixUsbDriver::flashFirmware(void){
     }
 
     //Run stage 3
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-    exit_code = dfuprog_virtual_cmd(command);
+    exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
     if (exit_code) {
        return exit_code+300;
     }
@@ -551,8 +549,7 @@ int unixUsbDriver::flashFirmware(void){
     //Run stage 4 - double launch to clear the eeprom flag from bootloaderJump.
     do {
         QThread::msleep(200);
-        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-        exit_code = dfuprog_virtual_cmd(command);
+        exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
         QApplication::processEvents();
     } while (exit_code);
 
@@ -617,8 +614,7 @@ void unixUsbDriver::manualFirmwareRecovery(void){
         manualFirmwareMessages.exec();
         return;
     } else {
-        snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-        exit_code = dfuprog_virtual_cmd(command);
+        exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
         manualFirmwareMessages.setText("No Labrador board could be detected.\n\nIt's possible that you're stuck in booloader mode.\n\nI've attempted to launch the firmware manually.");
         manualFirmwareMessages.exec();
         if (exit_code) {
@@ -628,16 +624,14 @@ void unixUsbDriver::manualFirmwareRecovery(void){
         }
         //Firmware launch failed, but bootloader preset
         if (!connected) {
-            snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force");
-            exit_code = dfuprog_virtual_cmd(command);
+            exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u erase --force");
             snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s", qPrintable(firmware_path));
             exit_code += dfuprog_virtual_cmd(command);
             manualFirmwareMessages.setText("The bootloader is present, but firmware launch failed.  I've attempted to reprogram it.");
             manualFirmwareMessages.exec();
 
             if (!exit_code) { //Reprogramming was successful, but board is still in bootloader mode.
-                snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-                exit_code = dfuprog_virtual_cmd(command);
+                exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
                 manualFirmwareMessages.setText("Reprogramming was successful!  Attempting to launch the board.\n\nIf it does not start working immediately, please wait 10 seconds and then reconnect the board.");
                 manualFirmwareMessages.exec();
             } else { //Programming failed.

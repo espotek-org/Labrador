@@ -227,8 +227,7 @@ int androidUsbDriver::flashFirmware(void){
 
     //Run stage 1
     qDebug() << "\n\nFlashing Firmware, stage 1.\n\n";
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u erase --force --debug 300");
-    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u erase --force --debug 300", device_ptr, handle, ctx, 0);
     if (exit_code) {
         qDebug() << "ERROR ERASING FIRMWARE.";
         //return exit_code+100;
@@ -257,8 +256,7 @@ int androidUsbDriver::flashFirmware(void){
 
     //Run stage 3
     qDebug() << "\n\nFlashing Firmware, stage 3.\n\n";
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch", device_ptr, handle, ctx, 0);
     if (exit_code) {
         qDebug() << "\n\n\nERROR LAUNCHING DEVICE (INITIAL).\n\n\n";
         //return exit_code+300;
@@ -274,8 +272,7 @@ int androidUsbDriver::flashFirmware(void){
 
     //Run stage 4 - double launch to clear the eeprom flag from bootloaderJump.
     qDebug() << "\n\nFlashing Firmware, stage 4.\n\n";
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u launch");
-    exit_code = dfuprog_virtual_cmd(command, device_ptr, handle, ctx, 0);
+    exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch", device_ptr, handle, ctx, 0);
     if (exit_code) {
         qDebug() << "\n\n\nERROR LAUNCHING DEVICE (SECONDARY).\n\n\n";
         //return exit_code+300;

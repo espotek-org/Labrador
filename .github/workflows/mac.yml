@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Setup Homebrew dependencies
         run: |
@@ -51,6 +53,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(sysctl -n hw.ncpu)
