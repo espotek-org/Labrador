@@ -409,6 +409,17 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings->setValue("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
     settings->setValue("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
     settings->setValue("LAOffsetCH2", ui->laOffsetSpinBox_CH2->value());
+    settings->setValue("WidgetScopeGroup_CH1", ui->scopeGroup_CH1->isChecked());
+    settings->setValue("WidgetScopeGroup_CH2", ui->scopeGroup_CH2->isChecked());
+    settings->setValue("WidgetMultimeterGroup", ui->multimeterGroup->isChecked());
+    settings->setValue("WidgetBusSnifferGroup_CH1", ui->busSnifferGroup_CH1->isChecked());
+    settings->setValue("WidgetBusSnifferGroup_CH2", ui->busSnifferGroup_CH2->isChecked());
+    settings->setValue("WidgetDoubleSample", ui->doubleSampleLabel->isChecked());
+    settings->setValue("HideOscilloscope", ui->actionHide_Widget_Oscilloscope->isChecked());
+    settings->setValue("HideSignalGen", ui->actionHide_Widget_SignalGen->isChecked());
+    settings->setValue("HideMultimeter", ui->actionHide_Widget_Multimeter->isChecked());
+    settings->setValue("HidePowerSupply", ui->actionHide_Widget_PowerSupply->isChecked());
+    settings->setValue("HideLogicAnalyzer", ui->actionHide_Widget_LogicAnalyzer->isChecked());
 #endif
     QMainWindow::closeEvent(event);
 }
@@ -1526,6 +1537,39 @@ void MainWindow::readSettingsFile(){
     {
         ui->actionDark_Mode->setChecked(true);
         setDarkMode(true);
+    }
+
+    ui->scopeGroup_CH1->setChecked(settings->value("WidgetScopeGroup_CH1", true).toBool());
+    ui->scopeGroup_CH2->setChecked(settings->value("WidgetScopeGroup_CH2", false).toBool());
+    ui->multimeterGroup->setChecked(settings->value("WidgetMultimeterGroup", false).toBool());
+    ui->busSnifferGroup_CH1->setChecked(settings->value("WidgetBusSnifferGroup_CH1", false).toBool());
+    ui->busSnifferGroup_CH2->setChecked(settings->value("WidgetBusSnifferGroup_CH2", false).toBool());
+    ui->doubleSampleLabel->setChecked(settings->value("WidgetDoubleSample", false).toBool());
+
+    if (settings->value("HideOscilloscope").toBool())
+    {
+        ui->actionHide_Widget_Oscilloscope->setChecked(true);
+        on_actionHide_Widget_Oscilloscope_triggered(true);
+    }
+    if (settings->value("HideSignalGen").toBool())
+    {
+        ui->actionHide_Widget_SignalGen->setChecked(true);
+        on_actionHide_Widget_SignalGen_triggered(true);
+    }
+    if (settings->value("HideMultimeter").toBool())
+    {
+        ui->actionHide_Widget_Multimeter->setChecked(true);
+        on_actionHide_Widget_Multimeter_triggered(true);
+    }
+    if (settings->value("HidePowerSupply").toBool())
+    {
+        ui->actionHide_Widget_PowerSupply->setChecked(true);
+        on_actionHide_Widget_PowerSupply_triggered(true);
+    }
+    if (settings->value("HideLogicAnalyzer").toBool())
+    {
+        ui->actionHide_Widget_LogicAnalyzer->setChecked(true);
+        on_actionHide_Widget_LogicAnalyzer_triggered(true);
     }
 #endif
 
