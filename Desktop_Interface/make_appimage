@@ -4,7 +4,7 @@ set -e
 
 rm -rf AppDir
 export QT_SELECT=qt5
-qmake -config release PREFIX=/usr
+qmake -config release PREFIX=/usr EXPECTED_FIRMWARE_VERSION=$EXPECTED_FIRMWARE_VERSION
 make -j$(nproc)
 make INSTALL_ROOT=AppDir install ; find AppDir/
 cp -r build_linux/apprun-hooks AppDir/

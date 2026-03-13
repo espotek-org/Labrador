@@ -1,0 +1,14 @@
+name: Define the firmware version
+
+outputs:
+  firmware_ver:
+    description: the firmware version number 0x000N
+    value: ${{ steps.define_firmware_ver.outputs.firmware_ver }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: define firmware_ver
+      id: define_firmware_ver
+      run: echo "firmware_ver=0x0007" >> $GITHUB_OUTPUT
+      shell: bash
