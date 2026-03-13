@@ -35,7 +35,15 @@ private:
     int usbIsoInit(void);
     int flashFirmware(void);
     bool allEndpointsComplete(int n);
+    bool shutdownRequested = false;
+    bool shutdownCompleteSent = false;
+    bool transferPending[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX] = {};
+    QElapsedTimer shutdownElapsed;
+
 signals:
+    void shutdownComplete();
+
+
 public slots:
     void isoTimerTick(void);
     void recoveryTick();

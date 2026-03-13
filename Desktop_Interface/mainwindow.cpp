@@ -1619,7 +1619,13 @@ void MainWindow::reinitUsb(void){
     ui->controller_iso->driver->saveState(&reinitdeviceMode, &reinitScopeGain, &reinitCurrentPsuVoltage, &reinitDigitalPinState);
 
 #ifdef PLATFORM_WINDOWS
-    reinitUsbStage2();
+    if(!(ui->controller_iso->driver->connected)){
+        reinitUsbStage2();
+    } else{
+        connect(ui->controller_iso->driver, SIGNAL(shutdownComplete()),
+            this, SLOT(reinitUsbStage2()), Qt::UniqueConnection);
+        ui->controller_iso->driver->shutdownProcedure();
+    }
 #else
     if(!(ui->controller_iso->driver->connected)){
         reinitUsbStage2();
