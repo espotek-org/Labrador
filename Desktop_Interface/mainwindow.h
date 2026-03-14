@@ -254,7 +254,6 @@ private:
     int defaultNumberPrecision = 6;
     QString defaultNumberFormat;
 
-    QSettings *settings;
 	bool calibrationCanceled = false;
 
     QPalette defaultPalette;
@@ -267,6 +266,7 @@ private:
     void menuSetup();
     void initShortcuts();
     void readSettingsFile();
+    void writeSettings(const QString &key, const QVariant &value);
     void setDarkMode(bool dark);
     std::vector<uint8_t> uartEncode(const QString& line, UartParity parity);
     std::vector<uint8_t> resampler(std::vector<uint8_t>, int input_baudRate, int output_baudRate);

@@ -400,26 +400,26 @@ MainWindow::MainWindow(QWidget *parent) :
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    settings->setValue("ScopeTopRange", ui->controller_iso->display->topRange);
-    settings->setValue("ScopeBotRange", ui->controller_iso->display->botRange);
-    settings->setValue("ScopeTimeWindow", ui->controller_iso->display->window);
-    settings->setValue("ScopeDelay", ui->controller_iso->display->delay);
+    writeSettings("ScopeTopRange", ui->controller_iso->display->topRange);
+    writeSettings("ScopeBotRange", ui->controller_iso->display->botRange);
+    writeSettings("ScopeTimeWindow", ui->controller_iso->display->window);
+    writeSettings("ScopeDelay", ui->controller_iso->display->delay);
 #ifndef PLATFORM_ANDROID
-    settings->setValue("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
-    settings->setValue("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
-    settings->setValue("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
-    settings->setValue("LAOffsetCH2", ui->laOffsetSpinBox_CH2->value());
-    settings->setValue("WidgetScopeGroup_CH1", ui->scopeGroup_CH1->isChecked());
-    settings->setValue("WidgetScopeGroup_CH2", ui->scopeGroup_CH2->isChecked());
-    settings->setValue("WidgetMultimeterGroup", ui->multimeterGroup->isChecked());
-    settings->setValue("WidgetBusSnifferGroup_CH1", ui->busSnifferGroup_CH1->isChecked());
-    settings->setValue("WidgetBusSnifferGroup_CH2", ui->busSnifferGroup_CH2->isChecked());
-    settings->setValue("WidgetDoubleSample", ui->doubleSampleLabel->isChecked());
-    settings->setValue("HideOscilloscope", ui->actionHide_Widget_Oscilloscope->isChecked());
-    settings->setValue("HideSignalGen", ui->actionHide_Widget_SignalGen->isChecked());
-    settings->setValue("HideMultimeter", ui->actionHide_Widget_Multimeter->isChecked());
-    settings->setValue("HidePowerSupply", ui->actionHide_Widget_PowerSupply->isChecked());
-    settings->setValue("HideLogicAnalyzer", ui->actionHide_Widget_LogicAnalyzer->isChecked());
+    writeSettings("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
+    writeSettings("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
+    writeSettings("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
+    writeSettings("LAOffsetCH2", ui->laOffsetSpinBox_CH2->value());
+    writeSettings("WidgetScopeGroup_CH1", ui->scopeGroup_CH1->isChecked());
+    writeSettings("WidgetScopeGroup_CH2", ui->scopeGroup_CH2->isChecked());
+    writeSettings("WidgetMultimeterGroup", ui->multimeterGroup->isChecked());
+    writeSettings("WidgetBusSnifferGroup_CH1", ui->busSnifferGroup_CH1->isChecked());
+    writeSettings("WidgetBusSnifferGroup_CH2", ui->busSnifferGroup_CH2->isChecked());
+    writeSettings("WidgetDoubleSample", ui->doubleSampleLabel->isChecked());
+    writeSettings("HideOscilloscope", ui->actionHide_Widget_Oscilloscope->isChecked());
+    writeSettings("HideSignalGen", ui->actionHide_Widget_SignalGen->isChecked());
+    writeSettings("HideMultimeter", ui->actionHide_Widget_Multimeter->isChecked());
+    writeSettings("HidePowerSupply", ui->actionHide_Widget_PowerSupply->isChecked());
+    writeSettings("HideLogicAnalyzer", ui->actionHide_Widget_LogicAnalyzer->isChecked());
 #endif
     QMainWindow::closeEvent(event);
 }
@@ -1481,23 +1481,28 @@ void MainWindow::on_actionEnter_Manually_triggered()
     dialog.exec();
 }
 
+void MainWindow::writeSettings(const QString &key, const QVariant &value){
+    QSettings settings;
+    settings.setValue(key, value);
+}
+
 #define QSETTINGS_DEFAULT_RETURN 42069
 void MainWindow::readSettingsFile(){
-    settings = new QSettings();
-    int connectionType = settings->value("ConnectionType", QSETTINGS_DEFAULT_RETURN).toInt();
-    double calibrate_vref_ch1 = settings->value("CalibrateVrefCH1", 1.65).toDouble();
-    double calibrate_vref_ch2 = settings->value("CalibrateVrefCH2", 1.65).toDouble();
-    double calibrate_gain_ch1 = settings->value("CalibrateGainCH1", R4/(R3+R4)).toDouble();
-    double calibrate_gain_ch2 = settings->value("CalibrateGainCH2", R4/(R3+R4)).toDouble();
-    psu_voltage_calibration_offset = settings->value("CalibratePsu", 0).toDouble();
+    QSettings settings;
+    int connectionType = settings.value("ConnectionType", QSETTINGS_DEFAULT_RETURN).toInt();
+    double calibrate_vref_ch1 = settings.value("CalibrateVrefCH1", 1.65).toDouble();
+    double calibrate_vref_ch2 = settings.value("CalibrateVrefCH2", 1.65).toDouble();
+    double calibrate_gain_ch1 = settings.value("CalibrateGainCH1", R4/(R3+R4)).toDouble();
+    double calibrate_gain_ch2 = settings.value("CalibrateGainCH2", R4/(R3+R4)).toDouble();
+    psu_voltage_calibration_offset = settings.value("CalibratePsu", 0).toDouble();
 
-    daq_num_to_average = settings->value("daq_defaultAverage", 1).toInt();
-    daq_max_file_size = settings->value("daq_defaultFileSize", 2048000000).toULongLong();
+    daq_num_to_average = settings.value("daq_defaultAverage", 1).toInt();
+    daq_max_file_size = settings.value("daq_defaultFileSize", 2048000000).toULongLong();
 
-    double savedTopRange = settings->value("ScopeTopRange", 2.5).toDouble();
-    double savedBotRange = settings->value("ScopeBotRange", -0.5).toDouble();
-    double savedTimeWindow = settings->value("ScopeTimeWindow", 0.1).toDouble();
-    double savedDelay = settings->value("ScopeDelay", 0.0).toDouble();
+    double savedTopRange = settings.value("ScopeTopRange", 2.5).toDouble();
+    double savedBotRange = settings.value("ScopeBotRange", -0.5).toDouble();
+    double savedTimeWindow = settings.value("ScopeTimeWindow", 0.1).toDouble();
+    double savedDelay = settings.value("ScopeDelay", 0.0).toDouble();
 
     bool voltageRangeValid = savedTopRange > savedBotRange
                           && savedTopRange >= -20.0 && savedTopRange <= 20.0
@@ -1512,61 +1517,61 @@ void MainWindow::readSettingsFile(){
         ui->controller_iso->display->delay = savedDelay;
 
 #ifndef PLATFORM_ANDROID
-    double savedOffsetCH1 = settings->value("ScopeOffsetCH1", 0.0).toDouble();
-    double savedOffsetCH2 = settings->value("ScopeOffsetCH2", 0.0).toDouble();
+    double savedOffsetCH1 = settings.value("ScopeOffsetCH1", 0.0).toDouble();
+    double savedOffsetCH2 = settings.value("ScopeOffsetCH2", 0.0).toDouble();
     if (savedOffsetCH1 >= -20.0 && savedOffsetCH1 <= 20.0)
         ui->offsetSpinBox_CH1->setValue(savedOffsetCH1);
     if (savedOffsetCH2 >= -20.0 && savedOffsetCH2 <= 20.0)
         ui->offsetSpinBox_CH2->setValue(savedOffsetCH2);
 
-    double savedLAOffsetCH1 = settings->value("LAOffsetCH1", 0.0).toDouble();
-    double savedLAOffsetCH2 = settings->value("LAOffsetCH2", 0.0).toDouble();
+    double savedLAOffsetCH1 = settings.value("LAOffsetCH1", 0.0).toDouble();
+    double savedLAOffsetCH2 = settings.value("LAOffsetCH2", 0.0).toDouble();
     if (savedLAOffsetCH1 >= -20.0 && savedLAOffsetCH1 <= 20.0)
         ui->laOffsetSpinBox_CH1->setValue(savedLAOffsetCH1);
     if (savedLAOffsetCH2 >= -20.0 && savedLAOffsetCH2 <= 20.0)
         ui->laOffsetSpinBox_CH2->setValue(savedLAOffsetCH2);
 
-    if (settings->value("ShowRangeDialog").toBool())
+    if (settings.value("ShowRangeDialog").toBool())
     {
         qDebug() << "ShowRangeDialog setting true";
         ui->actionShow_Range_Dialog_on_Main_Page->setChecked(true);
         on_actionShow_Range_Dialog_on_Main_Page_triggered(true);
     }
 
-    if(settings->value("DarkModeEnabled").toBool())
+    if(settings.value("DarkModeEnabled").toBool())
     {
         ui->actionDark_Mode->setChecked(true);
         setDarkMode(true);
     }
 
-    ui->scopeGroup_CH1->setChecked(settings->value("WidgetScopeGroup_CH1", true).toBool());
-    ui->scopeGroup_CH2->setChecked(settings->value("WidgetScopeGroup_CH2", false).toBool());
-    ui->multimeterGroup->setChecked(settings->value("WidgetMultimeterGroup", false).toBool());
-    ui->busSnifferGroup_CH1->setChecked(settings->value("WidgetBusSnifferGroup_CH1", false).toBool());
-    ui->busSnifferGroup_CH2->setChecked(settings->value("WidgetBusSnifferGroup_CH2", false).toBool());
-    ui->doubleSampleLabel->setChecked(settings->value("WidgetDoubleSample", false).toBool());
+    ui->scopeGroup_CH1->setChecked(settings.value("WidgetScopeGroup_CH1", true).toBool());
+    ui->scopeGroup_CH2->setChecked(settings.value("WidgetScopeGroup_CH2", false).toBool());
+    ui->multimeterGroup->setChecked(settings.value("WidgetMultimeterGroup", false).toBool());
+    ui->busSnifferGroup_CH1->setChecked(settings.value("WidgetBusSnifferGroup_CH1", false).toBool());
+    ui->busSnifferGroup_CH2->setChecked(settings.value("WidgetBusSnifferGroup_CH2", false).toBool());
+    ui->doubleSampleLabel->setChecked(settings.value("WidgetDoubleSample", false).toBool());
 
-    if (settings->value("HideOscilloscope").toBool())
+    if (settings.value("HideOscilloscope").toBool())
     {
         ui->actionHide_Widget_Oscilloscope->setChecked(true);
         on_actionHide_Widget_Oscilloscope_triggered(true);
     }
-    if (settings->value("HideSignalGen").toBool())
+    if (settings.value("HideSignalGen").toBool())
     {
         ui->actionHide_Widget_SignalGen->setChecked(true);
         on_actionHide_Widget_SignalGen_triggered(true);
     }
-    if (settings->value("HideMultimeter").toBool())
+    if (settings.value("HideMultimeter").toBool())
     {
         ui->actionHide_Widget_Multimeter->setChecked(true);
         on_actionHide_Widget_Multimeter_triggered(true);
     }
-    if (settings->value("HidePowerSupply").toBool())
+    if (settings.value("HidePowerSupply").toBool())
     {
         ui->actionHide_Widget_PowerSupply->setChecked(true);
         on_actionHide_Widget_PowerSupply_triggered(true);
     }
-    if (settings->value("HideLogicAnalyzer").toBool())
+    if (settings.value("HideLogicAnalyzer").toBool())
     {
         ui->actionHide_Widget_LogicAnalyzer->setChecked(true);
         on_actionHide_Widget_LogicAnalyzer_triggered(true);
@@ -2056,10 +2061,10 @@ void MainWindow::on_actionCalibrate_triggered()
     ui->controller_iso->internalBuffer750->m_frontendGain = R4/(R3+R4);
     ui->controller_iso->internalBuffer375_CH2->m_frontendGain = R4/(R3+R4);
 
-    settings->setValue("CalibrateVrefCH1", 1.65);
-    settings->setValue("CalibrateVrefCH2", 1.65);
-    settings->setValue("CalibrateGainCH1", R4/(R3+R4));
-    settings->setValue("CalibrateGainCH2", R4/(R3+R4));
+    writeSettings("CalibrateVrefCH1", 1.65);
+    writeSettings("CalibrateVrefCH2", 1.65);
+    writeSettings("CalibrateGainCH1", R4/(R3+R4));
+    writeSettings("CalibrateGainCH2", R4/(R3+R4));
 
     qDebug() << "Calibration routine beginning!";
     calibrationMessages = new QMessageBox();
@@ -2098,8 +2103,8 @@ void MainWindow::calibrateStage2(){
     ui->controller_iso->internalBuffer750->m_voltage_ref = 3.3 - vref_CH1;
     ui->controller_iso->internalBuffer375_CH2->m_voltage_ref = 3.3 - vref_CH2;
 
-    settings->setValue("CalibrateVrefCH1", vref_CH1);
-    settings->setValue("CalibrateVrefCH2", vref_CH2);
+    writeSettings("CalibrateVrefCH1", vref_CH1);
+    writeSettings("CalibrateVrefCH2", vref_CH2);
 
     calibrationMessages = new QMessageBox();
     calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
@@ -2143,8 +2148,8 @@ void MainWindow::calibrateStage3(){
     ui->controller_iso->internalBuffer375_CH1->m_frontendGain = (vref_CH1 - vMeasured_CH1)*(ui->controller_iso->frontendGain_CH1)/vref_CH1;
     ui->controller_iso->internalBuffer750->m_frontendGain = (vref_CH1 - vMeasured_CH1)*(ui->controller_iso->frontendGain_CH1)/vref_CH1;
     ui->controller_iso->internalBuffer375_CH2->m_frontendGain = (vref_CH2 - vMeasured_CH2)*(ui->controller_iso->frontendGain_CH2)/vref_CH2;
-    settings->setValue("CalibrateGainCH1", ui->controller_iso->frontendGain_CH1);
-    settings->setValue("CalibrateGainCH2", ui->controller_iso->frontendGain_CH2);
+    writeSettings("CalibrateGainCH1", ui->controller_iso->frontendGain_CH1);
+    writeSettings("CalibrateGainCH2", ui->controller_iso->frontendGain_CH2);
     calibrationMessages = new QMessageBox();
     calibrationMessages->setAttribute(Qt::WA_DeleteOnClose);
     connect(ui->controller_iso->driver, SIGNAL(killMe()), calibrationMessages, SLOT(reject()));
@@ -2213,21 +2218,21 @@ void MainWindow::multimeterStateChange(bool enabled){
 void MainWindow::on_actionLo_bw_triggered()
 {
     expected_variant = 1;
-    settings->setValue("ConnectionType", 0);
+    writeSettings("ConnectionType", 0);
     if(ui->controller_iso->driver->connected) reinitUsb();
 }
 
 void MainWindow::on_actionSingle_ep_msync_triggered()
 {
     expected_variant = 2;
-    settings->setValue("ConnectionType", 1);
+    writeSettings("ConnectionType", 1);
     if(ui->controller_iso->driver->connected) reinitUsb();
 }
 
 void MainWindow::on_actionSingle_ep_async_triggered()
 {
     expected_variant = 2;
-    settings->setValue("ConnectionType", 2);
+    writeSettings("ConnectionType", 2);
     if(ui->controller_iso->driver->connected) reinitUsb();
 }
 
@@ -2481,8 +2486,8 @@ void MainWindow::daq_updatedMaxFileSize(qulonglong newVal){
 
 void MainWindow::daq_saveButtonPressed(){
     qDebug() << "MainWindow::daq_saveButtonPressed";
-    settings->setValue("daq_defaultAverage", daq_num_to_average);
-    settings->setValue("daq_defaultFileSize", daq_max_file_size);
+    writeSettings("daq_defaultAverage", daq_num_to_average);
+    writeSettings("daq_defaultFileSize", daq_max_file_size);
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -2666,7 +2671,7 @@ void MainWindow::calibrate_psu_stage3()
     }
 
     psu_voltage_calibration_offset = ((PSU5 - 5) + (PSU10 - 10)) / 2.0;
-    settings->setValue("CalibratePsu", psu_voltage_calibration_offset);
+    writeSettings("CalibratePsu", psu_voltage_calibration_offset);
     ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
 
     calibrationMessages = new QMessageBox();
@@ -2708,7 +2713,7 @@ void MainWindow::on_actionShow_Range_Dialog_on_Main_Page_triggered(bool checked)
         connect(ui->controller_iso, SIGNAL(delayUpdated(double)), scopeRangeSwitch, SLOT(delayChanged(double)));
     }
     qDebug() << "on_actionShow_Range_Dialog_on_Main_Page_triggered" << checked;
-    settings->setValue("ShowRangeDialog", checked);
+    writeSettings("ShowRangeDialog", checked);
     scopeRangeSwitch->setVisible(checked);
 #endif
 
@@ -2862,8 +2867,7 @@ void MainWindow::setDarkMode(bool dark)
         qApp->setPalette(defaultPalette);
     }
 
-    QSettings settings;
-    settings.setValue("DarkModeEnabled", dark);
+    writeSettings("DarkModeEnabled", dark);
 }
 
 
