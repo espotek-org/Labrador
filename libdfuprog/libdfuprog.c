@@ -38,6 +38,72 @@
 #include "commands.h"
 #include "libdfuprog.h"
 
+#ifdef PLATFORM_ANDROID // Exact copy of dfu_make_idle and its dependencies from dfu.c since it is declared as static
+#include "util.h"
+
+#define DFU_DETACH_TIMEOUT 1000
+#define DFU_DEBUG_THRESHOLD         100
+#define DEBUG(...)  dfu_debug( __FILE__, __FUNCTION__, __LINE__, \
+                               DFU_DEBUG_THRESHOLD, __VA_ARGS__ )
+static int32_t dfu_make_idle( dfu_device_t *device,
+                              const dfu_bool initial_abort ) {
+    dfu_status_t status;
+    int32_t retries = 4;
+
+    if( true == initial_abort ) {
+        dfu_abort( device );
+    }
+
+    while( 0 < retries ) {
+        if( 0 != dfu_get_status(device, &status) ) {
+            dfu_clear_status( device );
+            continue;
+        }
+
+        DEBUG( "State: %s (%d)\n", dfu_state_to_string(status.bState), status.bState );
+
+        switch( status.bState ) {
+            case STATE_DFU_IDLE:
+                if( DFU_STATUS_OK == status.bStatus ) {
+                    return 0;
+                }
+
+                /* We need the device to have the DFU_STATUS_OK status. */
+                dfu_clear_status( device );
+                break;
+
+            case STATE_DFU_DOWNLOAD_SYNC:   /* abort -> idle */
+            case STATE_DFU_DOWNLOAD_IDLE:   /* abort -> idle */
+            case STATE_DFU_MANIFEST_SYNC:   /* abort -> idle */
+            case STATE_DFU_UPLOAD_IDLE:     /* abort -> idle */
+            case STATE_DFU_DOWNLOAD_BUSY:   /* abort -> error */
+            case STATE_DFU_MANIFEST:        /* abort -> error */
+                dfu_abort( device );
+                break;
+
+            case STATE_DFU_ERROR:
+                dfu_clear_status( device );
+                break;
+
+            case STATE_APP_IDLE:
+                dfu_detach( device, DFU_DETACH_TIMEOUT );
+                break;
+
+            case STATE_APP_DETACH:
+            case STATE_DFU_MANIFEST_WAIT_RESET:
+                DEBUG( "Resetting the device\n" );
+                libusb_reset_device( device->handle );
+                return 1;
+        }
+
+        retries--;
+    }
+
+    DEBUG( "Not able to transition the device into the dfuIDLE state.\n" );
+    return -2;
+}
+#endif
+
 int debug;
 #ifdef HAVE_LIBUSB_1_0
 libusb_context *usbcontext;
