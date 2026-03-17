@@ -268,12 +268,6 @@ android {
     QMAKE_CFLAGS += -fsigned-char
     QMAKE_CXXFLAGS += -fsigned-char
 
-    # Building .so files fails with -Wl,--no-undefined
-    QMAKE_LFLAGS_APP     -= -Wl,--no-undefined
-    QMAKE_LFLAGS_SHLIB   -= -Wl,--no-undefined
-    QMAKE_LFLAGS_PLUGIN  -= -Wl,--no-undefined
-    QMAKE_LFLAGS_NOUNDEF -= -Wl,--no-undefined
-
     QT += androidextras
     CONFIG += mobility
     CONFIG += android_app_bundle
