@@ -127,11 +127,7 @@ MainWindow::MainWindow(QWidget *parent) :
         //ui->controller_iso->driver->usbSendControl(0x40, 0xa7, 0, 0, 0, NULL);
         //reinitUsb();
         ui->controller_iso->driver->killOnConnect = true;
-    #endif
-    #ifdef PLATFORM_LINUX
-        reinitUsb();
-    #endif
-    #ifdef PLATFORM_MAC
+    #else
         reinitUsb();
     #endif
     #ifdef PLATFORM_ANDROID
@@ -1387,7 +1383,7 @@ void MainWindow::enableLabradorDebugging(bool enabled){
     {
         new Q_DebugStream(std::cout, ui->debugConsole); //Redirect Console output to QTextEdit
         Q_DebugStream::registerQDebugMessageHandler(); //Redirect qDebug() output to QTextEdit
-        qDebug() << "DEBUG MODE ACTIVE";
+        qDebug() << "DEBUG MODE Redirected to GUI Console!";
     }
 }
 
@@ -1698,6 +1694,7 @@ void MainWindow::resetUsbState(void){
 
 
 #ifdef PLATFORM_ANDROID
+// ToDo: matching #endif is 300!!! lines down, needs refactoring to have a clear control flow!!
 //Should be called "High Resolution mode".  This function has been comandeered for Android devices with 1080p or higher resolutions.
 void MainWindow::on_actionOld_Person_Mode_triggered(bool checked)
 {
