@@ -1102,7 +1102,7 @@ static bool udc_reqvend(void){
 			uds.calValPos = cali_value_positive_gradient;
 			uds.CALA = DFLLRC2M.CALA;
 			uds.CALB = DFLLRC2M.CALB;
-			udd_set_setup_payload(&uds, udd_g_ctrlreq.req.wLength);
+			udd_set_setup_payload((uint8_t *) &uds, udd_g_ctrlreq.req.wLength);
 			//asm("nop");
 			return 1;
 		case 0xa1: //Receive waveform for signal gen
@@ -1212,7 +1212,7 @@ static bool udc_reqvend(void){
 			    : "memory");
 			    __builtin_unreachable();
 		case 0xa8:  //Firmware Version Request
-			udd_set_setup_payload(&firmver, udd_g_ctrlreq.req.wLength);
+			udd_set_setup_payload((uint8_t *) &firmver, udd_g_ctrlreq.req.wLength);
 			return 1;	
 		case 0xa9:  //Variant Version Request
 			udd_set_setup_payload(&variant, udd_g_ctrlreq.req.wLength);

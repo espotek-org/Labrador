@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QDateTime>
+#include <atomic>
 
 #include "genericusbdriver.h"
 #include "libusb.h"
@@ -22,6 +23,15 @@ typedef struct tcBlock{
     qint64 timeReceived;
 } tcBlock;
 
+class unixUsbDriver;
+
+typedef struct isoTransferUserData{
+    tcBlock *transferBlock = nullptr;
+    unixUsbDriver *owner = nullptr;
+    unsigned char endpoint = 0;
+    int context = 0;
+} isoTransferUserData;
+
 //Oddly, libusb requires you to make a blocking libusb_handle_events() call in order to execute the callbacks for an asynchronous transfer.
 //Since the call is blocking, this worker must exist in a separate, low priority thread!
 class worker : public QObject
@@ -32,28 +42,25 @@ public:
     worker(){};
     ~worker(){};
     libusb_context *ctx;
-    bool stopTime = false;
-    unsigned char cleanupRemaining = 4;
+    std::atomic_bool stopTime{false};
+    std::atomic_int *pendingTransfers = nullptr;
 public slots:
     void handle(){
         qDebug() << "SUB THREAD ID" << QThread::currentThreadId();
-        while(cleanupRemaining){
-            //qDebug() << cleanupRemaining;
-            if(libusb_event_handling_ok(ctx)){
+        while(true){
+            if(ctx && libusb_event_handling_ok(ctx)){
                 struct timeval tv;
                 tv.tv_sec = 0;
                 tv.tv_usec = 100000;
                 libusb_handle_events_timeout(ctx, &tv);
-                //qDebug() << "HANDLED";
             }
-            if(stopTime){
-                if(cleanupRemaining){
-                    cleanupRemaining--;
-                    qDebug("Cleaning... #%hhu phases remain.\n", cleanupRemaining);
+            if(stopTime.load()){
+                if((pendingTransfers == nullptr) || (pendingTransfers->load() <= 0)){
+                    break;
                 }
             }
         }
-        qDebug() << "Cleanup complete";  //THIS THREAD STILL EXISTS
+        qDebug() << "Cleanup complete";
     }
 };
 
@@ -69,6 +76,7 @@ public:
     void usbSendControl(uint8_t RequestType, uint8_t Request, uint16_t Value, uint16_t Index, uint16_t Length, unsigned char *LDATA);
     char *isoRead(unsigned int *newLength);
     void manualFirmwareRecovery(void);
+    void noteShutdownTransferCallback(unsigned char endpoint, int context);
 protected:
     //USB Vars
     libusb_context *ctx = NULL;
@@ -79,18 +87,25 @@ protected:
     qint64 midBufferOffsets[NUM_ISO_ENDPOINTS];
     libusb_transfer *isoCtx[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX] = { };
     tcBlock transferCompleted[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
+    isoTransferUserData transferUserData[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
     unsigned char dataBuffer[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
     worker *isoHandler = nullptr;
     QThread *workerThread = nullptr;
     int cumulativeFramePhaseErrors = 0;
+    QMutex shutdownStateMutex;
+    bool cancelPending[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX] = { };
+    std::atomic_int shutdownCallbacksPending{0};
+    bool shutdownInitiated = false;
+    bool shutdownSignalSent = false;
     //Generic Functions
     virtual unsigned char usbInit(unsigned long VIDin, unsigned long PIDin);
     int usbIsoInit(void);
     virtual int flashFirmware(void);
     bool allEndpointsComplete(int n);
+    int cancelIsoTransfers(void);
     bool shutdownMode = false;
-    int numCancelled = 0;
 signals:
+    void shutdownComplete(void); //This is emitted when the shutdown procedure is complete and the driver is safe to delete.
 public slots:
     void isoTimerTick(void);
     void recoveryTick(void);

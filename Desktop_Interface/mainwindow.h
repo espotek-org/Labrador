@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QActionGroup>
 #include <QAction>
+#include <QCloseEvent>
 #include <QShortcut>
 #include <QFont>
 #include <QDateTime>
@@ -41,6 +42,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event);
     void showFileDialog(QString *fileName);
     void openFileDialog(QString *fileName);

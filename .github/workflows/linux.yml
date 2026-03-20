@@ -4,11 +4,23 @@ permissions:
   contents: read
   pull-requests: write
   
-on:
+on: 
   workflow_dispatch:
   workflow_call:
+
   push:
+    branches:
+      - master
+      - main
+
   pull_request:
+    branches:
+      - master
+      - main
+      
+#env:
+  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  # ToDo: when required, add secrets for privilidged tasks here
   
 jobs:
   build-appimage:
@@ -24,6 +36,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: |
@@ -45,6 +59,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(nproc)
@@ -75,6 +95,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: |
@@ -96,6 +118,12 @@ jobs:
 
       - name: Build basicdemo
         working-directory: Librador_API/___librador/basicdemo
+        run: |
+          qmake -config release
+          make -j$(nproc)
+
+      - name: Build libdfuprog
+        working-directory: libdfuprog
         run: |
           qmake -config release
           make -j$(nproc)

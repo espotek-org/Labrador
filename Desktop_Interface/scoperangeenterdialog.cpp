@@ -13,6 +13,7 @@ scopeRangeEnterDialog::scopeRangeEnterDialog(QWidget *parent, bool buttonVisible
     ui->vMaxBox->setValue(yTop);
     ui->vMinBox->setValue(yBot);
     ui->timeWindowBox->setValue(window);
+    ui->delayBox->setValue(delay);
     ui->buttonBox->setVisible(buttonVisible);
 
     for (espoSpinBox* spinBox : {ui->vMaxBox, ui->vMinBox, ui->timeWindowBox, ui->delayBox})

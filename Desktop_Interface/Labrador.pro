@@ -33,6 +33,7 @@ equals(QCP_VER,"2"){
 }
 
 include(ui_elements.pri)
+!win32: include(../libdfuprog/libdfuprog.pri)
 
 MOC_DIR = moc
 RCC_DIR = qrc
@@ -101,11 +102,16 @@ win32 {
 
     RC_ICONS = build_win/appicon.ico
 
+    CONFIG += console
+
     target.path = /
     lib_deploy.path = /
 
     firmware.path = /firmware
-    firmware.files = $$files(resources/firmware/*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
+    # Windows special for firmware update
+    firmware.files += $$files(resources/firmware/*.bat)
+    firmware.files += $$files(resources/firmware/*.exe)
 
     waveforms.path = /waveforms
     waveforms.files = $$files(resources/waveforms/*)
@@ -156,15 +162,9 @@ unix:!android:!macx {
 
     isEmpty(PREFIX): PREFIX = /usr/local
     target.path = $$PREFIX/bin
-    lib_deploy.path = $$PREFIX/lib
-
-    #libdfuprog include
-    INCLUDEPATH += build_linux/libdfuprog/include
-    LIBS += -L$$PWD/build_linux/libdfuprog/lib/$${QT_ARCH} -ldfuprog-0.9
-    lib_deploy.files += build_linux/libdfuprog/lib/$${QT_ARCH}/libdfuprog-0.9.so
 
     firmware.path = $$PREFIX/share/EspoTek/Labrador/firmware
-    firmware.files += $$files(resources/firmware/labrafirm*)
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = $$PREFIX/share/EspoTek/Labrador/waveforms
     waveforms.files += $$files(resources/waveforms/*)
@@ -185,7 +185,6 @@ unix:!android:!macx {
     udevextra.extra = test -n $$shell_quote($(INSTALL_ROOT)) || { udevadm control --reload-rules && udevadm trigger --subsystem-match=usb ; }
 
     INSTALLS += target
-    INSTALLS += lib_deploy
     INSTALLS += firmware
     INSTALLS += waveforms
     INSTALLS += udev
@@ -215,14 +214,12 @@ macx {
     QMAKE_TARGET_BUNDLE_PREFIX = com.EspoTek
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 
-    #libdfuprog dylib include
-    INCLUDEPATH += build_mac/libdfuprog/include
-    LIBS += -L$$PWD/build_mac/libdfuprog/lib -ldfuprog-0.9
-
     INCLUDEPATH += $$system(brew --prefix)/include
     INCLUDEPATH += $$system(brew --prefix)/include/eigen3
     INCLUDEPATH += $$system(brew --prefix)/include/libusb-1.0
+    INCLUDEPATH += $$system(brew --prefix libomp)/include
     LIBS += -L$$system(brew --prefix)/lib -lusb-1.0
+    LIBS += -L$$system(brew --prefix libomp)/lib
 
     QMAKE_LFLAGS += "-undefined dynamic_lookup"
 }
@@ -271,12 +268,6 @@ android {
     QMAKE_CFLAGS += -fsigned-char
     QMAKE_CXXFLAGS += -fsigned-char
 
-    # Building .so files fails with -Wl,--no-undefined
-    QMAKE_LFLAGS_APP     -= -Wl,--no-undefined
-    QMAKE_LFLAGS_SHLIB   -= -Wl,--no-undefined
-    QMAKE_LFLAGS_PLUGIN  -= -Wl,--no-undefined
-    QMAKE_LFLAGS_NOUNDEF -= -Wl,--no-undefined
-
     QT += androidextras
     CONFIG += mobility
     CONFIG += android_app_bundle
@@ -300,15 +291,12 @@ android {
     ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
 
     firmware.path = /assets/firmware
-    firmware.files = resources/firmware/labrafirm_0007_02.hex
+    firmware.files = $$files(resources/firmware/labrafirm*)
 
     waveforms.path = /assets/waveforms
     waveforms.files = $$files(resources/waveforms/*)
 
     INSTALLS += firmware waveforms
-
-    #libdfuprog include
-    INCLUDEPATH += build_android/libdfuprog/include
 
     # Frequency spectrum/response disabled for now, needs UI and supporting libraries
     DEFINES += DISABLE_SPECTRUM
@@ -322,10 +310,6 @@ android {
     for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
     for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
     for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
-
-    #libdfuprog library
-    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/libdfuprog/lib/$${abi} -ldfuprog-0.9
-    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libdfuprog/lib/$${abi}/libdfuprog-0.9.so
 
     #liblog library
     for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/liblog/lib/$${abi} -llog

@@ -164,9 +164,6 @@ int main(void){
 	}
 }
 
-//! Global variable to give and record information about setup request management
-udd_ctrl_request_t udd_g_ctrlreq;
-
 //CALLBACKS:
 void main_suspend_action(void)
 {

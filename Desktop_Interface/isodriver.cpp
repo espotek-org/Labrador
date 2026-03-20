@@ -318,12 +318,34 @@ void isoDriver::setVisible_CH2(bool visible){
     axes->graph(1)->setVisible(visible);
 }
 
+void isoDriver::refreshInteractiveGraph()
+{
+    if (!axes) {
+        return;
+    }
+
+#ifndef DISABLE_SPECTRUM
+    if (spectrum || freqResp) {
+        axes->xAxis->setRange(display->leftRange, display->rightRange);
+        axes->yAxis->setRange(display->botRange, display->topRange);
+    } else if (!eyeDiagram)
+#endif
+    {
+        axes->xAxis->setRange(-display->window - display->delay, -display->delay);
+        axes->yAxis->setRange(display->topRange, display->botRange);
+    }
+
+    updateCursors();
+    axes->replot();
+}
+
 void isoDriver::setVoltageRange(QWheelEvent* event)
 {
-    if (doNotTouchGraph && !fileModeEnabled) return;
+    if (doNotTouchGraph && !fileModeEnabled && (!driver || driver->connected)) return;
 #ifndef DISABLE_SPECTRUM
     if (freqResp || spectrum) {
         display->setRespAndSpecRanges(event, axes, this);
+        refreshInteractiveGraph();
         return;
     }
     if (eyeDiagram) return;
@@ -337,6 +359,8 @@ void isoDriver::setVoltageRange(QWheelEvent* event)
     if (!(event->modifiers() == Qt::ControlModifier))
         if (autoGainEnabled && !isProperlyPaused)
             autoGain();
+
+    refreshInteractiveGraph();
 }
 
 DisplayControl::DisplayControl(double left, double right, double top, double bottom)
@@ -582,6 +606,7 @@ void isoDriver::graphMousePress(QMouseEvent *event){
         display->x0 = axes->xAxis->pixelToCoord(event->x());
     }
     qDebug() << "x0 =" << display->x0 << "x1 =" << display->x1 << "y0 =" << display->y0 << "y1 =" << display->y1;
+    refreshInteractiveGraph();
 }
 
 void isoDriver::graphMouseRelease(QMouseEvent *event){
@@ -595,6 +620,7 @@ void isoDriver::graphMouseRelease(QMouseEvent *event){
         placingVertAxes = false;
     }
     qDebug() << "x0 =" << display->x0 << "x1 =" << display->x1 << "y0 =" << display->y0 << "y1 =" << display->y1;
+    refreshInteractiveGraph();
 }
 
 void isoDriver::graphMouseMove(QMouseEvent *event){
@@ -607,6 +633,7 @@ void isoDriver::graphMouseMove(QMouseEvent *event){
 #endif
         display->x1 = axes->xAxis->pixelToCoord(event->x());
     }
+    refreshInteractiveGraph();
 }
 
 void isoDriver::cursorEnableHori(bool enabled){
@@ -622,6 +649,7 @@ void isoDriver::cursorEnableHori(bool enabled){
         horiCursorEnabled0 = enabled;
     axes->graph(4)->setVisible(enabled);
     axes->graph(5)->setVisible(enabled);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::cursorEnableVert(bool enabled){
@@ -637,6 +665,7 @@ void isoDriver::cursorEnableVert(bool enabled){
         vertCursorEnabled0 = enabled;
     axes->graph(2)->setVisible(enabled);
     axes->graph(3)->setVisible(enabled);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::updateCursors(){
@@ -977,6 +1006,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         broadcastStats(0);
     } else if (CH1_mode == 2) {
         CH1 = digitalConvert(readData_CH1);
+        for (int i = 0; i < CH1.size(); ++i)
+            CH1[i] += m_digitalOffset_CH1;
     } else if (CH1_mode == -2) {
         CH1 = fileStreamConvert(readDataFile);
     }
@@ -1004,6 +1035,8 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
         broadcastStats(1);
     } else if (CH2_mode == 2) {
         CH2 = digitalConvert(readData_CH2);
+        for (int i = 0; i < CH2.size(); ++i)
+            CH2[i] += m_digitalOffset_CH2;
     }
 
 
@@ -1082,7 +1115,12 @@ void isoDriver::frameActionGeneric(char CH1_mode, char CH2_mode)
             // If there is too much error in the least square fitting, discard current trace
             if (norm_rms1 > 0.1 || norm_rms2 > 2) {
                 err_cnt++;
+                freqRespStatusMark->setText("☒");
+                freqRespStatusMark->setColor(Qt::red);
             } else {
+                freqRespStatusMark->setText("☑");
+                freqRespStatusMark->setColor(Qt::green);
+
                 // Calculate gain, and phase difference
                 gain = amp2 / amp1;
                 phase_diff = phase2 - phase1;
@@ -1738,6 +1776,7 @@ void isoDriver::setTopRange(double newTop)
     // NOTE: Should this be clamped to 20?
     display->topRange = newTop;
     topRangeUpdated(display->topRange);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::setBotRange(double newBot)
@@ -1745,16 +1784,19 @@ void isoDriver::setBotRange(double newBot)
     // NOTE: Should this be clamped to 20?
     display->botRange = newBot;
     botRangeUpdated(display->botRange);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::setTimeWindow(double newWindow){
     display->window = newWindow;
     timeWindowUpdated(display->window);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::setDelay(double newDelay){
     display->delay = newDelay;
     delayUpdated(display->delay);
+    refreshInteractiveGraph();
 }
 
 void isoDriver::takeSnapshot(QString *fileName, unsigned char channel){
@@ -2070,6 +2112,16 @@ void isoDriver::offsetChanged_CH2(double newOffset)
     m_offset_CH2 = newOffset;
 }
 
+void isoDriver::digitalOffsetChanged_CH1(double newOffset)
+{
+    m_digitalOffset_CH1 = newOffset;
+}
+
+void isoDriver::digitalOffsetChanged_CH2(double newOffset)
+{
+    m_digitalOffset_CH2 = newOffset;
+}
+
 void isoDriver::attenuationChanged_CH1(int attenuationIndex)
 {
     switch(attenuationIndex)
@@ -2156,7 +2208,7 @@ void isoDriver::retickXAxis()
     if(display->logSpaceX) {
         if((upper_range/lower_range)>100.0) {
             axes->xAxis->setScaleLogBase(10.0);
-            axes->xAxis->setSubTickCount(9);
+            axes->xAxis->setSubTickCount(8);
             fSpaceLabel->setVisible(false);
             axes->xAxis->setNumberPrecision(0);
             axes->xAxis->setNumberFormat("gb");

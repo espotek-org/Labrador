@@ -1,0 +1,3 @@
+[submodule "libdfuprog/dfu-programmer"]
+	path = libdfuprog/dfu-programmer
+	url = https://github.com/dfu-programmer/dfu-programmer
