@@ -376,7 +376,7 @@ void genericUsbDriver::setGain(double newGain){
     */
     qDebug("newGain = %f", newGain);
     qDebug("gainMask = %x", gainMask);
-    usbSendControl(0x40, 0xa5, deviceMode, gainMask, 0, NULL);
+    usbSendControl(0x40, 0xa5, (deviceMode == 5 ? 0 : 5), gainMask, 0, NULL);
 }
 
 void genericUsbDriver::avrDebug(void){
