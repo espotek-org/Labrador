@@ -23,220 +23,104 @@
 # the suffix 0x01.  It is recommended that this line in globals.h be left
 # commented-out, which ensures that `make 0x01` and `make 0x02` work as
 # expected.
-EXECUTABLES :=
-LIB_DEP :=
-LIBS :=
-USER_OBJS :=
-OUTPUT_FILE_PATH :=
-OUTPUT_FILE_PATH =$(NAME).elf
-OUTPUT_FILE_PATH_AS_ARGS +=$(NAME).elf
-AVR_APP_PATH :=$$$AVR_APP_PATH$$$
 
-AVRDIR=
-CC=$(AVRDIR)/bin/avr-gcc
-INCLUDES=-I"./common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained" -I"./common/services/usb/class/vendor/device/example" -I"./src/ASF/common/services/usb/udc" -I"./src/ASF/xmega/drivers/nvm" -I"./src/ASF/common/services/sleepmgr" -I"./src/ASF/common/services/clock" -I"./src/ASF/xmega/drivers/sleep" -I"./src/ASF/xmega/drivers/usb" -I"./src/ASF/xmega/drivers/cpu" -I"./src/ASF/common/services/usb/class/vendor" -I"./src/ASF/common/services/usb/class/vendor/device" -I"./src/ASF/common/services/usb" -I"./common/applications/user_application/user_board/config" -I"./src/ASF/xmega/utils" -I"./src/config" -I"./src/ASF/common/boards" -I"./src/ASF/xmega/utils/preprocessor" -I"./src/ASF/common/utils" -I"./src" -I"./src/ASF/common/boards/user_board" -I"./src/ASF/common/services/ioport"
+CROSS_COMPILE = avr-
+CC      = $(CROSS_COMPILE)gcc
+OBJCOPY = $(CROSS_COMPILE)objcopy
+OBJDUMP = $(CROSS_COMPILE)objdump
+SIZE    = $(CROSS_COMPILE)size
 
-CFLAGS=-std=gnu99 -ffunction-sections -mmcu=atxmega32a4u -fsigned-char -funsigned-bitfields -fdata-sections -fshort-enums -fno-strict-aliasing -fno-jump-tables -fpack-struct -Wall -O2 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" 
-NAME=labrafirm_$(SUFFIX)
+DEFINES = \
+-DNDEBUG \
+-DBOARD=USER_BOARD
 
-OBJS += \
-./src/tiny_calibration.o \
-./src/tiny_dig.o \
-./src/tiny_eeprom.o \
-./src/ASF/common/boards/user_board/init.o \
-./src/ASF/common/services/ioport/xmega/ioport_compat.o \
-./src/main.o \
-./src/tiny_adc.o \
-./src/tiny_dac.o \
-./src/tiny_dma.o \
-./src/tiny_timer.o \
-./src/tiny_uart.o \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
-./src/ASF/common/services/clock/xmega/sysclk.o \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
-./src/ASF/common/services/usb/udc/udc.o \
-./src/ASF/xmega/drivers/nvm/nvm.o \
-./src/ASF/xmega/drivers/nvm/nvm_asm.o \
-./src/ASF/xmega/drivers/cpu/ccp.o \
-./src/ASF/xmega/drivers/usb/usb_device.o
+INCLUDES = \
+-Icommon/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained \
+-Icommon/services/usb/class/vendor/device/example \
+-Isrc/ASF/common/services/usb/udc \
+-Isrc/ASF/xmega/drivers/nvm \
+-Isrc/ASF/common/services/sleepmgr \
+-Isrc/ASF/common/services/clock \
+-Isrc/ASF/xmega/drivers/sleep \
+-Isrc/ASF/xmega/drivers/usb \
+-Isrc/ASF/xmega/drivers/cpu \
+-Isrc/ASF/common/services/usb/class/vendor \
+-Isrc/ASF/common/services/usb/class/vendor/device \
+-Isrc/ASF/common/services/usb \
+-Icommon/applications/user_application/user_board/config \
+-Isrc/ASF/xmega/utils \
+-Isrc/config \
+-Isrc/ASF/common/boards \
+-Isrc/ASF/xmega/utils/preprocessor \
+-Isrc/ASF/common/utils \
+-Isrc \
+-Isrc/ASF/common/boards/user_board \
+-Isrc/ASF/common/services/ioport
 
-C_DEPS_AS_ARGS += \
-./src/tiny_calibration.d \
-./src/tiny_dig.d \
-./src/tiny_eeprom.d \
-./src/ASF/common/boards/user_board/init.d \
-./src/ASF/common/services/ioport/xmega/ioport_compat.d \
-./src/main.d \
-./src/tiny_adc.d \
-./src/tiny_dac.d \
-./src/tiny_dma.d \
-./src/tiny_timer.d \
-./src/tiny_uart.d \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.d \
-./src/ASF/common/services/clock/xmega/sysclk.d \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.d \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.d \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.d \
-./src/ASF/common/services/usb/udc/udc.d \
-./src/ASF/xmega/drivers/nvm/nvm.d \
-./src/ASF/xmega/drivers/nvm/nvm_asm.d \
-./src/ASF/xmega/drivers/cpu/ccp.d \
-./src/ASF/xmega/drivers/usb/usb_device.d
+CPPFLAGS = $(DEFINES) $(INCLUDES)
 
-OBJS_AS_ARGS += \
-./src/tiny_calibration.o \
-./src/tiny_dig.o \
-./src/tiny_eeprom.o \
-./src/ASF/common/boards/user_board/init.o \
-./src/ASF/common/services/ioport/xmega/ioport_compat.o \
-./src/main.o \
-./src/tiny_adc.o \
-./src/tiny_dac.o \
-./src/tiny_dma.o \
-./src/tiny_timer.o \
-./src/tiny_uart.o \
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
-./src/ASF/common/services/clock/xmega/sysclk.o \
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
-./src/ASF/common/services/usb/udc/udc.o \
-./src/ASF/xmega/drivers/nvm/nvm.o \
-./src/ASF/xmega/drivers/nvm/nvm_asm.o \
-./src/ASF/xmega/drivers/cpu/ccp.o \
-./src/ASF/xmega/drivers/usb/usb_device.o
+CFLAGS = \
+-std=gnu99 \
+-ffunction-sections \
+-mmcu=atxmega32a4u \
+-fsigned-char \
+-funsigned-bitfields \
+-fdata-sections \
+-fshort-enums \
+-fno-strict-aliasing \
+-fno-jump-tables \
+-fpack-struct \
+-Wall \
+-O2 \
+-MD -MP -MF $(@:%.o=%.d) -MT $(@:%.o=%.d) -MT $(@:%.o=%.o)
 
-./src/tiny_calibration.o: ./src/tiny_calibration.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+OBJS = \
+src/tiny_calibration.o \
+src/tiny_dig.o \
+src/tiny_eeprom.o \
+src/ASF/common/boards/user_board/init.o \
+src/ASF/common/services/ioport/xmega/ioport_compat.o \
+src/main.o \
+src/tiny_adc.o \
+src/tiny_dac.o \
+src/tiny_dma.o \
+src/tiny_timer.o \
+src/tiny_uart.o \
+src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o \
+src/ASF/common/services/clock/xmega/sysclk.o \
+src/ASF/common/services/sleepmgr/xmega/sleepmgr.o \
+src/ASF/common/services/usb/class/vendor/device/udi_vendor.o \
+src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o \
+src/ASF/common/services/usb/udc/udc.o \
+src/ASF/xmega/drivers/nvm/nvm.o \
+src/ASF/xmega/drivers/nvm/nvm_asm.o \
+src/ASF/xmega/drivers/cpu/ccp.o \
+src/ASF/xmega/drivers/usb/usb_device.o
 
-./src/tiny_dig.o: ./src/tiny_dig.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+.PHONY: 0x01 0x02
+0x01: labrafirm_0x01.elf
+0x02: labrafirm_0x02.elf
 
-./src/tiny_eeprom.o: ./src/tiny_eeprom.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+labrafirm_0x02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 
-./src/ASF/common/boards/user_board/init.o: ./src/ASF/common/boards/user_board/init.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
-./src/ASF/common/services/ioport/xmega/ioport_compat.o: ./src/ASF/common/services/ioport/xmega/ioport_compat.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+%.o: %.s
+	$(CC) -x assembler-with-cpp $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
-./src/main.o: ./src/main.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+labrafirm_%.elf: $(OBJS)
+	$(CC) -o $@ $(OBJS) -Wl,-Map=$(@:%.elf=%.map) -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax
+	$(SIZE) $@
+	$(OBJDUMP) -h -S $@ > $(@:%.elf=%.lss)
+	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.hex)
+	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.srec)
+	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $@ $(@:%.elf=%.eep) || exit 0
 
-./src/tiny_adc.o: ./src/tiny_adc.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
+.PHONY: clean
+clean:
+	-rm -rf $(OBJS) $(OBJS:%.o=%.d) $(foreach variant,0x01 0x02,$(foreach ext,elf map hex srec eep lss,labrafirm_$(variant).$(ext)))
 
-./src/tiny_dac.o: ./src/tiny_dac.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/tiny_dma.o: ./src/tiny_dma.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/tiny_timer.o: ./src/tiny_timer.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/tiny_uart.o: ./src/tiny_uart.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.o: ./src/ASF/common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained/ui.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/clock/xmega/sysclk.o: ./src/ASF/common/services/clock/xmega/sysclk.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/sleepmgr/xmega/sleepmgr.o: ./src/ASF/common/services/sleepmgr/xmega/sleepmgr.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor.o: ./src/ASF/common/services/usb/class/vendor/device/udi_vendor.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.o: ./src/ASF/common/services/usb/class/vendor/device/udi_vendor_desc.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/common/services/usb/udc/udc.o: ./src/ASF/common/services/usb/udc/udc.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/xmega/drivers/cpu/ccp.o: ./src/ASF/xmega/drivers/cpu/ccp.s
-	@echo Building file: $<
-	@$(CC) -x assembler-with-cpp -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/xmega/drivers/nvm/nvm.o: ./src/ASF/xmega/drivers/nvm/nvm.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/xmega/drivers/nvm/nvm_asm.o: ./src/ASF/xmega/drivers/nvm/nvm_asm.s
-	@echo Building file: $<
-	@$(CC) -x assembler-with-cpp -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-./src/ASF/xmega/drivers/usb/usb_device.o: ./src/ASF/xmega/drivers/usb/usb_device.c
-	@echo Building file: $<
-	@$(CC) -DNDEBUG -DBOARD=USER_BOARD $(INCLUDES) $(CFLAGS) -c -o "$@" "$<" 
-	@echo Finished building: $<
-
-0x01: SUFFIX=0x01
-0x01: $(OUTPUT_FILE_PATH)
-
-0x02: CFLAGS+=-DSINGLE_ENDPOINT_INTERFACE
-0x02: SUFFIX=0x02
-0x02: $(OUTPUT_FILE_PATH)
-
-$(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER_SCRIPT_DEP)
-	@echo Building target: $@
-	$(CC) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -Wl,-Map=$(NAME)".map"  -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax 
-	$(AVRDIR)/bin/avr-objcopy -O ihex -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".hex"
-	$(AVRDIR)/bin/avr-objdump -h -S $(NAME)".elf" > $(NAME)".lss"
-	$(AVRDIR)/bin/avr-objcopy -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $(NAME)".elf" $(NAME)".eep" || exit 0
-	$(AVRDIR)/bin/avr-objcopy -O srec -R .eeprom -R .fuse -R .lock -R .signature  $(NAME)".elf" $(NAME)".srec"
-	$(AVRDIR)/bin/avr-size $(NAME)".elf"
-	@echo Finished successfully: $(NAME)
-
-VARIANTS = 0x01 0x02
-clean :
-	-rm -rf $(OBJS_AS_ARGS) $(EXECUTABLES)
-	-rm -rf $(C_DEPS_AS_ARGS)
-	$(foreach SUFFIX,$(VARIANTS), \
-		rm -rf $(NAME).hex ; \
-		rm -rf $(NAME).lss ; \
-		rm -rf $(NAME).eep ; \
-		rm -rf $(NAME).srec ; \
-		rm -rf $(NAME).elf $(NAME).a $(NAME).map)
+ifneq ($(MAKECMDGOALS),clean)
+-include $(OBJS:%.o=%.d)
+endif
