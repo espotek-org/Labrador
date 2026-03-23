@@ -97,11 +97,12 @@ src/ASF/xmega/drivers/nvm/nvm_asm.o \
 src/ASF/xmega/drivers/cpu/ccp.o \
 src/ASF/xmega/drivers/usb/usb_device.o
 
+VERSION = 0007
 .PHONY: 0x01 0x02
-0x01: labrafirm_0x01.elf
-0x02: labrafirm_0x02.elf
+0x01: labrafirm_$(VERSION)_01.elf
+0x02: labrafirm_$(VERSION)_02.elf
 
-labrafirm_0x02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
+labrafirm_$(VERSION)_02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
@@ -109,7 +110,7 @@ labrafirm_0x02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 %.o: %.s
 	$(CC) -x assembler-with-cpp $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
-labrafirm_%.elf: $(OBJS)
+labrafirm_$(VERSION)_%.elf: $(OBJS)
 	$(CC) -o $@ $(OBJS) -Wl,-Map=$(@:%.elf=%.map) -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax
 	$(SIZE) $@
 	$(OBJDUMP) -h -S $@ > $(@:%.elf=%.lss)
@@ -119,7 +120,7 @@ labrafirm_%.elf: $(OBJS)
 
 .PHONY: clean
 clean:
-	-rm -rf $(OBJS) $(OBJS:%.o=%.d) $(foreach variant,0x01 0x02,$(foreach ext,elf map hex srec eep lss,labrafirm_$(variant).$(ext)))
+	-rm -rf $(OBJS) $(OBJS:%.o=%.d) $(foreach variant,01 02,$(foreach ext,elf map lss hex srec eep,labrafirm_$(VERSION)_$(variant).$(ext)))
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(OBJS:%.o=%.d)
