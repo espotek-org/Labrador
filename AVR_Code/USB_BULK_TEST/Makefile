@@ -99,9 +99,9 @@ src/ASF/xmega/drivers/usb/usb_device.o
 
 VERSION = 0007
 .PHONY: 0x01 0x02
-0x01: labrafirm_$(VERSION)_01.elf
-0x02: labrafirm_$(VERSION)_02.elf
-
+0x01: labrafirm_$(VERSION)_01.hex
+0x02: labrafirm_$(VERSION)_02.hex
+labrafirm_$(VERSION)_01.elf:
 labrafirm_$(VERSION)_02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 
 %.o: %.c
@@ -114,9 +114,15 @@ labrafirm_$(VERSION)_%.elf: $(OBJS)
 	$(CC) -o $@ $(OBJS) -Wl,-Map=$(@:%.elf=%.map) -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax
 	$(SIZE) $@
 	$(OBJDUMP) -h -S $@ > $(@:%.elf=%.lss)
-	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.hex) && sed -i 's/\r$$//' $(@:%.elf=%.hex) && chmod -x $(@:%.elf=%.hex)
-	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.srec) && sed -i 's/\r$$//' $(@:%.elf=%.srec) && chmod -x $(@:%.elf=%.srec)
-	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $@ $(@:%.elf=%.eep) && chmod -x $(@:%.elf=%.eep) || exit 0
+
+%.hex: %.elf
+	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i 's/\r$$//' $@ && chmod -x $@
+
+%.srec: %.elf
+	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i 's/\r$$//' $@ && chmod -x $@
+
+%.eep: %.elf
+	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $< $@ && chmod -x $@ || exit 0
 
 .PHONY: clean
 clean:
