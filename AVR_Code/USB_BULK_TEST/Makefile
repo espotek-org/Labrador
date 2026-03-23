@@ -114,9 +114,9 @@ labrafirm_$(VERSION)_%.elf: $(OBJS)
 	$(CC) -o $@ $(OBJS) -Wl,-Map=$(@:%.elf=%.map) -Wl,-lm -mmcu=atxmega32a4u -Wl,--gc-sections -Wl,--relax
 	$(SIZE) $@
 	$(OBJDUMP) -h -S $@ > $(@:%.elf=%.lss)
-	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.hex)
-	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.srec)
-	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $@ $(@:%.elf=%.eep) || exit 0
+	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.hex) && sed -i 's/\r$$//' $(@:%.elf=%.hex) && chmod -x $(@:%.elf=%.hex)
+	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $@ $(@:%.elf=%.srec) && sed -i 's/\r$$//' $(@:%.elf=%.srec) && chmod -x $(@:%.elf=%.srec)
+	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $@ $(@:%.elf=%.eep) && chmod -x $(@:%.elf=%.eep) || exit 0
 
 .PHONY: clean
 clean:
