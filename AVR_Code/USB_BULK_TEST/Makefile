@@ -1,15 +1,15 @@
 # see https://github.com/espotek-org/Labrador/wiki/Building-from-source#building-the-firmware
 # Usage :
-# make 0x01
+# make 01
 # 	build a version of the firmware compatible with Windows x64 OSs
-# make 0x02
+# make 02
 # 	build a version of the firmware compatible with all other OSs
 # Here, OS refers to that of the machine with which the Labrador board will interface.
-# After running 'make 0x01', to switch to building variant 0x02 instead, first run 'make clean'.
-# The same goes for switching from building the 0x02 variant to building the 0x01 variant.
+# After running 'make 01', to switch to building variant 02 instead, first run 'make clean'.
+# The same goes for switching from building the 02 variant to building the 01 variant.
 # Some details:
-# 	In the build process for variant 0x01, the macro SINGLE_ENDPOINT_INTERFACE
-# 	is undefined, while in the build process for variant 0x02,
+# 	In the build process for variant 01, the macro SINGLE_ENDPOINT_INTERFACE
+# 	is undefined, while in the build process for variant 02,
 # 	SINGLE_ENDPOINT_INTERFACE is defined.  In several regions of the source
 # 	code, the undefined/defined status of this macro determines which of two
 # 	possible code blocks are compiled into the firmware.  The collective effect
@@ -18,10 +18,10 @@
 # 	endpoints to send the scope/logic analyzer data" (from
 # 	https://github.com/espotek-org/Labrador/issues/260)
 # *NOTE* : there is a commented-out line defining SINGLE_ENDPOINT_INTERFACE in
-# globals.h.  If it is uncommented, both 'make 0x01' and 'make 0x02' will
-# produce variant 0x02.  Further, 'make 0x01' will mislabel the firmware with
-# the suffix 0x01.  It is recommended that this line in globals.h be left
-# commented-out, which ensures that `make 0x01` and `make 0x02` work as
+# globals.h.  If it is uncommented, both 'make 01' and 'make 02' will
+# produce variant 02.  Further, 'make 01' will mislabel the firmware with
+# the suffix 01.  It is recommended that this line in globals.h be left
+# commented-out, which ensures that `make 01` and `make 02` work as
 # expected.
 
 CROSS_COMPILE = avr-
@@ -98,9 +98,9 @@ src/ASF/xmega/drivers/cpu/ccp.o \
 src/ASF/xmega/drivers/usb/usb_device.o
 
 VERSION = 0007
-.PHONY: 0x01 0x02
-0x01: labrafirm_$(VERSION)_01.hex
-0x02: labrafirm_$(VERSION)_02.hex
+.PHONY: 01 02
+01: labrafirm_$(VERSION)_01.hex
+02: labrafirm_$(VERSION)_02.hex
 labrafirm_$(VERSION)_01.elf:
 labrafirm_$(VERSION)_02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 
