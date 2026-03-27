@@ -22,7 +22,9 @@
 # produce variant 02.  Further, 'make 01' will mislabel the firmware with
 # the suffix 01.  It is recommended that this line in globals.h be left
 # commented-out, which ensures that `make 01` and `make 02` work as
-# expected.
+# expected.  Similarly, FIRMWARE_VERSION_ID is commented out in globals.h
+# and instead defined by this Makefile.  Only uncomment either definition if
+# you are using Atmel Studio or similar and are not using this Makefile to build.
 
 CROSS_COMPILE = avr-
 CC      = $(CROSS_COMPILE)gcc
@@ -107,7 +109,8 @@ EXES = $(foreach variant,$(VARIANTS),$(foreach ext,$(EXEEXTS),labrafirm_$(VERSIO
 .PHONY: $(VARIANTS)
 01: labrafirm_$(VERSION)_01.hex
 02: labrafirm_$(VERSION)_02.hex
-labrafirm_$(VERSION)_02.elf: DEFINES += SINGLE_ENDPOINT_INTERFACE
+labrafirm_$(VERSION)_01.elf: DEFINES += FIRMWARE_VERSION_ID=0x$(VERSION)
+labrafirm_$(VERSION)_02.elf: DEFINES += FIRMWARE_VERSION_ID=0x$(VERSION) SINGLE_ENDPOINT_INTERFACE
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
