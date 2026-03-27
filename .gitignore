@@ -29,6 +29,7 @@ AVR Code/USB_BULK_TEST/Release
 Desktop_Interface/debug
 Desktop_Interface/release
 !Desktop_Interface/resources/firmware/dfu-programmer.exe
+*.d
 *.o
 *.a
 *.so
@@ -40,6 +41,14 @@ Desktop_Interface/release
 Thumbs.db
 pinout.png
 *.mex
+
+*.elf
+*.map
+*.lss
+*.hex
+*.srec
+*.eep
+!Desktop_Interface/resources/firmware/*.hex
 
 libdfuprog/Makefile*
 
