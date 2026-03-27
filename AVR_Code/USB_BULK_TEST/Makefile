@@ -97,11 +97,16 @@ src/ASF/xmega/drivers/nvm/nvm_asm.o \
 src/ASF/xmega/drivers/cpu/ccp.o \
 src/ASF/xmega/drivers/usb/usb_device.o
 
+DEPS = $(OBJS:%.o=%.d)
+
 VERSION = 0007
-.PHONY: 01 02
+VARIANTS = 01 02
+EXEEXTS = .elf .map .lss .hex .srec .eep
+EXES = $(foreach variant,$(VARIANTS),$(foreach ext,$(EXEEXTS),labrafirm_$(VERSION)_$(variant)$(ext)))
+
+.PHONY: $(VARIANTS)
 01: labrafirm_$(VERSION)_01.hex
 02: labrafirm_$(VERSION)_02.hex
-labrafirm_$(VERSION)_01.elf:
 labrafirm_$(VERSION)_02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
 
 %.o: %.c
@@ -126,8 +131,7 @@ labrafirm_$(VERSION)_%.elf: $(OBJS)
 
 .PHONY: clean
 clean:
-	-rm -rf $(OBJS) $(OBJS:%.o=%.d) $(foreach variant,01 02,$(foreach ext,elf map lss hex srec eep,labrafirm_$(VERSION)_$(variant).$(ext)))
+	-rm -rf $(OBJS) $(DEPS) $(EXES)
 
-ifneq ($(MAKECMDGOALS),clean)
--include $(OBJS:%.o=%.d)
-endif
+$(OBJS) $(EXES): Makefile
+-include $(DEPS)
