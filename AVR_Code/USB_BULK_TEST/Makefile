@@ -129,9 +129,11 @@ labrafirm_$(VERSION)_%.elf: $(OBJS)
 %.eep: %.elf
 	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $< $@ && chmod -x $@ || exit 0
 
-.PHONY: clean
-clean:
-	-rm -rf $(OBJS) $(DEPS) $(EXES)
+.PHONY: mostlyclean clean
+mostlyclean:
+	-rm -f $(OBJS) $(DEPS)
+clean: mostlyclean
+	-rm -f $(EXES)
 
 $(OBJS) $(EXES): Makefile
 -include $(DEPS)
