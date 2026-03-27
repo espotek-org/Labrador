@@ -31,33 +31,33 @@ OBJDUMP = $(CROSS_COMPILE)objdump
 SIZE    = $(CROSS_COMPILE)size
 
 DEFINES = \
--DNDEBUG \
--DBOARD=USER_BOARD
+NDEBUG \
+BOARD=USER_BOARD
 
 INCLUDES = \
--Icommon/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained \
--Icommon/services/usb/class/vendor/device/example \
--Isrc/ASF/common/services/usb/udc \
--Isrc/ASF/xmega/drivers/nvm \
--Isrc/ASF/common/services/sleepmgr \
--Isrc/ASF/common/services/clock \
--Isrc/ASF/xmega/drivers/sleep \
--Isrc/ASF/xmega/drivers/usb \
--Isrc/ASF/xmega/drivers/cpu \
--Isrc/ASF/common/services/usb/class/vendor \
--Isrc/ASF/common/services/usb/class/vendor/device \
--Isrc/ASF/common/services/usb \
--Icommon/applications/user_application/user_board/config \
--Isrc/ASF/xmega/utils \
--Isrc/config \
--Isrc/ASF/common/boards \
--Isrc/ASF/xmega/utils/preprocessor \
--Isrc/ASF/common/utils \
--Isrc \
--Isrc/ASF/common/boards/user_board \
--Isrc/ASF/common/services/ioport
+common/services/usb/class/vendor/device/example/atxmega256a3bu_xmega_a3bu_xplained \
+common/services/usb/class/vendor/device/example \
+src/ASF/common/services/usb/udc \
+src/ASF/xmega/drivers/nvm \
+src/ASF/common/services/sleepmgr \
+src/ASF/common/services/clock \
+src/ASF/xmega/drivers/sleep \
+src/ASF/xmega/drivers/usb \
+src/ASF/xmega/drivers/cpu \
+src/ASF/common/services/usb/class/vendor \
+src/ASF/common/services/usb/class/vendor/device \
+src/ASF/common/services/usb \
+common/applications/user_application/user_board/config \
+src/ASF/xmega/utils \
+src/config \
+src/ASF/common/boards \
+src/ASF/xmega/utils/preprocessor \
+src/ASF/common/utils \
+src \
+src/ASF/common/boards/user_board \
+src/ASF/common/services/ioport
 
-CPPFLAGS = $(DEFINES) $(INCLUDES)
+CPPFLAGS = $(addprefix -D,$(DEFINES)) $(addprefix -I,$(INCLUDES))
 
 CFLAGS = \
 -std=gnu99 \
@@ -107,7 +107,7 @@ EXES = $(foreach variant,$(VARIANTS),$(foreach ext,$(EXEEXTS),labrafirm_$(VERSIO
 .PHONY: $(VARIANTS)
 01: labrafirm_$(VERSION)_01.hex
 02: labrafirm_$(VERSION)_02.hex
-labrafirm_$(VERSION)_02.elf: DEFINES+=-DSINGLE_ENDPOINT_INTERFACE
+labrafirm_$(VERSION)_02.elf: DEFINES += SINGLE_ENDPOINT_INTERFACE
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
