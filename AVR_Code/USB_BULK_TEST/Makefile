@@ -1,12 +1,16 @@
 # see https://github.com/espotek-org/Labrador/wiki/Building-from-source#building-the-firmware
 # Usage :
-# make 01
-# 	build a version of the firmware compatible with Windows x64 OSs
-# make 02
-# 	build a version of the firmware compatible with all other OSs
+# `make 01`
+# 	build a variant of the firmware compatible with Windows x64 OSs
+# `make 02`
+# 	build a variant of the firmware compatible with all other OSs
 # Here, OS refers to that of the machine with which the Labrador board will interface.
-# After running 'make 01', to switch to building variant 02 instead, first run 'make clean'.
-# The same goes for switching from building the 02 variant to building the 01 variant.
+#
+# Whenever switching between building the two variants, always run either
+# `make clean` (to delete everything) or `make mostlyclean` (to delete the
+# object files and leave the .hex that you will load to the Labrador board)
+# so that all objects will be rebuilt with the correct macro definitions.
+#
 # Some details:
 # 	In the build process for variant 01, the macro SINGLE_ENDPOINT_INTERFACE
 # 	is undefined, while in the build process for variant 02,
@@ -18,8 +22,8 @@
 # 	endpoints to send the scope/logic analyzer data" (from
 # 	https://github.com/espotek-org/Labrador/issues/260)
 # *NOTE* : there is a commented-out line defining SINGLE_ENDPOINT_INTERFACE in
-# globals.h.  If it is uncommented, both 'make 01' and 'make 02' will
-# produce variant 02.  Further, 'make 01' will mislabel the firmware with
+# globals.h.  If it is uncommented, both `make 01` and `make 02` will
+# produce variant 02.  Further, `make 01` will mislabel the firmware with
 # the suffix 01.  It is recommended that this line in globals.h be left
 # commented-out, which ensures that `make 01` and `make 02` work as
 # expected.  Similarly, FIRMWARE_VERSION_ID is commented out in globals.h
