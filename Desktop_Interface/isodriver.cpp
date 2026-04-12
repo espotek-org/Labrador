@@ -389,11 +389,12 @@ void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes,
         range.lower += scale * offset;
         if (range.upper > 90.0) range.upper = 90.0;
         if (range.lower < -90.0) range.lower = -90.0;
-        topRange = range.upper;
-        botRange = range.lower;
-
-        topRangeUpdated(topRange);
-        botRangeUpdated(botRange);
+        if( (range.upper - range.lower) > 1.e-4) {
+            topRange = range.upper;
+            botRange = range.lower;
+            topRangeUpdated(topRange);
+            botRangeUpdated(botRange);
+        }
     } else {
         QCPRange range = axes->xAxis->range();
         double offset;
@@ -421,11 +422,12 @@ void DisplayControl::setRespAndSpecRanges(QWheelEvent* event, QCustomPlot* axes,
             if (range.lower < 0.0) range.lower = 0.0;
         }
         if (range.upper > 750.0e3) range.upper = 750.0e3;
-        leftRange = range.lower;
-        rightRange = range.upper;
-
-        if (axes->xAxis->scaleType() == QCPAxis::stLogarithmic) {
-            driver->retickXAxis();
+        if((range.upper - range.lower) > 1.e-3) {
+            leftRange = range.lower;
+            rightRange = range.upper;
+            if (axes->xAxis->scaleType() == QCPAxis::stLogarithmic) {
+                driver->retickXAxis();
+            }
         }
     }
 }
@@ -446,13 +448,17 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
         qDebug() << range.upper;
 
         double scale = steps * (topRange - botRange) / 4.0;
-        topRange -= scale * (1.0 - offset);
-        botRange += scale * offset;
-        if (topRange > 20.0) topRange = 20.0;
-        if (botRange < -20.0) botRange = -20.0;
+        range.upper -= scale * (1.0 - offset);
+        range.lower += scale * offset;
+        if (range.upper > 20.0) range.upper = 20.0;
+        if (range.lower < -20.0) range.lower = -20.0;
+        if( (range.upper - range.lower) > 1.e-6) {
+            topRange = range.upper;
+            botRange = range.lower;
+            topRangeUpdated(topRange);
+            botRangeUpdated(botRange);
+        }
 
-        topRangeUpdated(topRange);
-        botRangeUpdated(botRange);
     } else {
         QCPRange range = axes->xAxis->range();
         double offset = (double)axes->xAxis->pixelToCoord(event->x()) - range.lower;
@@ -467,33 +473,22 @@ void DisplayControl::setVoltageRange (QWheelEvent* event, bool isProperlyPaused,
             qDebug() << "upper = " << range.upper << "lower = " << range.lower;
             qDebug() << "window = " << window;
             qDebug() << scale * offset;
-            qDebug() << scale * (1.0 - offset) * offset;
+            qDebug() << scale * (1.0 - offset);
         }
-        window -= scale * offset;
-        delay += scale * (1.0 - offset) * offset;
 
-        // NOTE: delayUpdated and timeWindowUpdated are called more than once beyond here,
-        // maybe they should only be called once at the end?
-
-        delayUpdated(delay);
-        timeWindowUpdated(window);
-
-        qDebug() << window << delay;
-
-        if (window > maxWindowSize)
-        {
-            window = maxWindowSize;
+        double lower = delay;
+        double upper = delay + window;
+        lower += scale * (1.0 - offset);
+        upper -= scale * offset;
+        if(lower < 0)
+            lower = 0;
+        if(upper > MAX_WINDOW_SIZE)
+            upper = MAX_WINDOW_SIZE;
+        if ((upper - lower) > 1.e-9) {
+            window = upper - lower;
+            delay = lower;
+            delayUpdated(delay);
             timeWindowUpdated(window);
-        }
-        if ((window + delay) > maxWindowSize)
-        {
-            delay = maxWindowSize - window;
-            delayUpdated(delay);
-        }
-        if (delay < 0)
-        {
-            delay = 0;
-            delayUpdated(delay);
         }
     }
 }
