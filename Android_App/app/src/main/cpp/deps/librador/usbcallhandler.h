@@ -11,8 +11,11 @@ extern "C"
 #include "i2cdecoder.h"
 #include <thread>
 #include <vector>
-#include <jni.h>
 #include <chrono>
+
+#ifdef PLATFORM_ANDROID
+#include <jni.h>
+#endif
 
 #define NUM_ISO_ENDPOINTS (1)
 #define NUM_FUTURE_CTX (4)

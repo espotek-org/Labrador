@@ -4,13 +4,14 @@
 #include <dlfcn.h>
 #include "logging_internal.h"
 #include "uartstyledecoder.h"
-
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-
 #include <mutex>
 #include <thread>
+
+#ifdef PLATFORM_ANDROID
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include "SDL_android.h"
+#endif
 
 void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     //Thread mutex??
@@ -173,6 +174,7 @@ usbCallHandler::~usbCallHandler(){
     LIBRADOR_LOG(LOG_DEBUG, "librador USB call handler deleted\n");
 }
 
+#ifdef PLATFORM_ANDROID
 void usbCallHandler::set_bootloader_mode_allowed(bool allowed) {
     JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
     jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
@@ -194,6 +196,7 @@ void usbCallHandler::initiateFirmwareFlash()
     ctx = nullptr;
     handle=  nullptr;
 }
+#endif
 
 //Initialise libusb
 int usbCallHandler::init_libusb(){
@@ -753,6 +756,7 @@ bool usbCallHandler::isoThreadIsActive(){
     return tempReturn;
 }
 
+#ifdef PLATFORM_ANDROID
 int usbCallHandler::flashFirmware(int file_descriptor){
 
     libusb_device *device_ptr;
@@ -830,6 +834,7 @@ int usbCallHandler::flashFirmware(int file_descriptor){
     starting_after_flash = true;
     return 0;
 }
+#endif
 
 void usbCallHandler::dfu_launch() {
     LOGI("\n\n\nDFU LAUNCH.\n\n\n");
@@ -846,6 +851,7 @@ void usbCallHandler::dfu_launch() {
     handle=  nullptr;
 }
 
+#ifdef PLATFORM_ANDROID
 void usbCallHandler::respondToStartupOrUsbStateChange(bool is_plugged_in, int file_descriptor, bool bootloader_mode){
     if(is_plugged_in) {
         if(bootloader_mode) {
@@ -933,3 +939,4 @@ void usbCallHandler::respondToStartupOrUsbStateChange(bool is_plugged_in, int fi
         }
     }
 }
+#endif
