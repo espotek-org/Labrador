@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    namespace = "org.labrador.imgui.android"
+    namespace = "com.EspoTek.Labrador"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "org.labrador.imgui.android"
+        applicationId = "com.EspoTek.Labrador"
         minSdk = 25
         targetSdk = 36
         versionCode = 1
