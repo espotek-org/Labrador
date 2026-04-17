@@ -83,6 +83,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: asset-apk
-          path: Desktop_Interface/Labrador*.apk
+          path: Android_App/Labrador*.apk
           compression-level: 0
           if-no-files-found: error
