@@ -6,8 +6,6 @@
 
 #if defined(PLATFORM_WINDOWS)
 #include "winusbdriver.h"
-#elif defined(PLATFORM_ANDROID)
-#include "androidusbdriver.h"
 #else
 #include "unixusbdriver.h"
 #endif
@@ -58,8 +56,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 #if defined(PLATFORM_WINDOWS)
     ui->controller_iso->setDriver(new winUsbDriver());
-#elif defined(PLATFORM_ANDROID)
-    ui->controller_iso->setDriver(new androidUsbDriver());
 #else
     ui->controller_iso->setDriver(new unixUsbDriver());
 #endif
@@ -111,12 +107,10 @@ MainWindow::MainWindow(QWidget *parent) :
         console->setFont(font);
     }
 
-#ifndef PLATFORM_ANDROID
     ui->kickstartIsoButton->setVisible(0);
     ui->console1->setVisible(0);
     ui->console2->setVisible(0);
     ui->txuart->setVisible(0);
-#endif
     ui->timeBaseSlider->setVisible(0);
 
     //ui->pausedLabel_CH2->setVisible(0);
@@ -135,81 +129,6 @@ MainWindow::MainWindow(QWidget *parent) :
     #ifdef PLATFORM_MAC
         reinitUsb();
     #endif
-    #ifdef PLATFORM_ANDROID
-        ui->actionAutomatically_Enable_Cursors->setVisible(false);
-        //hide second pause label
-        ui->pausedLabel_CH2->setVisible(false);
-        //Capture pinches
-        ui->scopeAxes->grabGesture(Qt::PinchGesture);
-        ui->scopeAxes->installEventFilter(this);
-        //Mutually exclude pinches/cursors
-        connect(ui->scaleHoriCheck, SIGNAL(clicked(bool)),
-                   this, SLOT(horiScaleEvent(bool)));
-        connect(ui->scaleVertCheck, SIGNAL(clicked(bool)),
-                   this, SLOT(vertScaleEvent(bool)));
-        //Screen Rotation.  Thanks, Hamlet.  https://forum.qt.io/topic/66240/how-to-detect-rotate-on-android
-        screenPtr = QGuiApplication::primaryScreen();
-            connect(screenPtr, SIGNAL(orientationChanged(Qt::ScreenOrientation)),
-                       this, SLOT(screenRotateEvent(Qt::ScreenOrientation)));
-
-             screenPtr->setOrientationUpdateMask(
-                        Qt::PortraitOrientation
-                        | Qt::LandscapeOrientation
-                        | Qt::InvertedPortraitOrientation
-                        | Qt::InvertedLandscapeOrientation);
-
-        //Hide the PSU page
-        ui->stackedWidget->removeWidget(ui->page_5);
-
-        //Reconnect the other objects.
-        //ui->controller_iso->driver->setBufferPtr(ui->bufferDisplay);
-        connect(ui->debugButton1, SIGNAL(clicked()), ui->controller_iso->driver, SLOT(avrDebug()));
-        connect(ui->psuSlider, SIGNAL(voltageChanged(double)), ui->controller_iso->driver, SLOT(setPsu(double)));
-        connect(ui->controller_iso, SIGNAL(setGain(double)), ui->controller_iso->driver, SLOT(setGain(double)));
-        connect(ui->controller_iso, &isoDriver::setGain, this, [this](){
-            // Force a trigger refresh when gain changes (issue #233)
-            ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());
-        });
-        connect(ui->controller_fg, &functionGenControl::functionGenToUpdate, ui->controller_iso->driver, &genericUsbDriver::setFunctionGen);
-        connect(ui->bufferDisplay, SIGNAL(modeChange(int)), ui->controller_iso->driver, SLOT(setDeviceMode(int)));
-		connect(ui->bufferDisplay, &bufferControl::modeChange, this, [this](){
-			// Force a trigger refresh
-			ui->controller_iso->setTriggerLevel(ui->triggerLevelValue->value());
-		});
-        connect(ui->bufferDisplay, SIGNAL(updateDig(int)), ui->controller_iso->driver, SLOT(newDig(int)));
-
-        //Set the settings again!
-        connect(ui->controller_iso->driver, SIGNAL(gainBuffers(double)), ui->controller_iso, SLOT(gainBuffers(double)));
-        connect(ui->controller_iso->driver, SIGNAL(disableWindow(bool)), this, SLOT(setEnabled(bool)));
-        connect(ui->controller_iso->driver, SIGNAL(sendClearBuffer(bool,bool,bool)), ui->controller_iso, SLOT(clearBuffers(bool,bool,bool)));
-        //connect(ui->controller_iso->driver, SIGNAL(startIsoTimer()), ui->controller_iso, SLOT(startTimer()));
-        connect(ui->controller_iso->driver, SIGNAL(setVisible_CH2(bool)), ui->controller_iso, SLOT(setVisible_CH2(bool)));
-        //connect(ui->controller_iso->driver, SIGNAL(enableMMTimer()), ui->controller_iso, SLOT(enableMM()));
-        connect(ui->controller_iso->driver, SIGNAL(checkXY(bool)), ui->xyDisplayLabel, SLOT(setChecked(bool)));
-        connect(ui->controller_iso->driver, SIGNAL(disableWindow(bool)), ui->deviceConnected, SLOT(connectedStatusChanged(bool)));
-        connect(ui->controller_iso->driver, SIGNAL(upTick()), ui->controller_iso, SLOT(timerTick()));
-        connect(ui->controller_iso->driver, SIGNAL(connectedStatus(bool)), ui->deviceConnected, SLOT(connectedStatusChanged(bool)));
-        connect(ui->controller_iso->driver, SIGNAL(signalFirmwareFlash(void)), ui->deviceConnected, SLOT(flashingFirmware(void)));
-
-        ui->serialDecodingModeSelect_CH1->setVisible(false);
-        ui->serialDecodingModeSelect_CH2->setVisible(false);
-
-        QTimer::singleShot(30, this, SLOT(dpiAutoScaling()));
-
-        ui->androidMenuButton->setVisible(false);
-
-        ui->menuAndroid_Special->menuAction()->setVisible(false);
-
-        ui->controller_iso->driver->psu_offset = psu_voltage_calibration_offset;
-
-        if((ui->controller_iso->driver->connected)&&dt_userWantsToCalibrate)
-        // this singleShot timer only starts when the core application loop has started, which main.cpp shows is after the mainWindow has
-        // been constructed, so the line below essentially sets on_actionCalibrate... as a callback upon completion of the UI setup
-            QTimer::singleShot(0, this, SLOT(on_actionCalibrate_triggered()));
-
-        ui->controller_iso->driver->calibrateOnConnect = dt_userWantsToCalibrate;
-        connect(ui->controller_iso->driver, SIGNAL(calibrateMe()), this, SLOT(on_actionCalibrate_triggered()));
-    #endif
 
     connect(ui->controller_iso->driver, SIGNAL(killMe()), this, SLOT(reinitUsb()));
     ui->console1->setMaximumBlockCount(MAX_CONSOLE_BLOCK_COUNT);
@@ -218,10 +137,8 @@ MainWindow::MainWindow(QWidget *parent) :
     //ui->amplitudeValue_CH2->setValue(2);
     ui->controller_iso->doNotTouchGraph = false;
 
-#ifndef PLATFORM_ANDROID
     ui->multimeterRLabel->setVisible(false);
     ui->multimeterRComboBox->setVisible(false);
-#endif
 
     connect(ui->controller_iso, SIGNAL(multimeterREnabled(int)), this, SLOT(rSourceIndexChanged(int)));
     connect(ui->controller_iso, SIGNAL(multimeterRMS(double)), ui->multimeterRmsDisplay, SLOT(display(double)));
@@ -246,7 +163,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pause_LA, SIGNAL(toggled(bool)), this, SLOT(paused(bool)));
     connect(ui->multimeterPauseCheckBox, SIGNAL(toggled(bool)), this, SLOT(paused(bool)));
 
-#ifndef PLATFORM_ANDROID
     connect(ui->hideCH1Box, SIGNAL(toggled(bool)), ui->controller_iso, SLOT(hideCH1(bool)));
     connect(ui->hideCH2Box, SIGNAL(toggled(bool)), ui->controller_iso, SLOT(hideCH2(bool)));
 
@@ -255,7 +171,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	ui->hideCH1Box->setVisible(false);
 	ui->hideCH2Box->setVisible(false);
-#endif
     ui->realTimeButton->setVisible(false);
 
     auto geom = QGuiApplication::primaryScreen()->availableGeometry();
@@ -271,7 +186,6 @@ MainWindow::MainWindow(QWidget *parent) :
         this->resize(1520, 800);
     }
 
-#ifndef PLATFORM_ANDROID
     connect(ui->offsetSpinBox_CH1, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH1(double)));
     connect(ui->offsetSpinBox_CH2, SIGNAL(valueChanged(double)), ui->controller_iso, SLOT(offsetChanged_CH2(double)));
 
@@ -280,7 +194,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->attenuationComboBox_CH1, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH1(int)));
     connect(ui->attenuationComboBox_CH2, SIGNAL(currentIndexChanged(int)), ui->controller_iso, SLOT(attenuationChanged_CH2(int)));
-#endif
     connect(ui->controller_iso, &isoDriver::enableCursorGroup, this, &MainWindow::cursorGroupEnabled);
 
 #ifndef DISABLE_SPECTRUM
@@ -409,7 +322,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
     writeSettings("ScopeBotRange", ui->controller_iso->display->botRange);
     writeSettings("ScopeTimeWindow", ui->controller_iso->display->window);
     writeSettings("ScopeDelay", ui->controller_iso->display->delay);
-#ifndef PLATFORM_ANDROID
     writeSettings("ScopeOffsetCH1", ui->offsetSpinBox_CH1->value());
     writeSettings("ScopeOffsetCH2", ui->offsetSpinBox_CH2->value());
     writeSettings("LAOffsetCH1", ui->laOffsetSpinBox_CH1->value());
@@ -425,7 +337,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
     writeSettings("HideMultimeter", ui->actionHide_Widget_Multimeter->isChecked());
     writeSettings("HidePowerSupply", ui->actionHide_Widget_PowerSupply->isChecked());
     writeSettings("HideLogicAnalyzer", ui->actionHide_Widget_LogicAnalyzer->isChecked());
-#endif
     QMainWindow::closeEvent(event);
 }
 
@@ -608,7 +519,6 @@ void MainWindow::resizeEvent(QResizeEvent *event){
         }
     }
 
-#ifndef PLATFORM_ANDROID
     // This prevents the multimeter LCD labels from being differently-sized
     auto mmGeometry = ui->gridLayout->geometry();
     auto rows = ui->gridLayout->rowCount();
@@ -616,7 +526,6 @@ void MainWindow::resizeEvent(QResizeEvent *event){
     auto mmHeight = mmGeometry.height();
     mmGeometry.setHeight(mmHeight - ((mmHeight - ((rows - 1) * spacing)) % rows));
     ui->gridLayout->setGeometry(mmGeometry);
-#endif
 }
 
 void MainWindow::menuSetup(){
@@ -661,10 +570,8 @@ void MainWindow::menuSetup(){
     fpsGroup->addAction(ui->action5FPS);
 
     serialProtocolGroup = new QActionGroup(this);
-#ifndef PLATFORM_ANDROID
     serialProtocolGroup->addAction(ui->actionSerial);
     serialProtocolGroup->addAction(ui->actionI2C);
-#endif
 
 
     connect(ui->actionAutoV, SIGNAL(toggled(bool)), ui->controller_iso, SLOT(setAutoMultimeterV(bool)));
@@ -713,19 +620,15 @@ void MainWindow::menuSetup(){
 
     uartParityGroup_CH1 = new QActionGroup(this);
     uartParityGroup_CH1->addAction(ui->actionNone);
-#ifndef PLATFORM_ANDROID
     uartParityGroup_CH1->addAction(ui->actionEven);
     uartParityGroup_CH1->addAction(ui->actionOdd);
-#endif
     ui->actionNone->setChecked(true);
 
     uartParityGroup_CH2 = new QActionGroup(this);
     uartParityGroup_CH2->addAction(ui->actionNone_2);
-#ifndef PLATFORM_ANDROID
     uartParityGroup_CH2->addAction(ui->actionEven_2);
     uartParityGroup_CH2->addAction(ui->actionOdd_2);
     ui->actionNone_2->setChecked(true);
-#endif
 
     connectionTypeGroup = new QActionGroup(this);
     connectionTypeGroup->addAction(ui->actionLo_bw);
@@ -1383,9 +1286,7 @@ void MainWindow::enableLabradorDebugging(bool enabled){
     ui->debugButton1->setVisible(enabled);
     ui->debugButton2->setVisible(enabled);
     ui->debugButton3->setVisible(enabled);
-#ifndef PLATFORM_ANDROID
     ui->kickstartIsoButton->setVisible(enabled);
-#endif
     ui->debugConsole->setVisible(enabled);
 
     if (enabled)
@@ -1529,7 +1430,6 @@ void MainWindow::readSettingsFile(){
     if (savedDelay >= 0.0 && savedDelay <= 1.0)
         ui->controller_iso->display->delay = savedDelay;
 
-#ifndef PLATFORM_ANDROID
     double savedOffsetCH1 = settings.value("ScopeOffsetCH1", 0.0).toDouble();
     double savedOffsetCH2 = settings.value("ScopeOffsetCH2", 0.0).toDouble();
     if (savedOffsetCH1 >= -20.0 && savedOffsetCH1 <= 20.0)
@@ -1589,7 +1489,6 @@ void MainWindow::readSettingsFile(){
         ui->actionHide_Widget_LogicAnalyzer->setChecked(true);
         on_actionHide_Widget_LogicAnalyzer_triggered(true);
     }
-#endif
 
     //Change connection Type
     switch(connectionType){
@@ -1656,8 +1555,6 @@ void MainWindow::reinitUsbStage2(void){
     qDebug() << "Reinitialising USB driver!";
 #if defined(PLATFORM_WINDOWS)
     ui->controller_iso->setDriver(new winUsbDriver());
-#elif defined(PLATFORM_ANDROID)
-    ui->controller_iso->setDriver(new androidUsbDriver());
 #else
     ui->controller_iso->setDriver(new unixUsbDriver());
 #endif
@@ -1717,309 +1614,6 @@ void MainWindow::resetUsbState(void){
     ui->controller_iso->clearBuffers(1,1,1);
     ui->controller_iso->doNotTouchGraph = false;
 }
-
-
-#ifdef PLATFORM_ANDROID
-//Should be called "High Resolution mode".  This function has been comandeered for Android devices with 1080p or higher resolutions.
-void MainWindow::on_actionOld_Person_Mode_triggered(bool checked)
-{
-    //Scope Page
-    ui->scopeGroup_CH1->setFlat(true);
-    ui->scopeGroup_CH2->setFlat(true);
-    ui->triggerGroup->setFlat(true);
-    ui->cursorGroup->setFlat(true);
-
-
-    //Signal Gen Page
-    ui->signalGenGroup_CH1->setFlat(true);
-    ui->signalGenGroup_CH2->setFlat(true);
-
-    //Multimeter Page
-    ui->multimeterGroup->setFlat(true);
-
-    //Logic Analyzer Page
-    ui->digitalOutputGroup->setFlat(true);
-    ui->busSnifferGroup_CH1->setFlat(true);
-    ui->busSnifferGroup_CH2->setFlat(true);
-    ui->serialDecodingCheck_CH1->setFlat(true);
-    ui->serialDecodingCheck_CH2->setFlat(true);
-
-
-
-
-    for (int i=1;i<100;i++){
-        qDebug() << "High Resolution Mode" << checked;
-    }
-    if(checked){
-        //Embiggen the fonts
-        QFont font_scope1 = ui->scopeGroup_CH1->font();
-        font_scope1.setPointSize(16);
-        font_scope1.setBold(true);
-        ui->scopeGroup_CH1->setFont(font_scope1);
-
-        QFont font_scope2 = ui->scopeGroup_CH2->font();
-        font_scope2.setPointSize(16);
-        font_scope2.setBold(true);
-        ui->scopeGroup_CH2->setFont(font_scope2);
-
-        QFont font_scope_trigger = ui->triggerGroup->font();
-        font_scope_trigger.setPointSize(16);
-        font_scope_trigger.setBold(true);
-        ui->triggerGroup->setFont(font_scope_trigger);
-
-        QFont font_cursor_scaling = ui->cursorGroup->font();
-        font_cursor_scaling.setPointSize(16);
-        font_cursor_scaling.setBold(true);
-        ui->cursorGroup->setFont(font_cursor_scaling);
-
-        QFont font_scope_pause = ui->pausedLabel_CH1->font();
-        font_scope_pause.setPointSize(16);
-        font_scope_pause.setBold(true);
-        ui->pausedLabel_CH1->setFont(font_scope_pause);
-
-        QFont font_sg1 = ui->signalGenGroup_CH1->font();
-        font_sg1.setPointSize(16);
-        font_sg1.setBold(true);
-        ui->signalGenGroup_CH1->setFont(font_sg1);
-
-        QFont font_sg2 = ui->signalGenGroup_CH2->font();
-        font_sg2.setPointSize(16);
-        font_sg2.setBold(true);
-        ui->signalGenGroup_CH2->setFont(font_sg2);
-
-        QFont font_3 = ui->page_3->font();
-        font_3.setPointSize(16);
-        font_3.setBold(true);
-        ui->page_3->setFont(font_3);
-
-        QFont font_4 = ui->page_4->font();
-        font_4.setPointSize(16);
-        font_4.setBold(true);
-        ui->page_4->setFont(font_4);
-
-        QFont font_5 = ui->page_5->font();
-        font_5.setPointSize(16);
-        font_5.setBold(true);
-        ui->page_5->setFont(font_5);
-
-        QFont font_realtime = ui->realTimeButton->font();
-        font_realtime.setPointSize(16);
-        font_realtime.setBold(true);
-        ui->realTimeButton->setFont(font_realtime);
-
-        QFont font_android_menu = ui->androidMenuButton->font();
-        font_android_menu.setPointSize(16);
-        font_android_menu.setBold(true);
-        ui->androidMenuButton->setFont(font_android_menu);
-
-
-        //Embiggen the serial consoles.
-        ui->console1->setMinimumHeight(128);
-        ui->console1->setMaximumHeight(256);
-        ui->console2->setMinimumHeight(128);
-        ui->console2->setMaximumHeight(256);
-
-        //Increase the size of the swiped stack
-        ui->stackedWidget->setMaximumHeight(720);
-        ui->stackedWidget->setMinimumHeight(480);
-
-        //Grow Pause buttons
-        ui->pausedLabel_CH1->setMaximumHeight(80);
-        ui->pausedLabel_CH2->setMaximumHeight(80);
-        ui->pause_LA->setMaximumHeight(80);
-        ui->multimeterPauseCheckBox->setMaximumHeight(80);
-
-        //Show the "single shot" button
-        ui->singleShotCheckBox->setVisible(true);
-
-
-    }else{
-        //Shrink the fonts
-        QFont font_scope1 = ui->scopeGroup_CH1->font();
-        font_scope1.setPointSize(11);
-        font_scope1.setBold(true);
-        ui->scopeGroup_CH1->setFont(font_scope1);
-
-        QFont font_scope2 = ui->scopeGroup_CH2->font();
-        font_scope2.setPointSize(11);
-        font_scope2.setBold(true);
-        ui->scopeGroup_CH2->setFont(font_scope2);
-
-        QFont font_scope_trigger = ui->triggerGroup->font();
-        font_scope_trigger.setPointSize(11);
-        font_scope_trigger.setBold(true);
-        ui->triggerGroup->setFont(font_scope_trigger);
-
-        QFont font_cursor_scaling = ui->cursorGroup->font();
-        font_cursor_scaling.setPointSize(11);
-        font_cursor_scaling.setBold(true);
-        ui->cursorGroup->setFont(font_cursor_scaling);
-
-        QFont font_scope_pause = ui->pausedLabel_CH1->font();
-        font_scope_pause.setPointSize(11);
-        font_scope_pause.setBold(true);
-        ui->pausedLabel_CH1->setFont(font_scope_pause);
-
-        QFont font_sg1 = ui->signalGenGroup_CH1->font();
-        font_sg1.setPointSize(11);
-        font_sg1.setBold(true);
-        ui->signalGenGroup_CH1->setFont(font_sg1);
-
-        QFont font_sg2 = ui->signalGenGroup_CH2->font();
-        font_sg2.setPointSize(11);
-        font_sg2.setBold(true);
-        ui->signalGenGroup_CH2->setFont(font_sg2);
-
-        QFont font_3 = ui->page_3->font();
-        font_3.setPointSize(11);
-        font_3.setBold(true);
-        ui->page_3->setFont(font_3);
-
-        QFont font_4 = ui->page_4->font();
-        font_4.setPointSize(11);
-        font_4.setBold(true);
-        ui->page_4->setFont(font_4);
-
-        QFont font_5 = ui->page_5->font();
-        font_5.setPointSize(11);
-        font_5.setBold(true);
-        ui->page_5->setFont(font_5);
-
-        QFont font_realtime = ui->realTimeButton->font();
-        font_realtime.setPointSize(11);
-        font_realtime.setBold(true);
-        ui->realTimeButton->setFont(font_realtime);
-
-        QFont font_android_menu = ui->androidMenuButton->font();
-        font_android_menu.setPointSize(11);
-        font_android_menu.setBold(true);
-        ui->androidMenuButton->setFont(font_android_menu);
-
-        //Shrink the serial consoles.
-        ui->console1->setMinimumHeight(0);
-        ui->console1->setMaximumHeight(96);
-        ui->console2->setMinimumHeight(0);
-        ui->console2->setMaximumHeight(96);
-
-        //Increase the size of the swiped stack
-        ui->stackedWidget->setMaximumHeight(480);
-        ui->stackedWidget->setMinimumHeight(400);
-
-        //Shrink Pause buttons
-        ui->pausedLabel_CH1->setMaximumHeight(40);
-        ui->pausedLabel_CH2->setMaximumHeight(40);
-        ui->pause_LA->setMaximumHeight(40);
-        ui->multimeterPauseCheckBox->setMaximumHeight(40);
-
-        //Hide the "single shot" button
-        ui->singleShotCheckBox->setVisible(false);
-
-    }
-    return;
-
-}
-
-void MainWindow::screenRotateEvent(Qt::ScreenOrientation orientation)
-{
-    qDebug() << "Orientation:" << orientation;
-
-    QWidget *oldCentralWidget = centralWidget();
-    QLayout *oldLayout = oldCentralWidget->layout();
-    oldLayout->removeWidget(ui->scopeAxes);
-    oldLayout->removeWidget(ui->stackedWidget);
-    oldLayout->removeWidget(ui->deviceConnected);
-
-    QLayout *newLayout;
-    if((orientation == Qt::LandscapeOrientation) || (orientation == Qt::InvertedLandscapeOrientation)){
-      newLayout = new QHBoxLayout(this);
-      ui->stackedWidget->setVisible(0);
-    } else {
-      newLayout = new QVBoxLayout(this);
-      ui->stackedWidget->setVisible(1);
-    }
-    newLayout->addWidget(ui->scopeAxes);
-    newLayout->addWidget(ui->stackedWidget);
-    newLayout->addWidget(ui->deviceConnected);
-    newLayout->setContentsMargins(0,0,0,0);
-    newLayout->setSpacing(0);
-
-    QWidget* newCentralWidget = new QWidget();
-    newCentralWidget->setLayout(newLayout);
-    setCentralWidget(newCentralWidget);
-    delete(oldCentralWidget);
-}
-
-bool MainWindow::eventFilter(QObject *obj, QEvent *event){
-    //qDebug() << event;
-    if(event->type() == QEvent::Gesture){
-        qDebug() << "gesture!!";
-        return gestureFilter(static_cast<QGestureEvent*>(event));
-    } else {
-        return false;
-    }
-
-
-    //return QMainWindow::eventFilter(obj, event);
-}
-
-bool MainWindow::gestureFilter(QGestureEvent *event){
-    QGesture *capturedGesture = event->gesture(Qt::PinchGesture);
-    if(capturedGesture->gestureType() == Qt::PinchGesture){
-        qDebug() << "pinch!";
-        QPinchGesture *pinchGesture = static_cast<QPinchGesture *>(capturedGesture);
-        qDebug() << "Last Centre Point" << pinchGesture->lastCenterPoint();
-        qDebug() << "Last Scale Factor" << pinchGesture->lastScaleFactor();
-        qDebug() << "Start Centre Point" << pinchGesture->startCenterPoint();
-        qDebug() << "Total Scale Factor" << pinchGesture->totalScaleFactor();
-        qDebug() << "Angle" << pinchGesture->rotationAngle();
-
-        qreal totalScaleFactor = pinchGesture->totalScaleFactor();
-
-        bool embiggen;
-        if(totalScaleFactor >= ANDROID_SCALE_INSENSITIVITY){
-            embiggen = true;
-            pinchGesture->setTotalScaleFactor(totalScaleFactor/ANDROID_SCALE_INSENSITIVITY);
-        } else if(totalScaleFactor < (1/ANDROID_SCALE_INSENSITIVITY)){
-            embiggen = false;
-            pinchGesture->setTotalScaleFactor(totalScaleFactor*ANDROID_SCALE_INSENSITIVITY);
-        } else {
-            return true;
-        }
-
-        QPoint point = pinchGesture->centerPoint().toPoint();
-        qDebug() << point;
-        if(scalingInTimeAxis){
-            wheelEmu = new QWheelEvent(point, (embiggen ? 120 : -120), 0, Qt::ControlModifier, Qt::Vertical);
-        } else{
-            wheelEmu = new QWheelEvent(point, (embiggen ? 120 : -120), 0, 0, Qt::Vertical);
-        }
-        ui->controller_iso->setVoltageRange(wheelEmu);
-
-        return true;
-    } else {
-        return false;
-    }
-}
-
-void MainWindow::horiScaleEvent(bool enabled){
-    if(enabled){
-        ui->scaleHoriCheck->setChecked(true);
-    }
-    qDebug() << "Hori Scale";
-    scalingInTimeAxis = true;
-    ui->scaleVertCheck->setChecked(false);
-}
-
-void MainWindow::vertScaleEvent(bool enabled){
-    if(enabled){
-        ui->scaleVertCheck->setChecked(true);
-    }
-    qDebug() << "Vert Scale";
-    scalingInTimeAxis = false;
-    ui->scaleHoriCheck->setChecked(false);
-}
-
-#endif
 
 void MainWindow::on_actionCalibrate_triggered()
 {
@@ -2182,10 +1776,8 @@ void MainWindow::calibrateStage3(){
 
 void MainWindow::rSourceIndexChanged(int newSource){
     if(newSource == 0){
-#ifndef PLATFORM_ANDROID
         ui->multimeterRLabel->setVisible(true);
         ui->multimeterRComboBox->setVisible(true);
-#endif
         ui->signalGenGroup_CH2->setEnabled(false);
         ui->psuGroup->setEnabled(true);
         ui->waveformSelect_CH2->setCurrentText("DC");
@@ -2193,10 +1785,8 @@ void MainWindow::rSourceIndexChanged(int newSource){
         ui->amplitudeValue_CH2->setValue(3);
     }
     if(newSource == 1){
-#ifndef PLATFORM_ANDROID
         ui->multimeterRLabel->setVisible(true);
         ui->multimeterRComboBox->setVisible(true);
-#endif
         ui->psuGroup->setEnabled(false);
         ui->signalGenGroup_CH2->setEnabled(true);
         ui->psuSlider->setValue(100);
@@ -2205,10 +1795,8 @@ void MainWindow::rSourceIndexChanged(int newSource){
     if(newSource == 254){
         ui->signalGenGroup_CH2->setEnabled(false);
         ui->psuGroup->setEnabled(true);
-#ifndef PLATFORM_ANDROID
         ui->multimeterRLabel->setVisible(false);
         ui->multimeterRComboBox->setVisible(false);
-#endif
         ui->waveformSelect_CH2->setCurrentText("Square");
         ui->frequencyValue_CH2->setValue(4);
         ui->dcOffsetValue_CH2->setValue(0);
@@ -2218,10 +1806,8 @@ void MainWindow::rSourceIndexChanged(int newSource){
     if(newSource == 255){
         ui->signalGenGroup_CH2->setEnabled(true);
         ui->psuGroup->setEnabled(true);
-#ifndef PLATFORM_ANDROID
         ui->multimeterRLabel->setVisible(false);
         ui->multimeterRComboBox->setVisible(false);
-#endif
     }
 }
 
@@ -2376,12 +1962,10 @@ void MainWindow::on_actionRecord_CH1_triggered(bool checked)
     QString fileName;
     showFileDialog(&fileName);
     qDebug() << fileName;
-#ifndef PLATFORM_ANDROID
     if (fileName.isEmpty()) {
         ui->actionRecord_CH1->setChecked(false);
         return;  // User cancelled
     }
-#endif
 
     if(ui->controller_iso->driver->deviceMode!=6){
         output375_CH1 = new QFile(fileName);
@@ -2406,12 +1990,10 @@ void MainWindow::on_actionRecord_CH2_triggered(bool checked)
     QString fileName;
     showFileDialog(&fileName);
     qDebug() << fileName;
-#ifndef PLATFORM_ANDROID
     if (fileName.isEmpty()) {
         ui->actionRecord_CH2->setChecked(false);
         return;  // User cancelled
     }
-#endif
 
     output375_CH2 = new QFile(fileName);
     ui->controller_iso->internalBuffer375_CH2->enableFileIO(output375_CH2, daq_num_to_average, daq_max_file_size);
@@ -2528,36 +2110,6 @@ void MainWindow::on_actionOpen_DAQ_File_triggered()
     QFile *inputFile = new QFile(fileName);
     ui->controller_iso->loadFileBuffer(inputFile);
 }
-
-#ifdef PLATFORM_ANDROID
-
-void MainWindow::dpiAutoScaling(){
-    this->update();
-    this->updateGeometry();
-    this->repaint();
-    QSize size = this->size();
-    int numPixels = size.height() * size.width();
-
-    for(int i=0;i<100;i++){
-        qDebug() << size.height();
-        qDebug() << size.width();
-        qDebug() << numPixels;
-    }
-
-    if(numPixels > (1280 * 720 * 1.5)){
-        on_actionOld_Person_Mode_triggered(true);
-    } else on_actionOld_Person_Mode_triggered(false);
-}
-
-
-void MainWindow::on_androidMenuButton_clicked()
-{
-    //ui->menuBar->actions();
-    ui->menuBar->show();
-    dpiAutoScaling();
-}
-
-#endif
 
 void MainWindow::on_actionQuit_triggered()
 {
@@ -2713,7 +2265,6 @@ void MainWindow::on_actionI2C_triggered(bool checked)
 
 void MainWindow::on_actionShow_Range_Dialog_on_Main_Page_triggered(bool checked)
 {
-#ifndef PLATFORM_ANDROID
     if (scopeRangeSwitch == nullptr)
     {
         scopeRangeSwitch = new scopeRangeEnterDialog(nullptr, false, ui->controller_iso->display->topRange, ui->controller_iso->display->botRange, ui->controller_iso->display->window, ui->controller_iso->display->delay);
@@ -2732,13 +2283,11 @@ void MainWindow::on_actionShow_Range_Dialog_on_Main_Page_triggered(bool checked)
     qDebug() << "on_actionShow_Range_Dialog_on_Main_Page_triggered" << checked;
     writeSettings("ShowRangeDialog", checked);
     scopeRangeSwitch->setVisible(checked);
-#endif
 
 }
 
 void MainWindow::paused(bool enabled)
 {
-#ifndef PLATFORM_ANDROID
 	qDebug() << "MainWindow::paused(" << enabled << ")";
 	ui->hideCH1Box->setVisible(enabled);
 	ui->hideCH2Box->setVisible(enabled);
@@ -2748,7 +2297,6 @@ void MainWindow::paused(bool enabled)
 		ui->hideCH1Box->setChecked(false);
 		ui->hideCH2Box->setChecked(false);
 	}
-#endif
 }
 
 void MainWindow::on_actionNone_triggered()
