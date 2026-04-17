@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <jni.h>
 
+#ifdef PLATFORM_ANDROID
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,6 +19,7 @@ JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeInitiateFirm
 #ifdef __cplusplus
 }
 #endif
+#endif // PLATFORM_ANDROID
 
 LIBRADORSHARED_EXPORT int librador_init();
 LIBRADORSHARED_EXPORT int librador_exit();

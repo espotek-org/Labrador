@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#ifdef PLATFORM_ANDROID
 JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeRespondToStartupOrUsbStateChange(JNIEnv *env, jobject thisobject, jboolean is_plugged_in, jint file_descriptor, jboolean bootloader_mode)
 {
     if(!internal_librador_object)
@@ -24,6 +25,7 @@ JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeInitiateFirm
     internal_librador_object->usb_driver->initiateFirmwareFlash();
     return;
 }
+#endif
 
 Librador::Librador()
 {
