@@ -342,8 +342,8 @@ void o1buffer::resetTrigger(double scope_gain, bool twelve_bit_multimeter)
     m_triggerSensitivity = static_cast<short>((1 + abs(actual_trigger_level * kTriggerSensitivityMultiplier )) * TOP / 128.);
     buffer_related_settings_mutex.unlock();
 
-    LOGI("Trigger Level: %d", m_triggerLevelADC);
-    LOGI("Trigger sensitivity: %d", m_triggerSensitivity);
+    LIBRADOR_LOG(LOG_DEBUG, "Trigger Level: %d", m_triggerLevelADC);
+    LIBRADOR_LOG(LOG_DEBUG, "Trigger sensitivity: %d", m_triggerSensitivity);
 }
 
 

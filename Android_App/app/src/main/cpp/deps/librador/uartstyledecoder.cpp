@@ -53,7 +53,7 @@ void uartStyleDecoder::UartDecode()
     //Not a single stop bit, or idle bit, in the whole stream.  Wire must be disconnected.
     if (allZeroes)
 	{
-        LOGW("Wire Disconnect detected!");
+        LIBRADOR_LOG(LOG_WARNING, "Wire Disconnect detected!");
     }
 }
 
@@ -160,7 +160,7 @@ bool uartStyleDecoder::jitterCompensationProcedure(bool current_bit)
     //Can't be bothered dealing with the corner case where the serial pointer is at the very start of the buffer.
     //Just return and try again next time.
     int left_coord = serialPtr_bit - (8*m_parent->m_samples_per_second)/ m_settings.baudRate;
-    LOGI("left_coord = %d", left_coord);
+    LIBRADOR_LOG(LOG_DEBUG, "left_coord = %d", left_coord);
     if (left_coord < 0)
         return true; //Don't want to read out of bounds!!
 

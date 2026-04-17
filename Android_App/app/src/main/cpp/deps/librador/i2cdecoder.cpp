@@ -11,7 +11,7 @@ i2cDecoder::i2cDecoder(o1buffer* sda_in, o1buffer* scl_in) :
 
 void i2cDecoder::reset()
 {
-    LOGI("Resetting I2C");
+    LIBRADOR_LOG(LOG_DEBUG, "Resetting I2C");
 
     if (sda->mostRecentAddress != scl->mostRecentAddress)
     {
@@ -76,9 +76,9 @@ void i2cDecoder::runStateMachine()
 	if ((sdaEdge == edge::rising) && (sclEdge == edge::falling)) // INVALID STATE TRANSITION
 	{
         state = transmissionState::unknown;
-        LOGW("Dumping I2C state and aborting...");
+        LIBRADOR_LOG(LOG_WARNING, "Dumping I2C state and aborting...");
         for (int i=31; i>=0; i--)
-            LOGI("%02x\t%02x", sda->get(serialPtr_bit/8 - i) & 0xFF, scl->get(serialPtr_bit/8 - i) & 0xFF);
+            LIBRADOR_LOG(LOG_DEBUG, "%02x\t%02x", sda->get(serialPtr_bit/8 - i) & 0xFF, scl->get(serialPtr_bit/8 - i) & 0xFF);
         throw std::runtime_error("unknown i2c transmission state");
         return;
 	}
@@ -134,7 +134,7 @@ void i2cDecoder::decodeAddress(edge sdaEdge, edge sclEdge)
 
     if (currentBitIndex == addressBitStreamLength)
     {
-        LOGI("Finished Address Decode");
+        LIBRADOR_LOG(LOG_DEBUG, "Finished Address Decode");
         if (currentBitStream & 0b0000000000000010)
             m_serialBuffer.insert("READ:  ");
         else
@@ -167,7 +167,7 @@ void i2cDecoder::decodeData(edge sdaEdge, edge sclEdge)
 
     if (currentBitIndex == dataBitStreamLength)
     {
-        LOGI("Finished Data byte Decode");
+        LIBRADOR_LOG(LOG_DEBUG, "Finished Data byte Decode");
 
         m_serialBuffer.insert_hex((uint8_t)((currentBitStream & 0b0000000111111110) >> 1));
         m_serialBuffer.insert(' ');
@@ -188,14 +188,14 @@ void i2cDecoder::startCondition()
 	currentBitIndex = 0;
     currentBitStream = 0x0000;
 	state = transmissionState::address;	
-    LOGI("I2C START");
+    LIBRADOR_LOG(LOG_DEBUG, "I2C START");
 }
 
 void i2cDecoder::stopCondition()
 {
     state = transmissionState::idle;
     m_serialBuffer.insert('\n');
-    LOGI("I2C STOP");
+    LIBRADOR_LOG(LOG_DEBUG, "I2C STOP");
 }
 
 char * i2cDecoder::getString()

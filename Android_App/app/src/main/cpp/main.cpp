@@ -98,7 +98,7 @@ int main(int, char**)
     jclass MainActivity(env->GetObjectClass(MainActivityObject));
     jmethodID getDpiID = env->GetMethodID(MainActivity, "getDpi", "()F");
     float dpi = (float) env->CallFloatMethod(MainActivityObject,getDpiID);
-    LOGI("dpi: %.2f", dpi);
+    LIBRADOR_LOG(LOG_DEBUG, "dpi: %.2f", dpi);
     SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window* window = SDL_CreateWindow("main window", (int)bounds.w, (int)bounds.h, window_flags);
     if (window == nullptr)
@@ -201,10 +201,10 @@ int main(int, char**)
     int sh = (int) env->CallIntMethod(MainActivityObject,getScreenHeight);
     int sbh = (int) env->CallIntMethod(MainActivityObject,getStatusBarHeightID);
     int nbh = (int) env->CallIntMethod(MainActivityObject,getNavigationBarHeightID);
-    LOGI("screen width: %d", sw);
-    LOGI("screen height: %d", sh);
-    LOGI("status bar beight: %d", sbh);
-    LOGI("navigation bar beight: %d", nbh);
+    LIBRADOR_LOG(LOG_DEBUG, "screen width: %d", sw);
+    LIBRADOR_LOG(LOG_DEBUG, "screen height: %d", sh);
+    LIBRADOR_LOG(LOG_DEBUG, "status bar beight: %d", sbh);
+    LIBRADOR_LOG(LOG_DEBUG, "navigation bar beight: %d", nbh);
     
     // Our state
     bool show_mainwindow = true;
