@@ -52,7 +52,9 @@ target_include_directories(labrador-imgui-android PRIVATE
         deps/SDL/include/build_config
     )
 
-target_compile_definitions(labrador-imgui-android PRIVATE IMGUI_IMPL_OPENGL_ES3 PLATFORM_ANDROID)
+target_compile_definitions(labrador-imgui-android PRIVATE 
+    IMGUI_IMPL_OPENGL_ES3
+    PLATFORM_ANDROID)
 
 add_library(libusb SHARED IMPORTED)
 set_target_properties(libusb PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_LIST_DIR}/deps/librador/librador_deps/libusb/android/${ANDROID_ABI}/libusb1.0.so)

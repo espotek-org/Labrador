@@ -13,8 +13,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-JNIEXPORT void JNICALL Java_org_labrador_imgui_android_MainActivity_nativeRespondToStartupOrUsbStateChange(JNIEnv *, jobject, jboolean, jint, jboolean);
-JNIEXPORT void JNICALL Java_org_labrador_imgui_android_MainActivity_nativeInitiateFirmwareFlash(JNIEnv *, jobject);
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeRespondToStartupOrUsbStateChange(JNIEnv *, jobject, jboolean, jint, jboolean);
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeInitiateFirmwareFlash(JNIEnv *, jobject);
 #ifdef __cplusplus
 }
 #endif

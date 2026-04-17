@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-JNIEXPORT void JNICALL Java_org_labrador_imgui_android_MainActivity_nativeRespondToStartupOrUsbStateChange(JNIEnv *env, jobject thisobject, jboolean is_plugged_in, jint file_descriptor, jboolean bootloader_mode)
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeRespondToStartupOrUsbStateChange(JNIEnv *env, jobject thisobject, jboolean is_plugged_in, jint file_descriptor, jboolean bootloader_mode)
 {
     if(!internal_librador_object)
     {
@@ -19,7 +19,7 @@ JNIEXPORT void JNICALL Java_org_labrador_imgui_android_MainActivity_nativeRespon
     return;
 }
 
-JNIEXPORT void JNICALL Java_org_labrador_imgui_android_MainActivity_nativeInitiateFirmwareFlash(JNIEnv *env, jobject thisobject)
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeInitiateFirmwareFlash(JNIEnv *env, jobject thisobject)
 {
     internal_librador_object->usb_driver->initiateFirmwareFlash();
     return;
