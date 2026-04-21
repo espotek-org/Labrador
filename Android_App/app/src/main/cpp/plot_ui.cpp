@@ -40,32 +40,23 @@ void get_ref_line_label(char * label, int size, char X_or_Y, ImPlotAxis ax, doub
 
     double ref_1 = ImMin(ref_a, ref_b);
     double ref_2 = ImMax(ref_a, ref_b);
-    int n_prec = 3;
-    int n_sig_figs_needed = ref_1 != ref_2 ? ImMax(ImLog10(ImMax(ImAbs(ref_1),ImAbs(ref_2)) / ImAbs(ref_2-ref_1)),0.) + n_prec : 0;
-    int n_sig_figs_needed_1 = (int) (floor(ImLog10(ImAbs(ref_1))) - floor(ImLog10(ax.Range.Max - ax.Range.Min))) + n_prec;
-    int n_sig_figs_needed_2 = (int) (floor(ImLog10(ImAbs(ref_2))) - floor(ImLog10(ax.Range.Max - ax.Range.Min))) + n_prec;
-
-    n_sig_figs_needed_1 = ImMax(n_sig_figs_needed, n_sig_figs_needed_1);
-    n_sig_figs_needed_2 = ImMax(n_sig_figs_needed, n_sig_figs_needed_2);
-    n_sig_figs_needed_1 = ImMin(n_sig_figs_needed_1, 8);
-    n_sig_figs_needed_2 = ImMin(n_sig_figs_needed_2, 8);
-
-    // write the ref 1, 2 values and their difference to the same number of decimal places
-    int ref_1_prec = n_sig_figs_needed_1 - floor(ImLog10(ImAbs(ref_1)));
-    int ref_2_prec = n_sig_figs_needed_2 - floor(ImLog10(ImAbs(ref_2)));
-    ref_1_prec = ImMax(ref_1_prec, ref_2_prec);
-    ref_2_prec = ImMax(ref_1_prec, ref_2_prec);
-    n_sig_figs_needed_1 = ref_1_prec + floor(ImLog10(ImAbs(ref_1)));
-    n_sig_figs_needed_2 = ref_2_prec + floor(ImLog10(ImAbs(ref_2)));
     double difference = ref_2 - ref_1;
-    int n_sig_figs_needed_diff = ImMax(ref_1_prec, ref_2_prec) + floor(ImLog10(difference));
-    n_sig_figs_needed_diff = ImMin(n_sig_figs_needed_diff, 8);
+    // write the ref 1, 2 values and their difference to the same number of decimal places
+    int max_prec = 3 - floor(ImLog10(ImMin(ax.Range.Max - ax.Range.Min, ImAbs(ref_2 - ref_1))));
+
+    int n_sig_figs_needed_1 = max_prec + floor(ImLog10(ImAbs(ref_1)));
+    int n_sig_figs_needed_2 = max_prec + floor(ImLog10(ImAbs(ref_2)));
+    int n_sig_figs_needed_diff = max_prec + floor(ImLog10(difference));
+
+    n_sig_figs_needed_1 = ImMax(ImMin(n_sig_figs_needed_1, 8),0);
+    n_sig_figs_needed_2 = ImMax(ImMin(n_sig_figs_needed_2, 8),0);
+    n_sig_figs_needed_diff = ImMax(ImMin(n_sig_figs_needed_diff, 8),0);
 
     int buf_size = 64;
-    char str_to_format[buf_size];
-    ImFormatString(str_to_format, buf_size, "%%c1: %%.%dg\n%%c2: %%.%dg\n\xee\xa4\x84%%c: %%.%dg", n_sig_figs_needed_1, n_sig_figs_needed_2, n_sig_figs_needed_diff);
+    char label_template[buf_size];
+    ImFormatString(label_template, buf_size, "%%c1: %%.%dg\n%%c2: %%.%dg\n\xee\xa4\x84%%c: %%.%dg", n_sig_figs_needed_1, n_sig_figs_needed_2, n_sig_figs_needed_diff);
 
-    ImFormatString(label, size, str_to_format, X_or_Y, ref_1, X_or_Y, ref_2, X_or_Y, difference);
+    ImFormatString(label, size, label_template, X_or_Y, ref_1, X_or_Y, ref_2, X_or_Y, difference);
 }
 
 void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled, bool chB_enabled, double data_width, double plot_height)
