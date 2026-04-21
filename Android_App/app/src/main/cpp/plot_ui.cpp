@@ -36,6 +36,38 @@ void plotUI::recompute_x_bounds(bool mode_changed, inputsUI::Mode mode)
     }
 }
 
+void get_ref_line_label(char * label, int size, char X_or_Y, ImPlotAxis ax, double ref_a, double ref_b) {
+
+    double ref_1 = ImMin(ref_a, ref_b);
+    double ref_2 = ImMax(ref_a, ref_b);
+    int n_prec = 3;
+    int n_sig_figs_needed = ref_1 != ref_2 ? ImMax(ImLog10(ImMax(ImAbs(ref_1),ImAbs(ref_2)) / ImAbs(ref_2-ref_1)),0.) + n_prec : 0;
+    int n_sig_figs_needed_1 = (int) (floor(ImLog10(ImAbs(ref_1))) - floor(ImLog10(ax.Range.Max - ax.Range.Min))) + n_prec;
+    int n_sig_figs_needed_2 = (int) (floor(ImLog10(ImAbs(ref_2))) - floor(ImLog10(ax.Range.Max - ax.Range.Min))) + n_prec;
+
+    n_sig_figs_needed_1 = ImMax(n_sig_figs_needed, n_sig_figs_needed_1);
+    n_sig_figs_needed_2 = ImMax(n_sig_figs_needed, n_sig_figs_needed_2);
+    n_sig_figs_needed_1 = ImMin(n_sig_figs_needed_1, 8);
+    n_sig_figs_needed_2 = ImMin(n_sig_figs_needed_2, 8);
+
+    // write the ref 1, 2 values and their difference to the same number of decimal places
+    int ref_1_prec = n_sig_figs_needed_1 - floor(ImLog10(ImAbs(ref_1)));
+    int ref_2_prec = n_sig_figs_needed_2 - floor(ImLog10(ImAbs(ref_2)));
+    ref_1_prec = ImMax(ref_1_prec, ref_2_prec);
+    ref_2_prec = ImMax(ref_1_prec, ref_2_prec);
+    n_sig_figs_needed_1 = ref_1_prec + floor(ImLog10(ImAbs(ref_1)));
+    n_sig_figs_needed_2 = ref_2_prec + floor(ImLog10(ImAbs(ref_2)));
+    double difference = ref_2 - ref_1;
+    int n_sig_figs_needed_diff = ImMax(ref_1_prec, ref_2_prec) + floor(ImLog10(difference));
+    n_sig_figs_needed_diff = ImMin(n_sig_figs_needed_diff, 8);
+
+    int buf_size = 64;
+    char str_to_format[buf_size];
+    ImFormatString(str_to_format, buf_size, "%%c1: %%.%dg\n%%c2: %%.%dg\n\xee\xa4\x84%%c: %%.%dg", n_sig_figs_needed_1, n_sig_figs_needed_2, n_sig_figs_needed_diff);
+
+    ImFormatString(label, size, str_to_format, X_or_Y, ref_1, X_or_Y, ref_2, X_or_Y, difference);
+}
+
 void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled, bool chB_enabled, double data_width, double plot_height)
 {
     std::vector<double> *from_librador_chA;
@@ -191,14 +223,29 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             ImPlot::SetNextAxisLimits(ImAxis_X1, xmin, xmax, ImPlotCond_Always);
             ImPlot::SetNextAxisLimits(ImAxis_Y1, ymin, ymax, ImPlotCond_Always);
 
+            int buffer_size = 64;
+            char x_ref_line_label[buffer_size];
+            char y_ref_line_label[buffer_size];
+            if(enable_x_ref_lines) {
+                get_ref_line_label(x_ref_line_label, buffer_size, 'X', mainplot->XAxis(0), x_ref_1, x_ref_2);
+            } else {
+                x_ref_line_label[0] = '\0';
+            }
+            if(enable_y_ref_lines) {
+                get_ref_line_label(y_ref_line_label, buffer_size, 'Y', mainplot->YAxis(0), y_ref_1, y_ref_2);
+            } else {
+                y_ref_line_label[0] = '\0';
+            }
+
+
             if(enable_x_ref_lines || enable_y_ref_lines) {
-                ImGui::SetNextWindowBgAlpha(0.25f);
                 ImGuiStyle& style = ImGui::GetStyle();
 
                 ImPlotContext& gp = *GImPlot;
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {2 * style.ItemSpacing.x, style.ItemSpacing.y});
-                float ref_legend_width = (enable_x_ref_lines + enable_y_ref_lines) * ImGui::CalcTextSize("X1: -0.000").x + (enable_x_ref_lines && enable_y_ref_lines) * style.ItemSpacing.x + 2 * style.FramePadding.x;
-                float ref_legend_height = 3 * ImGui::GetFontSize() + 2 * style.FramePadding.y;
+                float ref_legend_width = ImGui::CalcTextSize(x_ref_line_label).x + ImGui::CalcTextSize(y_ref_line_label).x + (enable_x_ref_lines && enable_y_ref_lines) * style.ItemSpacing.x + 2 * style.FramePadding.x;
+                float ref_legend_height = ImMax(ImGui::CalcTextSize(x_ref_line_label).y, ImGui::CalcTextSize(y_ref_line_label).y) + 2 * style.FramePadding.y;
+
                 ImGui::SetCursorScreenPos(mainplot->PlotRect.Max - ImVec2(ref_legend_width, ref_legend_height) - gp.Style.LegendPadding );
                 ImDrawList* draw_list = ImGui::GetWindowDrawList();
                 draw_list->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(ref_legend_width, ref_legend_height), ImGui::GetColorU32(ImGuiCol_WindowBg,.75));
@@ -206,13 +253,13 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
 
                 ImGui::BeginGroup();
                 if(enable_x_ref_lines) {
-                    ImGui::Text("X1: %.3f\nX2: %.3f\n\xee\xa4\x84X: %.3f", fmin(x_ref_1,x_ref_2), fmax(x_ref_1,x_ref_2), fabs(x_ref_2 - x_ref_1));
+                    ImGui::Text("%s", x_ref_line_label);
                 }
                 if(enable_x_ref_lines && enable_y_ref_lines) {
                     ImGui::SameLine();
                 }
                 if(enable_y_ref_lines) {
-                    ImGui::Text("Y1: %.3f\nY2: %.3f\n\xee\xa4\x84Y: %.3f", fmin(y_ref_1,y_ref_2), fmax(y_ref_1,y_ref_2), fabs(y_ref_2 - y_ref_1));
+                    ImGui::Text("%s", y_ref_line_label);
                 }
                 ImGui::EndGroup();
                 ImGui::PopStyleVar();
