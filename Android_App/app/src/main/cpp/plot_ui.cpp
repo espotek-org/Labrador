@@ -122,8 +122,8 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             ImGuiContext& g = *GImGui;
 
             if(ImPlot::IsAxisActivated(ImAxis_X1)) {
-                float mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_X1);
-                cursor_drag_tool_toggle = fabs(x_ref_1 - mouse_down_clicked_val) > fabs(x_ref_2 - mouse_down_clicked_val);
+                double mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_X1);
+                cursor_drag_tool_toggle = ImAbs(x_ref_1 - mouse_down_clicked_val) > ImAbs(x_ref_2 - mouse_down_clicked_val);
             }
 
             ImPlotDragToolFlags x1_drag_tool_flags = cursor_drag_tool_toggle ? ImPlotDragToolFlags_NoAxisInputs : 0;
@@ -146,8 +146,8 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             }
 
             if(ImPlot::IsAxisActivated(ImAxis_Y1)) {
-                float mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_Y1);
-                cursor_drag_tool_toggle = fabs(y_ref_1 - mouse_down_clicked_val) > fabs(y_ref_2 - mouse_down_clicked_val);
+                double mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_Y1);
+                cursor_drag_tool_toggle = ImAbs(y_ref_1 - mouse_down_clicked_val) > ImAbs(y_ref_2 - mouse_down_clicked_val);
             }
 
             ImPlotDragToolFlags y1_drag_tool_flags = cursor_drag_tool_toggle ? ImPlotDragToolFlags_NoAxisInputs : 0;
