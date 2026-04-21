@@ -7,14 +7,16 @@
 #define GRAPH_SAMPLES 512
 class plotUI
 {
-    float xmin = -.5;
-    float xmax = 0.;
-    float ymin = -2.;
-    float ymax = 2.;
+    double xmin = -.5;
+    double xmax = 0.;
+    double ymin = -2.;
+    double ymax = 2.;
     const double max_time_window_375khz = 10;
-    const double max_voltage = 20;
+    const float max_voltage = 20;
     double x_constraint_min = -max_time_window_375khz;
     double x_constraint_max = 0.;
+    const double min_window_size = 1.e-6;
+    const double min_voltage_diff = 1.e-3;
 
     double x_ref_1;
     double x_ref_2;

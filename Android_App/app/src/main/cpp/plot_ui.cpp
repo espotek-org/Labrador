@@ -187,14 +187,47 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             if(ImGui::BeginPopup("select x lims")) {
                 ImGuiStyle& style = ImGui::GetStyle();
                 ImGui::Text("X-axis limits:");
-                ImGui::PushItemWidth(ImGui::CalcTextSize("-10.00 s").x + 2 * style.FramePadding.x);
-                ImGui::InputFloat("Min", &xmin, 0.f, 0.f, "%.2f s");
-                float new_window = xmax - xmin;
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-00000000. s").x + 2 * style.FramePadding.x);
+                float xminf = xmin;
+                float window = xmax - xmin;
+                int n_prec = 3;
+                int n_sig_figs_needed = xmax != xmin ? ImMax(ImLog10(ImMax(ImAbs(xmax),ImAbs(xmin)) / ImAbs(window)),0.) + n_prec : 0;
+                n_sig_figs_needed = ImMin(n_sig_figs_needed, 8);
+
+                char label_template[32];
+                ImFormatString(label_template, 32, "%%.%dg s", n_sig_figs_needed);
+                if(ImGui::InputFloat("Min", &xminf, 0.f, 0.f, label_template)) {
+                    if(xminf < 0) {
+                        xminf = ImMax((float) x_constraint_min, xminf);
+                        xminf = ImMin((float) x_constraint_max, xminf);
+                        xmin = xminf;
+                    }
+                }
+                float new_window = xmax - xmin; 
                 float new_delay = fabs(-xmax); // fabs to prevent signed 0
-                ImGui::InputFloat("Window", &new_window, 0.f, 0.f, "%.2f s");
-                ImGui::InputFloat("Delay", &new_delay, 0.f, 0.f, "%.2f s");
-                xmin = -new_delay - new_window;
-                xmax = -new_delay;
+                char window_label_template[32];
+                ImFormatString(window_label_template, 32, "%%.%dg s", n_prec);
+                if(ImGui::InputFloat("Window", &new_window, 0.f, 0.f, window_label_template)) {
+                    if(new_window < 0) {
+                        new_window = xmax - xmin;
+                    }
+                    new_window = ImMax((double) new_window, min_window_size);
+                }
+                if(ImGui::InputFloat("Delay", &new_delay, 0.f, 0.f, label_template)) {
+                    if(new_delay < 0) {
+                        new_delay = fabs(-xmax);
+                    }
+                }
+                double new_xmin = -new_delay - new_window;
+                double new_xmax = -new_delay;
+                new_xmin = ImMax(x_constraint_min, new_xmin);
+                new_xmin = ImMin(x_constraint_max - min_window_size, new_xmin);
+                new_xmax = ImMax(new_xmin + min_window_size, new_xmax);
+                new_xmax = ImMin(x_constraint_max, new_xmax);
+                if(new_xmin!=new_xmax) {
+                    xmin = new_xmin;
+                    xmax = new_xmax;
+                }
                 ImGui::EndPopup();
             } else {
                 xmin = axes_limits.X.Min;
@@ -208,9 +241,25 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             if(ImGui::BeginPopup("select y lims")) {
                 ImGuiStyle& style = ImGui::GetStyle();
                 ImGui::Text("Y-axis limits:");
-                ImGui::PushItemWidth(ImGui::CalcTextSize("-20.00 V").x + 2 * style.FramePadding.x);
-                ImGui::InputFloat("Max", &ymax, 0.f, 0.f, "%.2f V");
-                ImGui::InputFloat("Min", &ymin, 0.f, 0.f, "%.2f V");
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-00000000. V").x + 2 * style.FramePadding.x);
+                int n_sig_figs_needed = ymin != ymax ? ImMax(ImLog10(ImMax(ImAbs(ymin),ImAbs(ymax)) / ImAbs(ymin-ymax)),0.) + 3 : 0;
+                n_sig_figs_needed = ImMin(n_sig_figs_needed, 8);
+                char label_template[32];
+                ImFormatString(label_template, 32, "%%.%dg V", n_sig_figs_needed);
+                float ymaxf = ymax;
+                if(ImGui::InputFloat("Max", &ymaxf, 0.f, 0.f, label_template)) {
+                    ymaxf = ImMin(max_voltage, ymaxf);
+                    if(ymaxf > ymin) {
+                        ymax = ymaxf;
+                    }
+                }
+                float yminf = ymin;
+                if(ImGui::InputFloat("Min", &yminf, 0.f, 0.f, label_template)) {
+                    yminf = ImMax(-max_voltage, yminf);
+                    if(yminf < ymax) {
+                        ymin = yminf;
+                    }
+                }
                 ImGui::EndPopup();
             } else {
                 ymin = axes_limits.Y.Min;
