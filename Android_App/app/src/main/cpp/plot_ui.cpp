@@ -41,7 +41,6 @@ void get_ref_line_label(char * label, int size, char X_or_Y, ImPlotAxis ax, doub
     double ref_1 = ImMin(ref_a, ref_b);
     double ref_2 = ImMax(ref_a, ref_b);
     double difference = ref_2 - ref_1;
-    // write the ref 1, 2 values and their difference to the same number of decimal places
     int max_prec = 3 - floor(ImLog10(ImMin(ax.Range.Max - ax.Range.Min, ImAbs(ref_2 - ref_1))));
 
     int n_sig_figs_needed_1 = max_prec + floor(ImLog10(ImAbs(ref_1)));
@@ -178,46 +177,59 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             if(ImGui::BeginPopup("select x lims")) {
                 ImGuiStyle& style = ImGui::GetStyle();
                 ImGui::Text("X-axis limits:");
-                ImGui::PushItemWidth(ImGui::CalcTextSize("-00000000. s").x + 2 * style.FramePadding.x);
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-000000000. s").x + 2 * style.FramePadding.x);
                 float xminf = xmin;
                 float window = xmax - xmin;
+                float delay = ImAbs(-xmax); // fabs to prevent signed 0
                 int n_prec = 3;
-                int n_sig_figs_needed = xmax != xmin ? ImMax(ImLog10(ImMax(ImAbs(xmax),ImAbs(xmin)) / ImAbs(window)),0.) + n_prec : 0;
-                n_sig_figs_needed = ImMin(n_sig_figs_needed, 8);
+                int max_prec = n_prec - floor(ImLog10(ImAbs(window))); //
 
-                char label_template[32];
-                ImFormatString(label_template, 32, "%%.%dg s", n_sig_figs_needed);
-                if(ImGui::InputFloat("Min", &xminf, 0.f, 0.f, label_template)) {
+                char min_label_template[32];
+                int n_sig_figs_needed_min = max_prec + floor(ImLog10(ImAbs(xminf)));
+                n_sig_figs_needed_min = ImMax(ImMin(n_sig_figs_needed_min, 8),0);
+                ImFormatString(min_label_template, 32, "%%.%dg s", n_sig_figs_needed_min);
+                if(ImGui::InputFloat("Min", &xminf, 0.f, 0.f, min_label_template)) {
                     if(xminf < 0) {
                         xminf = ImMax((float) x_constraint_min, xminf);
                         xminf = ImMin((float) x_constraint_max, xminf);
                         xmin = xminf;
                     }
                 }
-                float new_window = xmax - xmin; 
-                float new_delay = fabs(-xmax); // fabs to prevent signed 0
+
+                bool modified = false;
                 char window_label_template[32];
                 ImFormatString(window_label_template, 32, "%%.%dg s", n_prec);
-                if(ImGui::InputFloat("Window", &new_window, 0.f, 0.f, window_label_template)) {
-                    if(new_window < 0) {
-                        new_window = xmax - xmin;
-                    }
-                    new_window = ImMax((double) new_window, min_window_size);
-                }
-                if(ImGui::InputFloat("Delay", &new_delay, 0.f, 0.f, label_template)) {
-                    if(new_delay < 0) {
-                        new_delay = fabs(-xmax);
+                if(ImGui::InputFloat("Window", &window, 0.f, 0.f, window_label_template)) {
+                    if(window <= 0) {
+                        window = xmax - xmin;
+                    } else {
+                        window = ImMax((double) window, min_window_size);
+                        modified = true;
                     }
                 }
-                double new_xmin = -new_delay - new_window;
-                double new_xmax = -new_delay;
-                new_xmin = ImMax(x_constraint_min, new_xmin);
-                new_xmin = ImMin(x_constraint_max - min_window_size, new_xmin);
-                new_xmax = ImMax(new_xmin + min_window_size, new_xmax);
-                new_xmax = ImMin(x_constraint_max, new_xmax);
-                if(new_xmin!=new_xmax) {
-                    xmin = new_xmin;
-                    xmax = new_xmax;
+
+                char delay_label_template[32];
+                int n_sig_figs_needed_delay = max_prec + (delay != 0 ? floor(ImLog10(ImAbs(delay))) : 0);
+                n_sig_figs_needed_delay = ImMax(ImMin(n_sig_figs_needed_delay, 8),0);
+                ImFormatString(delay_label_template, 32, "%%.%dg s", n_sig_figs_needed_delay);
+                if(ImGui::InputFloat("Delay", &delay, 0.f, 0.f, delay_label_template)) {
+                    if(delay < 0) {
+                        delay = fabs(-xmax);
+                    } else {
+                        modified = true;
+                    }
+                }
+                if(modified) {
+                    double new_xmin = -delay - window;
+                    double new_xmax = -delay;
+                    new_xmin = ImMax(x_constraint_min, new_xmin);
+                    new_xmin = ImMin(x_constraint_max - min_window_size, new_xmin);
+                    new_xmax = ImMax(new_xmin + min_window_size, new_xmax);
+                    new_xmax = ImMin(x_constraint_max, new_xmax);
+                    if(new_xmin!=new_xmax) {
+                        xmin = new_xmin;
+                        xmax = new_xmax;
+                    }
                 }
                 ImGui::EndPopup();
             } else {
@@ -232,7 +244,7 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             if(ImGui::BeginPopup("select y lims")) {
                 ImGuiStyle& style = ImGui::GetStyle();
                 ImGui::Text("Y-axis limits:");
-                ImGui::PushItemWidth(ImGui::CalcTextSize("-00000000. V").x + 2 * style.FramePadding.x);
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-000000000. V").x + 2 * style.FramePadding.x);
                 int n_sig_figs_needed = ymin != ymax ? ImMax(ImLog10(ImMax(ImAbs(ymin),ImAbs(ymax)) / ImAbs(ymin-ymax)),0.) + 3 : 0;
                 n_sig_figs_needed = ImMin(n_sig_figs_needed, 8);
                 char label_template[32];
