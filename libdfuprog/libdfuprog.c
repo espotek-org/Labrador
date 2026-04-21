@@ -190,9 +190,11 @@ int dfuprog_virtual_main(int argc, char **argv)
     dfu_device.interface = interface;
 
     int retries = 6;
-    while (retries > 0) {
+    dfu_bool made_idle = false;
+    while (retries > 0 && made_idle == false) {
         switch (dfu_make_idle(&dfu_device, args.initial_abort)) {
             case 0:
+                made_idle = true;
                 break;
             case 1:
                 retries--;
