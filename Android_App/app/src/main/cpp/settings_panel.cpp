@@ -71,7 +71,7 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
     col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels : 0;
 
     row_col_tiling = (!landscape && (n_singlet_tiles_visible == 2) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < fmax(tile_col_heights[0], tile_col_heights[1]))) || \
-        (landscape && (n_singlet_tiles_visible > 0) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < settings_height_max));
+        (landscape && (n_singlet_tiles_visible > 0) && (tile_col_heights[1] > 0) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < settings_height_max));
 
     if(landscape) {
         if(collapse_settings) {
