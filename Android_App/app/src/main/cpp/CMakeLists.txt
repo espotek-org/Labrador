@@ -32,8 +32,6 @@ add_library(
         deps/imgui/backends/imgui_impl_opengl3.cpp
         ${IMPLOT_SOURCES}
         ${LIBRADOR_SOURCES}
-        deps/SDL/src/core/android/SDL_android.c
-        deps/SDL/src
 )
 
 target_include_directories(labrador-imgui-android PRIVATE
