@@ -70,3 +70,12 @@ Labrador.app
 # Nix
 result
 Desktop_Interface/_install/
+
+# Android
+.gradle
+local.properties
+keystore.properties
+Android_App/app/.cxx/
+Android_App/app/build/
+Android_App/build/
+libdfuprog/build/
