@@ -24,7 +24,6 @@
 #include "scoperangeenterdialog.h"
 //#include "isobuffer.h"
 #include "q_debugstream.h"
-#include "pinchcatcher.h"
 
 
 //The Main Window object.  This has a lot of control information too (keyboard shortcuts etc.)!
