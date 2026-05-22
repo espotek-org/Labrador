@@ -16,11 +16,7 @@ void SingleChannelController::waveformName(QString newName)
     qDebug() << "newName = " << newName;
     m_data.waveform = newName;
 
-#if defined(PLATFORM_ANDROID)
-    QFile file(newName.prepend("assets:/waveforms/").append(".tlw"));
-#else
     QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, newName.prepend("waveforms/").append(".tlw")));
-#endif
 
     qDebug() << "opening" << file.fileName();
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))

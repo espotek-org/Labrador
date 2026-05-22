@@ -15,7 +15,7 @@ CONFIG += c++14
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-unix:!android:!macx: TARGET = labrador
+unix:!macx: TARGET = labrador
 else: TARGET = Labrador
 TEMPLATE = app
 
@@ -76,12 +76,7 @@ HEADERS += \
     i2cdecoder.h \
     asyncdft.h
 
-android: FORMS += \
-    ui_files_mobile/mainwindow.ui \
-    ui_files_mobile/scoperangeenterdialog.ui \
-    ui_files_desktop/daqform.ui \
-    ui_files_desktop/daqloadprompt.ui
-else: FORMS += \
+FORMS += \
     ui_files_desktop/mainwindow.ui \
     ui_files_desktop/scoperangeenterdialog.ui \
     ui_files_desktop/daqform.ui \
@@ -143,7 +138,7 @@ win32 {
 ################    GNU/LINUX BUILD ONLY    ################
 ###########################################################
 
-unix:!android:!macx {
+unix:!macx {
     message("Building for Linux ($${QT_ARCH})")
     DEFINES += PLATFORM_LINUX
 
@@ -232,91 +227,16 @@ unix:SOURCES += unixusbdriver.cpp
 unix:HEADERS += unixusbdriver.h
 
 # For multithreading on Unix fftw
-unix:!android:!macx: LIBS += -fopenmp
+unix:!macx: LIBS += -fopenmp
 macx: LIBS += -lomp
-unix:!android: LIBS += -lfftw3_omp
+unix: LIBS += -lfftw3_omp
 
-#############################################################
-########       SHARED ANDROID/LINUX GCC FLAGS      #########
-###########################################################
+#############################################
+########       LINUX GCC FLAGS      #########
+#############################################
 
 unix:!macx: QMAKE_CXXFLAGS_RELEASE -= -O0
 unix:!macx: QMAKE_CXXFLAGS_RELEASE -= -O1
 unix:!macx: QMAKE_CXXFLAGS_RELEASE -= -O2
 unix:!macx: QMAKE_CXXFLAGS_RELEASE -= -O3
 
-android: QMAKE_CXXFLAGS_RELEASE -= -O0
-android: QMAKE_CXXFLAGS_RELEASE -= -O1
-android: QMAKE_CXXFLAGS_RELEASE -= -O2
-android: QMAKE_CXXFLAGS_RELEASE -= -O3
-android: QMAKE_CXXFLAGS_RELEASE -= -Os
-
-
-android: QMAKE_CFLAGS_RELEASE -= -O0
-android: QMAKE_CFLAGS_RELEASE -= -O1
-android: QMAKE_CFLAGS_RELEASE -= -O2
-android: QMAKE_CFLAGS_RELEASE -= -O3
-android: QMAKE_CFLAGS_RELEASE -= -Os
-
-
-#############################################################
-#################    ANDROID BUILD ONLY    #################
-###########################################################
-
-android {
-    #Android treats char as unsigned by default (why???)
-    QMAKE_CFLAGS += -fsigned-char
-    QMAKE_CXXFLAGS += -fsigned-char
-
-    QT += androidextras
-    CONFIG += mobility
-    CONFIG += android_app_bundle
-    MOBILITY =
-
-    DEFINES += PLATFORM_ANDROID
-    SOURCES += androidusbdriver.cpp
-    HEADERS += androidusbdriver.h
-    INCLUDEPATH += build_android/libusb-242
-
-    ANDROID_PACKAGE_SOURCE_DIR = build_android/package_source
-    ANDROID_MIN_SDK_VERSION = 21
-    ANDROID_TARGET_SDK_VERSION = 31
-    ANDROID_SDK_BUILD_TOOLS_REVISION = 31.0.0
-
-    # These are used in the AndroidManifest.xml template
-    ANDROID_VERSION_NAME = 1.4
-    ANDROID_VERSION_CODE = 9
-    ANDROID_PERMISSIONS += android.permission.INTERNET
-    ANDROID_PERMISSIONS += android.permission.WRITE_EXTERNAL_STORAGE
-    ANDROID_PERMISSIONS += android.permission.READ_EXTERNAL_STORAGE
-
-    firmware.path = /assets/firmware
-    firmware.files = $$files(resources/firmware/labrafirm*)
-
-    waveforms.path = /assets/waveforms
-    waveforms.files = $$files(resources/waveforms/*)
-
-    INSTALLS += firmware waveforms
-
-    # Frequency spectrum/response disabled for now, needs UI and supporting libraries
-    DEFINES += DISABLE_SPECTRUM
-    SOURCES -= asyncdft.cpp
-    HEADERS -= asyncdft.h
-
-    # Library dependencies are only compiled for this ABI currently
-    ANDROID_ABIS = armeabi-v7a arm64-v8a
-
-    # Doing the following inside one equals() failed. qmake bug?  https://forum.qt.io/topic/113836/dynamic-libs-on-android-with-qt5-14-2/4
-    for(abi, ANDROID_ABIS): message("Building for Android ($${abi})")
-    for(abi, ANDROID_ABIS): LIBS += -L$${PWD}/build_android/libusb-242/android/$${abi} -lusb1.0
-    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/libusb-242/android/$${abi}/libusb1.0.so
-
-    #liblog library
-    for(abi, ANDROID_ABIS): LIBS += -L$$PWD/build_android/liblog/lib/$${abi} -llog
-    for(abi, ANDROID_ABIS): ANDROID_EXTRA_LIBS += $${PWD}/build_android/liblog/lib/$${abi}/liblog.so
-}
-
-DISTFILES += \
-    build_android/package_source/AndroidManifest.xml \
-    build_android/package_source/res/xml/device_filter.xml \
-    build_android/package_source/src/androidInterface.java

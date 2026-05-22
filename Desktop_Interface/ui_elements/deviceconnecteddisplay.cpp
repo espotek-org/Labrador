@@ -17,9 +17,6 @@ void deviceConnectedDisplay::connectedStatusChanged(bool status){
         setText("Device Not Connected!");
         setStyleSheet("QLabel { color:red; }");
     }
-#ifdef PLATFORM_ANDROID
-    this->setVisible(!status);
-#endif
 }
 
 void deviceConnectedDisplay::flashingFirmware(void){

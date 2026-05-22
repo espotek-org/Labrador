@@ -24,7 +24,6 @@
 #include "scoperangeenterdialog.h"
 //#include "isobuffer.h"
 #include "q_debugstream.h"
-#include "pinchcatcher.h"
 
 
 //The Main Window object.  This has a lot of control information too (keyboard shortcuts etc.)!
@@ -128,18 +127,6 @@ private slots:
     void resetUsbState(void);
     void rSourceIndexChanged(int newSource);
     void multimeterStateChange(bool state);
-
-#ifdef PLATFORM_ANDROID
-    //Android Special
-    void on_actionOld_Person_Mode_triggered(bool checked);
-    void screenRotateEvent(Qt::ScreenOrientation orientation);
-    bool eventFilter(QObject *obj, QEvent *event);
-    bool gestureFilter(QGestureEvent *event);
-    void horiScaleEvent(bool enabled);
-    void vertScaleEvent(bool enabled);
-    void dpiAutoScaling();
-    void on_androidMenuButton_clicked();
-#endif
 
     void on_actionCalibrate_triggered();
     void on_actionLo_bw_triggered();
@@ -339,11 +326,6 @@ private:
 
     scopeRangeEnterDialog* scopeRangeSwitch = nullptr;
 
-#ifdef PLATFORM_ANDROID
-    //Android Special
-    QScreen *screenPtr;
-    bool scalingInTimeAxis = false;
-#endif
 };
 
 #endif // MAINWINDOW_H

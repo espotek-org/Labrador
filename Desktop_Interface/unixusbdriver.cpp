@@ -507,7 +507,6 @@ void unixUsbDriver::backupCleanup(){
 }
 
 int unixUsbDriver::flashFirmware(void){
-#ifndef PLATFORM_ANDROID
     qDebug() << "\n\n\n\n\n\n\n\nFIRMWARE MISMATCH!!!!  FLASHING....\n\n\n\n\n\n\n";
 
     signalFirmwareFlash();
@@ -564,12 +563,10 @@ int unixUsbDriver::flashFirmware(void){
     ctx = NULL;
 
     return 0;
-#endif
 }
 
 
 void unixUsbDriver::manualFirmwareRecovery(void){
-#ifndef PLATFORM_ANDROID
     //Get location of firmware file
     QString firmware_path = QString::asprintf("firmware/labrafirm_%04x_%02x.hex", EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
     firmware_path = QStandardPaths::locate(QStandardPaths::AppDataLocation, firmware_path);
@@ -643,5 +640,4 @@ void unixUsbDriver::manualFirmwareRecovery(void){
         }
     }
 
-#endif
 }

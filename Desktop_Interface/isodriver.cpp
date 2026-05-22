@@ -570,14 +570,10 @@ void isoDriver::gainBuffers(double multiplier){
 }
 
 void isoDriver::gainTick(void){
-#ifdef PLATFORM_ANDROID
-#warning: "gainTick does nothing on Android!!"
-#else
     qDebug() << "Multiplying by " << multi;
     if (driver->deviceMode <5) internalBuffer375_CH1->gainBuffer(log2(multi));
     if ((driver->deviceMode == 1) | (driver->deviceMode == 2) | (driver->deviceMode == 4)) internalBuffer375_CH2->gainBuffer(log2(multi));
     if ((driver->deviceMode == 6) | (driver->deviceMode == 7)) internalBuffer750->gainBuffer(log2(multi));
-#endif
 }
 
 void isoDriver::setAutoGain(bool enabled){
@@ -592,11 +588,7 @@ void isoDriver::graphMousePress(QMouseEvent *event){
     if (HORICURSORENABLED && (event->button() == Qt::LeftButton)){
         placingHoriAxes = true;
         display->y0 = axes->yAxis->pixelToCoord(event->y());
-#ifndef PLATFORM_ANDROID
     }else if(VERTCURSORENABLED && (event->button() == Qt::RightButton)){
-#else
-    }if(VERTCURSORENABLED){
-#endif
         placingVertAxes = true;
         display->x0 = axes->xAxis->pixelToCoord(event->x());
     }
@@ -607,11 +599,7 @@ void isoDriver::graphMousePress(QMouseEvent *event){
 void isoDriver::graphMouseRelease(QMouseEvent *event){
     if(HORICURSORENABLED && placingHoriAxes && (event->button() == Qt::LeftButton)){
         placingHoriAxes = false;
-#ifndef PLATFORM_ANDROID
     } else if (VERTCURSORENABLED && placingVertAxes && (event->button() == Qt::RightButton)){
-#else
-    } if (VERTCURSORENABLED && placingVertAxes){
-#endif
         placingVertAxes = false;
     }
     qDebug() << "x0 =" << display->x0 << "x1 =" << display->x1 << "y0 =" << display->y0 << "y1 =" << display->y1;
@@ -621,11 +609,7 @@ void isoDriver::graphMouseRelease(QMouseEvent *event){
 void isoDriver::graphMouseMove(QMouseEvent *event){
     if(HORICURSORENABLED && placingHoriAxes){
         display->y1 = axes->yAxis->pixelToCoord(event->y());
-#ifndef PLATFORM_ANDROID
     } else if(VERTCURSORENABLED && placingVertAxes){
-#else
-    } if(VERTCURSORENABLED && placingVertAxes){
-#endif
         display->x1 = axes->xAxis->pixelToCoord(event->x());
     }
     refreshInteractiveGraph();
