@@ -6,9 +6,10 @@ virtualTransformUI virtual_transform_ui = virtualTransformUI();
 sigGenUI sig_gen_ui = sigGenUI();
 psuUI psu_ui = psuUI();
 logicDecodeUI logic_decode_ui = logicDecodeUI();
+daqUI daq_ui = daqUI();
 
-const int n_tiles = 6;
-UI_tile* tiles[n_tiles] = {&inputs_ui, &trigger_ui, &virtual_transform_ui, &sig_gen_ui, &psu_ui, &logic_decode_ui}; 
+const int n_tiles = 7;
+UI_tile* tiles[n_tiles] = {&inputs_ui, &trigger_ui, &virtual_transform_ui, &sig_gen_ui, &psu_ui, &logic_decode_ui, &daq_ui}; 
 
 float pixel_6a_screen_width = 1080.f;
 float pixel_6a_setting_panel_aspect = 1.13; // width to height
