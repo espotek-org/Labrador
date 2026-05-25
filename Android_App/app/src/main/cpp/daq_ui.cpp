@@ -111,9 +111,9 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         timer_on = false;
         timer = 0.f;
         if(doA)
-            librador_daq(0, (duration * in_sample_rate) / downsample_factor);
+            librador_daq(0, (duration * in_sample_rate) / downsample_factor, downsample_factor);
         if(doB)
-            librador_daq(1, (duration * in_sample_rate) / downsample_factor);
+            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor);
     }
 
 

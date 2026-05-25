@@ -67,7 +67,23 @@ int librador_avr_debug(){
     return internal_librador_object->usb_driver->avrDebug();
 }
 
-std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode)
+void librador_analog_daq(int channel, int numToGet, int interval_samples)
+{
+    VECTOR_API_INIT_CHECK
+    VECTOR_USB_INIT_CHECK
+
+    internal_librador_object->usb_driver->daq_double(channel, numToGet, interval_samples);
+}
+
+std::vector<double> * librador_digital_daq(int channel, int numToGet, int interval_samples)
+{
+    VECTOR_API_INIT_CHECK
+    VECTOR_USB_INIT_CHECK
+
+    return internal_librador_object->usb_driver->daq_singleBit(channel, numToGet, interval_samples);
+}
+
+std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode, bool daq)
 {
     VECTOR_API_INIT_CHECK
     VECTOR_USB_INIT_CHECK
@@ -102,7 +118,7 @@ std::vector<double> librador_get_time_array(double delay, double timeWindow_seco
 }
 
 
-std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds){
+std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq){
     VECTOR_API_INIT_CHECK
     VECTOR_USB_INIT_CHECK
 

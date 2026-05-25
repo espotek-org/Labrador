@@ -44,11 +44,12 @@ public:
     int get(int address);
     int mostRecentAddress = 0;
     int mostRecentAddressPaused = 0;
+    int mostRecentAddressDAQ = 0;
     int stream_index_at_last_call = 0;
     int distanceFromMostRecentAddress(int index);
     void resetTrigger(double scope_gain, bool twelve_bit_multimeter);
-    std::vector<double> *getMany_double(int numToGet, double interval_samples, int delay_sample, int filter_mode, double scope_gain, bool twelve_bit_multimeter);
-    std::vector<double> *getMany_singleBit(int numToGet, double interval_subsamples, int delay_subsamples);
+    std::vector<double> *getMany_double(int numToGet, double interval_samples, int delay_sample, int filter_mode, double scope_gain, bool twelve_bit_multimeter, bool daq = false);
+    std::vector<double> *getMany_singleBit(int numToGet, double interval_subsamples, int delay_subsamples, bool daq = false);
     std::vector<double> *getSinceLast(int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode, double scope_gain, bool twelve_bit_multimeter);
     double vcc = 3.3;
     double frontendGain = (75.0/1075.0);
@@ -59,7 +60,7 @@ public:
     bool setVirtualTransformSettings(virtual_transform_settings new_virtual_transform_settings);
     void setUartDecodeSettings(UartSettings new_settings);
     bool isTriggeringEnabled();
-    int getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool* single_shot_reached = NULL, int* trigger_delay_out = NULL);
+    int getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool* single_shot_reached = NULL, int* trigger_delay_out = NULL, bool daq = false);
     double m_samples_per_second;
     int m_bufferLen = NUM_SAMPLES_PER_CHANNEL;
     void UartDecode();
@@ -69,11 +70,13 @@ private:
     virtual_transform_settings m_virtual_transform_settings;
     int *buffer;
     int *buffer_paused;
+    int *buffer_daq;
     bool *m_is_triggered;
     std::vector<double> convertedStream_double;
+    std::vector<double> convertedStream_double_daq;
     std::vector<uint8_t> convertedStream_digital;
     void updateMostRecentAddress(int newAddress);
-    double get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter);
+    double get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter, bool daq = false);
     double sampleConvert(int sample, double scope_gain, bool twelve_bit_multimeter) const;
     short inverseSampleConvert(double voltageLevel, double scope_gain, bool twelve_bit_multimeter) const;
     enum TriggerSeekState {Invalid, AboveTriggerLevel, BelowTriggerLevel};

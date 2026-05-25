@@ -59,7 +59,10 @@ LIBRADORSHARED_EXPORT uint8_t librador_get_device_firmware_variant();
 
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode);
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
-LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds);
+LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq = false);
+
+LIBRADORSHARED_EXPORT void librador_analog_daq(int channel, int numToGet, int interval_samples);
+LIBRADORSHARED_EXPORT void librador_digital_daq(int channel, int numToGet, int interval_samples);
 
 LIBRADORSHARED_EXPORT std::vector<double> librador_get_time_array(double delay, double timeWindow_seconds, int n_samples);
 

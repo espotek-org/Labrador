@@ -347,107 +347,130 @@ int usbCallHandler::avrDebug(void){
     return 0;
 }
 
-std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode){
-std::vector<double>* temp_to_return = nullptr;
+std::vector<double>* usbCallHandler::daq_double(int channel, int numToGet, int interval_samples) {
+    std::vector<double>* temp_to_return = nullptr;
+    if(channel == 1) {
+        if(deviceMode==6) {
+            internal_o1_buffer_750_CHA->copy_to_daq();
+        } else {
+            internal_o1_buffer_375_CHA->copy_to_daq();
+        }
+    } else {
+        internal_o1_buffer_375_CHB->copy_to_daq();
+    }
+    daq_thread_active = true;
+    daq_thread = new std::thread(&usbCallHandler::getMany_double, this, channel, numToGet, interval_samples, 0, 0, true);
+}
 
-buffer_read_write_mutex.lock();
+std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, daq) {
+    std::vector<double>* temp_to_return = nullptr;
+
+    if(!daq) //daq uses its own buffer
+        buffer_read_write_mutex.lock();
     int delay_including_trigger;
     bool single_shot_reached = false;
     int trigger_delay = 0;
     switch(deviceMode){
     case 0:
         if(channel == 1) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet));
-            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq);
+            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
         }
         break;
     case 1:
         if(channel == 1) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
             internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay, true); // dont multiply trigger_delay by 8 b/c each sample of the buffer is 8 subsamples
-            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false);
+            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
         }
         break;
     case 2:
         if(internal_o1_buffer_375_CHA->isTriggeringEnabled() && ((channel==1) || ((channel == 2) && !internal_o1_buffer_375_CHB->getPaused()))) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
             internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay,true); // only relevant when single-shot triggering
         } else if (internal_o1_buffer_375_CHB->isTriggeringEnabled() && ((channel==2) || ((channel == 1) && !internal_o1_buffer_375_CHA->getPaused()))) {
-            delay_including_trigger = internal_o1_buffer_375_CHB->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay);
+            delay_including_trigger = internal_o1_buffer_375_CHB->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
             internal_o1_buffer_375_CHA->setPaused(single_shot_reached,-trigger_delay,true);// only relevant when single-shot triggering
         } else {
             delay_including_trigger = delay_sample;
         }
-        if(channel == 1) temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false);
-        else if (channel == 2) temp_to_return = internal_o1_buffer_375_CHB->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false);
+        if(channel == 1) temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
+        else if (channel == 2) temp_to_return = internal_o1_buffer_375_CHB->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
         break;
     case 6:
         if(channel == 1){
-            delay_including_trigger = internal_o1_buffer_750->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet));
-            temp_to_return = internal_o1_buffer_750->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false);
+            delay_including_trigger = internal_o1_buffer_750->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq);
+            temp_to_return = internal_o1_buffer_750->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
         }
         break;
     case 7:
         if(channel == 1) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet));
-            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, true);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq);
+            temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, true, daq);
         }
         break;
     }
-    buffer_read_write_mutex.unlock();
+    if(daq) {
+        get_set_daq_thread_active_mutex.lock();
+        daq_thread_active = false;
+        get_set_daq_thread_active_mutex.unlock();
+    } else {
+        buffer_read_write_mutex.unlock();
+    }
     return temp_to_return;
 }
 
-std::vector<double> * usbCallHandler::getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples){
+std::vector<double> * usbCallHandler::getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, daq){
     std::vector<double>* temp_to_return = nullptr;
+    if(!daq) // daq uses its own buffer
+        buffer_read_write_mutex.lock();
+    switch(deviceMode){
+    case 1:
+        if(channel == 2) 
+        {
+            int delay_including_trigger;
+            if(internal_o1_buffer_375_CHA->isTriggeringEnabled()) {
+                bool single_shot_reached = false;
+                int trigger_delay = 0;
+                delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(static_cast<int>(round(delay_subsamples/8.)), round(interval_subsamples/8. * numToGet), &single_shot_reached, &trigger_delay, daq) * 8;
+                internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay, true); // dont multiply trigger_delay by 8 b/c each sample of the buffer is 8 subsamples
+            } else {
+                delay_including_trigger = delay_subsamples;
+            }
 
-    buffer_read_write_mutex.lock();
-        switch(deviceMode){
-        case 1:
-            if(channel == 2) 
-            {
-                int delay_including_trigger;
-                if(internal_o1_buffer_375_CHA->isTriggeringEnabled()) {
-                    bool single_shot_reached = false;
-                    int trigger_delay = 0;
-                    delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(static_cast<int>(round(delay_subsamples/8.)), round(interval_subsamples/8. * numToGet), &single_shot_reached, &trigger_delay) * 8;
-                    internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay, true); // dont multiply trigger_delay by 8 b/c each sample of the buffer is 8 subsamples
-                } else {
-                    delay_including_trigger = delay_subsamples;
-                }
-
-                temp_to_return = internal_o1_buffer_375_CHB->getMany_singleBit(numToGet, interval_subsamples, delay_including_trigger);
-                internal_o1_buffer_375_CHB->UartDecode();
-            }
-            break;
-        case 3:
-            if(channel == 1)
-            {
-                temp_to_return = internal_o1_buffer_375_CHA->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples);
-                internal_o1_buffer_375_CHA->UartDecode();
-            }
-            break;
-        case 4:
-            if(channel == 1){
-                temp_to_return = internal_o1_buffer_375_CHA->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples);
-                internal_o1_buffer_375_CHA->UartDecode();
-            }
-            else if (channel == 2){
-                temp_to_return = internal_o1_buffer_375_CHB->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples);
-                internal_o1_buffer_375_CHB->UartDecode();
-            }
-            try
-            {
-                m_i2c_decoder->run();
-            }
-            catch(...)
-            {
-                LIBRADOR_LOG(LOG_DEBUG, "Resetting I2C");
-                m_i2c_decoder->reset();
-            }
-            break;
+            temp_to_return = internal_o1_buffer_375_CHB->getMany_singleBit(numToGet, interval_subsamples, delay_including_trigger, daq);
+            internal_o1_buffer_375_CHB->UartDecode();
         }
-    buffer_read_write_mutex.unlock();
+        break;
+    case 3:
+        if(channel == 1)
+        {
+            temp_to_return = internal_o1_buffer_375_CHA->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples, daq);
+            internal_o1_buffer_375_CHA->UartDecode();
+        }
+        break;
+    case 4:
+        if(channel == 1){
+            temp_to_return = internal_o1_buffer_375_CHA->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples, daq);
+            internal_o1_buffer_375_CHA->UartDecode();
+        }
+        else if (channel == 2){
+            temp_to_return = internal_o1_buffer_375_CHB->getMany_singleBit(numToGet, interval_subsamples, delay_subsamples, daq);
+            internal_o1_buffer_375_CHB->UartDecode();
+        }
+        try
+        {
+            m_i2c_decoder->run();
+        }
+        catch(...)
+        {
+            LIBRADOR_LOG(LOG_DEBUG, "Resetting I2C");
+            m_i2c_decoder->reset();
+        }
+        break;
+    }
+    if(!daq)
+        buffer_read_write_mutex.unlock();
     return temp_to_return;
 }
 
