@@ -7,6 +7,10 @@
 #include <mutex>
 #include <thread>
 
+extern "C"
+{
+    #include "SDL_iostream_c.h"
+}
 #ifdef PLATFORM_ANDROID
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
@@ -386,8 +390,8 @@ void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples,
 
     if((channel == 1) || (channel == 3)) {
         std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
-//         SDL_IOStream* iostream = open_file(filename);
-//         SDL_CloseIO(iostream);
+        SDL_IOStream* iostream = open_file(filename);
+        SDL_CloseIO(iostream);
     }
     if((channel == 2) || (channel == 3)) {
         std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
@@ -991,23 +995,23 @@ void usbCallHandler::respondToStartupOrUsbStateChange(bool is_plugged_in, int fi
     }
 }
 
-// SDL_IOStream* usbCallHandler::open_file(const char * filepath) {
-//     JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
-//     jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
-//     jclass MainActivity(env->GetObjectClass(MainActivityObject));
-//     jmethodID initFileID = env->GetMethodID(MainActivity, "initFile", "(Ljava/lang/String;)Ljava/lang/String;");
-//     LIBRADOR_LOG(LOG_DEBUG, "daq filename: %s", filepath);
-//     jstring jfilename = env->NewStringUTF(filepath);
-//     jstring juri = (jstring)env->CallObjectMethod(MainActivityObject, initFileID, jfilename);
-//     const char *uri = env->GetStringUTFChars(juri, 0);
-//     LIBRADOR_LOG(LOG_DEBUG, "daq uri: %s", uri);
-//     env->DeleteLocalRef(jfilename);
-// // same as in SDL/src/io/SDL_iostream.c but using a file:// uri b/c such uris are valid inputs to ContentResolver:openFileDescriptor (which gets called by SDL via JNI in SDLActivity.java:openFileDescriptor)
-//     int fd = Android_JNI_OpenFileDescriptor(uri, "w");
-//     FILE *fp = fdopen(fd, "w");
-//     SDL_IOStream* iostream = SDL_IOFromFP(fp, true);
-//     return iostream;
-// }
+SDL_IOStream* usbCallHandler::open_file(const char * filepath) {
+    JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
+    jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
+    jclass MainActivity(env->GetObjectClass(MainActivityObject));
+    jmethodID initFileID = env->GetMethodID(MainActivity, "initFile", "(Ljava/lang/String;)Ljava/lang/String;");
+    LIBRADOR_LOG(LOG_DEBUG, "daq filename: %s", filepath);
+    jstring jfilename = env->NewStringUTF(filepath);
+    jstring juri = (jstring)env->CallObjectMethod(MainActivityObject, initFileID, jfilename);
+    const char *uri = env->GetStringUTFChars(juri, 0);
+    LIBRADOR_LOG(LOG_DEBUG, "daq uri: %s", uri);
+    env->DeleteLocalRef(jfilename);
+// same as in SDL/src/io/SDL_iostream.c but using a file:// uri b/c such uris are valid inputs to ContentResolver:openFileDescriptor (which gets called by SDL via JNI in SDLActivity.java:openFileDescriptor)
+    int fd = Android_JNI_OpenFileDescriptor(uri, "w");
+    FILE *fp = fdopen(fd, "w");
+    SDL_IOStream* iostream = SDL_IOFromFP(fp, true);
+    return iostream;
+}
 #endif
 
 

@@ -19,7 +19,6 @@ class daqUI : public UI_tile
     const ImU8   u8_one  = 1;
     ImU8   downsample_factor  = 1;
     static const int path_size = 128;
-    char full_path[path_size]; 
 
 public:
     daqUI() : UI_tile("DAQ","DAQ",UI_tile::Width::singlet, 8) {};
@@ -27,6 +26,7 @@ public:
     void poll_status();
     bool changed_since_last();
     int get_height() override;
+    char full_path[path_size]; 
 };
 
 #endif // DAQUI_H

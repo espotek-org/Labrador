@@ -5,7 +5,6 @@
 extern "C"
 {
     #include "libdfuprog.h"
-    #include "SDL_iostream_c.h"
 }
 #include "o1buffer.h"
 #include "uartstyledecoder.h"
@@ -69,6 +68,8 @@ typedef struct fGenSettings{
     if(temp_control_transfer_error_value < 0){ \
         return temp_control_transfer_error_value - 1000; \
     }
+
+struct SDL_IOStream;
 
 class usbCallHandler
 {
@@ -173,7 +174,7 @@ private:
     std::mutex buffer_read_write_mutex;
     std::mutex get_set_iso_thread_active_mutex;
 
-//     SDL_IOStream* open_file(const char * filepath);
+    static SDL_IOStream* open_file(const char * filepath);
 };
 
 template <typename T>
