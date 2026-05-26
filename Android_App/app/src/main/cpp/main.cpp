@@ -281,6 +281,7 @@ int main(int, char**)
 
         plot_ui.recompute_x_bounds(inputs_ui.changed_since_last(), inputs_ui.mode);
         logic_decode_ui.update(&inputs_ui);
+        daq_ui.poll_status();
 
         ImGui::SetNextWindowPos(ImVec2(0.f,statusBarHeight));
         ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x,io.DisplaySize.y - statusBarHeight - navigationBarHeight));

@@ -67,23 +67,17 @@ int librador_avr_debug(){
     return internal_librador_object->usb_driver->avrDebug();
 }
 
-void librador_analog_daq(int channel, int numToGet, int interval_samples)
+int librador_daq(int channel, int numToGet, int interval_samples, bool digital, const char* filename)
 {
-    VECTOR_API_INIT_CHECK
-    VECTOR_USB_INIT_CHECK
+    //     should uncomment!
+//     CHECK_API_INITIALISED
+//     CHECK_USB_INITIALISED
 
-    internal_librador_object->usb_driver->daq_double(channel, numToGet, interval_samples);
+    internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, digital, filename);
+    return 1;
 }
 
-std::vector<double> * librador_digital_daq(int channel, int numToGet, int interval_samples)
-{
-    VECTOR_API_INIT_CHECK
-    VECTOR_USB_INIT_CHECK
-
-    return internal_librador_object->usb_driver->daq_singleBit(channel, numToGet, interval_samples);
-}
-
-std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode, bool daq)
+std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode)
 {
     VECTOR_API_INIT_CHECK
     VECTOR_USB_INIT_CHECK
@@ -132,7 +126,7 @@ std::vector<double> * librador_get_digital_data(int channel, double timeWindow_s
     int delay_subsamples = round(delay_seconds * subsamples_per_second);
 //     int numToGet = round(timeWindow_seconds * subsamples_per_second)/interval_subsamples;
 
-    LIBRADOR_LOG(LOG_DEBUG, "interval_subsamples = %d\ndelay_subsamples = %d\nnumToGet=%d\n", interval_subsamples, delay_subsamples, numToGet);
+    LIBRADOR_LOG(LOG_DEBUG, "interval_subsamples = %f\ndelay_subsamples = %d\nnumToGet=%d\n", interval_subsamples, delay_subsamples, numToGet);
 
     return internal_librador_object->usb_driver->getMany_singleBit(channel, numToGet, interval_subsamples, delay_subsamples);
 }
@@ -421,4 +415,10 @@ bool librador_iso_thread_is_active()
 {
     return internal_librador_object->usb_driver->isoThreadIsActive();
 }
+
+bool librador_poll_daq_status()
+{
+    return internal_librador_object->usb_driver->poll_daq_status();
+}
+
 

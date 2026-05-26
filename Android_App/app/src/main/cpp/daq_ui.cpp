@@ -22,15 +22,14 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 #define INDENTRIGHT ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(style.CellPadding.x,0.f));
     const char* ext_storage_path = SDL_GetAndroidExternalStoragePath();
     const char* user_storage_path = SDL_GetAndroidExternalStoragePath();
-    int path_size = 128;
-    char full_path[path_size];
     char user_path[path_size];
 
     const char* mid_user_path = strstr(ext_storage_path, "/Android/data/org.qtproject.example.Labrador/files");
     strcpy(user_path, "/sdcard");
-    strcpy(user_path, mid_user_path);
-    strcpy(user_path, "/");
-    strcpy(full_path, "/");
+    strcat(user_path, mid_user_path);
+    strcat(user_path, "/");
+    strcpy(full_path, ext_storage_path);
+    strcat(full_path, "/");
 
     int file_name_size = 64;
     char file_name[file_name_size];
@@ -43,8 +42,30 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{0.f,0.f});
     ImGui::Dummy(ImVec2(width_pixels,0.f));
     ImGui::PopStyleVar();
-    INDENTRIGHT
+
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.ItemInnerSpacing.y));
+    INDENTRIGHT
+    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("id").x - style.ItemInnerSpacing.x);
+    ImGui::InputText("##iddaq", file_name, file_name_size);
+//     https://developer.android.com/reference/android/R.attr#inputType
+    if(ImGui::IsItemActivated()) {
+        SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 1);
+    } else if (ImGui::IsItemDeactivated()) {
+        SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
+    }
+    strcpy(file_name, "the_file");
+    strcat(user_path, file_name);
+    strcat(full_path, file_name);
+    INDENTRIGHT
+    ImGui::Button("File path");
+    if(ImGui::BeginItemTooltip()){
+        ImGui::PushTextWrapPos(800);
+        ImGui::Text("%s", full_path);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+    INDENTRIGHT
+
     in_sample_rate = 375e3;
     ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1000)/downsample_factor);
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
@@ -71,15 +92,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::EndCombo();
     }
 
-    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("id").x - style.ItemInnerSpacing.x);
-    INDENTRIGHT
-    ImGui::InputText("##iddaq", file_name, file_name_size);
-//     https://developer.android.com/reference/android/R.attr#inputType
-    if(ImGui::IsItemActivated()) {
-        SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 1);
-    } else if (ImGui::IsItemDeactivated()) {
-        SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
-    }
 
     int ch_sel = 1;
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, (ImGui::GetFontSize() + 2 * style.FramePadding.y - ImGui::CalcTextSize("CH: ").y)/2));
@@ -95,11 +107,8 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::Checkbox("B", &doB);
     ImGui::PopStyleVar();
 
-    strcpy(user_path, file_name);
-    strcpy(full_path, file_name);
     INDENTRIGHT
-    ImGui::Button("File path");
-    INDENTRIGHT
+    ImGui::BeginDisabled(daq_converting_and_saving);
     if(ImGui::Button("Begin")) {
         timer_on = true;
         timer = 0.f;
@@ -109,12 +118,19 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::SameLine();
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
-        timer = 0.f;
-        if(doA)
-            librador_daq(0, (duration * in_sample_rate) / downsample_factor, downsample_factor);
-        if(doB)
-            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor);
+        timer = -1.f;
+        if(doA||doB)
+            daq_converting_and_saving = true;
+        if(doA && doB)
+            librador_daq(3, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+        else if(doA)
+            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+        else if(doB)
+            librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+        else
+            librador_daq(-1, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
     }
+    ImGui::EndDisabled();
 
 
     ImGui::EndGroup();
@@ -125,6 +141,12 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f,style.FramePadding.y - style.ItemSpacing.y));
     ImGui::Dummy({0.f,0.f}); // prevents issue with this draw() command affecting the vertical alignment of whatever ui element comes after it
     ImGui::EndGroup();
+}
+
+void daqUI::poll_status()
+{
+    if(daq_converting_and_saving)
+        daq_converting_and_saving = librador_poll_daq_status();
 }
 
 int daqUI::get_height()

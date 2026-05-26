@@ -12,15 +12,19 @@ class daqUI : public UI_tile
     bool units_sel;
     float duration;
     bool doA, doB;
-    float timer;
-    bool timer_on;
+    bool daq_converting_and_saving = false;
+    float timer = -1.f;
+    bool timer_on = false;
     int in_sample_rate;
     const ImU8   u8_one  = 1;
     ImU8   downsample_factor  = 1;
+    static const int path_size = 128;
+    char full_path[path_size]; 
 
 public:
     daqUI() : UI_tile("DAQ","DAQ",UI_tile::Width::singlet, 8) {};
     void draw(float width, inputsUI* inputs_ui = nullptr) override;
+    void poll_status();
     bool changed_since_last();
     int get_height() override;
 };

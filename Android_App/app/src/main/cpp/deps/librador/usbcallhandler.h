@@ -5,6 +5,7 @@
 extern "C"
 {
     #include "libdfuprog.h"
+    #include "SDL_iostream_c.h"
 }
 #include "o1buffer.h"
 #include "uartstyledecoder.h"
@@ -12,6 +13,7 @@ extern "C"
 #include <thread>
 #include <vector>
 #include <chrono>
+#include <atomic>
 
 #ifdef PLATFORM_ANDROID
 #include <jni.h>
@@ -84,8 +86,8 @@ public:
     double get_samples_per_second();
     std::vector<double> *getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, bool daq = false);
     std::vector<double> * getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, bool daq = false);
-    void *daq_double(int channel, int numToGet, double interval_samples);
-    void *daq_singleBit(int channel, int numToGet, double interval_samples);
+    void daq_double(int channel, int numToGet, int interval_samples, const char * filename);
+    void daq_singleBit(int channel, int numToGet, int interval_samples);
     std::vector<double> *getMany_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode);
     bool connected = false;
     //Control Commands
@@ -114,6 +116,9 @@ public:
     void respondToStartupOrUsbStateChange(bool is_plugged_in, int file_descriptor, bool bootloader_mode);
     void set_bootloader_mode_allowed(bool allowed);
     void initiateFirmwareFlash();
+
+    void spawn_daq_thread(int channel, int numToGet, int interval_samples, bool digital, const char* filename);
+    bool poll_daq_status();
 private:
 
     unsigned short VID, PID;
@@ -162,12 +167,13 @@ private:
     bool iso_thread_shutdown_requested = false;
     int iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
     bool iso_thread_active = false;
-    bool daq_thread_active = false;
+    std::atomic<bool> daq_thread_active = false ;
 
     std::mutex iso_thread_shutdown_mutex;
     std::mutex buffer_read_write_mutex;
     std::mutex get_set_iso_thread_active_mutex;
-    std::mutex get_set_daq_thread_active_mutex;
+
+//     SDL_IOStream* open_file(const char * filepath);
 };
 
 template <typename T>

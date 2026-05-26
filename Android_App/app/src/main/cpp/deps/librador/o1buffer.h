@@ -41,7 +41,7 @@ public:
     int addVector(char *firstElement, int numElements);
     int addVector(unsigned char *firstElement, int numElements);
     int addVector(short *firstElement, int numElements);
-    int get(int address);
+    int get(int address, bool daq = false);
     int mostRecentAddress = 0;
     int mostRecentAddressPaused = 0;
     int mostRecentAddressDAQ = 0;
@@ -55,12 +55,13 @@ public:
     double frontendGain = (75.0/1075.0);
     double voltage_ref = 1.65;
     int setPaused(bool is_paused, int mostRecentAddressDelta = 0, bool hard = false);
+    void copy_to_daq();
     bool getPaused();
     bool setTriggerSettings(trigger_settings new_trigger_settings);
     bool setVirtualTransformSettings(virtual_transform_settings new_virtual_transform_settings);
     void setUartDecodeSettings(UartSettings new_settings);
     bool isTriggeringEnabled();
-    int getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool* single_shot_reached = NULL, int* trigger_delay_out = NULL, bool daq = false);
+    int getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool daq = false, bool* single_shot_reached = NULL, int* trigger_delay_out = NULL);
     double m_samples_per_second;
     int m_bufferLen = NUM_SAMPLES_PER_CHANNEL;
     void UartDecode();

@@ -159,6 +159,10 @@ usbCallHandler::~usbCallHandler(){
         LIBRADOR_LOG(LOG_DEBUG, "Transfers freed.\n");
     }
 
+    if(daq_thread && daq_thread->joinable()){
+        daq_thread->join();
+    }
+
     if(handle){
         libusb_release_interface(handle, 0);
         LIBRADOR_LOG(LOG_DEBUG, "Interface released\n");
@@ -347,26 +351,55 @@ int usbCallHandler::avrDebug(void){
     return 0;
 }
 
-std::vector<double>* usbCallHandler::daq_double(int channel, int numToGet, int interval_samples) {
-    std::vector<double>* temp_to_return = nullptr;
-    if(channel == 1) {
+void usbCallHandler::spawn_daq_thread(int channel, int numToGet, int interval_samples, bool digital, const char* filename) {
+    if(digital) {
+//         daq_thread = new std::thread(&usbCallHandler::faq_singleBit, this, channel, numToGet, interval_samples);
+    } else {
+        daq_thread = new std::thread(&usbCallHandler::daq_double, this, channel, numToGet, interval_samples, filename);
+    }
+}
+
+bool usbCallHandler::poll_daq_status() {
+    if(daq_thread_active) {
+        return true;
+    } else {
+        if(daq_thread && daq_thread->joinable()) {
+            daq_thread->join();
+            daq_thread = nullptr;
+        }
+        return false;
+    }
+}
+
+void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples, const char * filename) {
+    daq_thread_active = true;
+    if((channel == 1) || (channel == 3)) {
         if(deviceMode==6) {
-            internal_o1_buffer_750_CHA->copy_to_daq();
+            internal_o1_buffer_750->copy_to_daq();
         } else {
             internal_o1_buffer_375_CHA->copy_to_daq();
         }
-    } else {
+    }
+    if((channel == 2) || (channel == 3)) {
         internal_o1_buffer_375_CHB->copy_to_daq();
     }
-    daq_thread_active = true;
-    daq_thread = new std::thread(&usbCallHandler::getMany_double, this, channel, numToGet, interval_samples, 0, 0, true);
+
+    if((channel == 1) || (channel == 3)) {
+        std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
+//         SDL_IOStream* iostream = open_file(filename);
+//         SDL_CloseIO(iostream);
+    }
+    if((channel == 2) || (channel == 3)) {
+        std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
+    }
+
+    daq_thread_active = false;
 }
 
-std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, daq) {
+std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, bool daq) {
     std::vector<double>* temp_to_return = nullptr;
-
-    if(!daq) //daq uses its own buffer
-        buffer_read_write_mutex.lock();
+    if(!daq)
+        buffer_read_write_mutex.lock(); //daq uses its own buffer (TODO: same for paused state?)
     int delay_including_trigger;
     bool single_shot_reached = false;
     int trigger_delay = 0;
@@ -379,17 +412,17 @@ std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, d
         break;
     case 1:
         if(channel == 1) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq, &single_shot_reached, &trigger_delay);
             internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay, true); // dont multiply trigger_delay by 8 b/c each sample of the buffer is 8 subsamples
             temp_to_return = internal_o1_buffer_375_CHA->getMany_double(numToGet, interval_samples, delay_including_trigger, filter_mode, current_scope_gain, false, daq);
         }
         break;
     case 2:
         if(internal_o1_buffer_375_CHA->isTriggeringEnabled() && ((channel==1) || ((channel == 2) && !internal_o1_buffer_375_CHB->getPaused()))) {
-            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
+            delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq, &single_shot_reached, &trigger_delay);
             internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay,true); // only relevant when single-shot triggering
         } else if (internal_o1_buffer_375_CHB->isTriggeringEnabled() && ((channel==2) || ((channel == 1) && !internal_o1_buffer_375_CHA->getPaused()))) {
-            delay_including_trigger = internal_o1_buffer_375_CHB->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), &single_shot_reached, &trigger_delay, daq);
+            delay_including_trigger = internal_o1_buffer_375_CHB->getDelayIncludingFromTrigger(delay_sample, round(interval_samples * numToGet), daq, &single_shot_reached, &trigger_delay);
             internal_o1_buffer_375_CHA->setPaused(single_shot_reached,-trigger_delay,true);// only relevant when single-shot triggering
         } else {
             delay_including_trigger = delay_sample;
@@ -410,17 +443,12 @@ std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, d
         }
         break;
     }
-    if(daq) {
-        get_set_daq_thread_active_mutex.lock();
-        daq_thread_active = false;
-        get_set_daq_thread_active_mutex.unlock();
-    } else {
+    if(!daq)
         buffer_read_write_mutex.unlock();
-    }
     return temp_to_return;
 }
 
-std::vector<double> * usbCallHandler::getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, daq){
+std::vector<double> * usbCallHandler::getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, bool daq){
     std::vector<double>* temp_to_return = nullptr;
     if(!daq) // daq uses its own buffer
         buffer_read_write_mutex.lock();
@@ -432,7 +460,7 @@ std::vector<double> * usbCallHandler::getMany_singleBit(int channel, int numToGe
             if(internal_o1_buffer_375_CHA->isTriggeringEnabled()) {
                 bool single_shot_reached = false;
                 int trigger_delay = 0;
-                delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(static_cast<int>(round(delay_subsamples/8.)), round(interval_subsamples/8. * numToGet), &single_shot_reached, &trigger_delay, daq) * 8;
+                delay_including_trigger = internal_o1_buffer_375_CHA->getDelayIncludingFromTrigger(static_cast<int>(round(delay_subsamples/8.)), round(interval_subsamples/8. * numToGet), daq, &single_shot_reached, &trigger_delay) * 8;
                 internal_o1_buffer_375_CHB->setPaused(single_shot_reached,-trigger_delay, true); // dont multiply trigger_delay by 8 b/c each sample of the buffer is 8 subsamples
             } else {
                 delay_including_trigger = delay_subsamples;
@@ -962,4 +990,24 @@ void usbCallHandler::respondToStartupOrUsbStateChange(bool is_plugged_in, int fi
         }
     }
 }
+
+// SDL_IOStream* usbCallHandler::open_file(const char * filepath) {
+//     JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
+//     jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
+//     jclass MainActivity(env->GetObjectClass(MainActivityObject));
+//     jmethodID initFileID = env->GetMethodID(MainActivity, "initFile", "(Ljava/lang/String;)Ljava/lang/String;");
+//     LIBRADOR_LOG(LOG_DEBUG, "daq filename: %s", filepath);
+//     jstring jfilename = env->NewStringUTF(filepath);
+//     jstring juri = (jstring)env->CallObjectMethod(MainActivityObject, initFileID, jfilename);
+//     const char *uri = env->GetStringUTFChars(juri, 0);
+//     LIBRADOR_LOG(LOG_DEBUG, "daq uri: %s", uri);
+//     env->DeleteLocalRef(jfilename);
+// // same as in SDL/src/io/SDL_iostream.c but using a file:// uri b/c such uris are valid inputs to ContentResolver:openFileDescriptor (which gets called by SDL via JNI in SDLActivity.java:openFileDescriptor)
+//     int fd = Android_JNI_OpenFileDescriptor(uri, "w");
+//     FILE *fp = fdopen(fd, "w");
+//     SDL_IOStream* iostream = SDL_IOFromFP(fp, true);
+//     return iostream;
+// }
 #endif
+
+

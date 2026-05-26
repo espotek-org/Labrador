@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.lang.String;
+import java.io.File;
 
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.ViewCompat;
@@ -306,4 +307,29 @@ public class MainActivity extends SDLActivity {
         }
         usb_permission_request_allowed = true;
     }
+
+//     public int openFile(String filename) {
+//         File file = new File(filename);
+//         ParcelFileDescriptor filePfd;
+// //         DocumentFile file;
+//         filePfd = getContentResolver().openAssetFileDescriptor(file.toURI(), "w");
+//         int fd = filePfd.getFd();
+// 
+// 
+// 
+//     }
+// 
+    public String initFile(String filename) {
+//         File file = new File(MainActivity.getContext().getExternalFilesDir(null), filename);
+        File file = new File(filename);
+        try{
+            file.createNewFile();
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
+        return file.toURI().toString();
+    }
+
+
 }
