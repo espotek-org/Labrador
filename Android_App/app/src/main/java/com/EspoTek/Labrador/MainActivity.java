@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import android.os.Build;
+import android.os.Environment;
 import android.content.res.Configuration;
 
 import org.libsdl.app.SDLActivity;
@@ -30,6 +31,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.lang.String;
 import java.io.File;
+// import androidx.documentfile.provider.DocumentFile;
+import android.media.MediaScannerConnection;
 
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.ViewCompat;
@@ -320,7 +323,6 @@ public class MainActivity extends SDLActivity {
 //     }
 // 
     public String initFile(String filename) {
-//         File file = new File(MainActivity.getContext().getExternalFilesDir(null), filename);
         File file = new File(filename);
         try{
             file.createNewFile();
@@ -328,8 +330,21 @@ public class MainActivity extends SDLActivity {
         catch(IOException e){
             e.printStackTrace();
         }
+        file.setReadable(true, false);
+        file.setWritable(true, false);
         return file.toURI().toString();
     }
 
+    public String getDocsDir() {
+        String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador";
+        File docs_dir_struct = new File(docs_dir);
+        docs_dir_struct.mkdir();
+        return docs_dir;
+    }
 
+    public void scanFile(String filepath) {
+    MediaScannerConnection
+        .scanFile(MainActivity.getContext(), new String[] {filepath},
+                  new String[] {"text/plain"}, null);
+    }
 }

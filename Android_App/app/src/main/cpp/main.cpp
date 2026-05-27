@@ -288,10 +288,11 @@ int main(int, char**)
 
         ImGuiStyle& style = ImGui::GetStyle();
 
-        bool screen_keyboard_shown = SDL_ScreenKeyboardShown(window);
+//         bool screen_keyboard_shown = SDL_ScreenKeyboardShown(window);
+        bool screen_keyboard_shown = false;
         ImGui::Begin("MainWindow",
                      &show_mainwindow,
-                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | (screen_keyboard_shown ? ImGuiWindowFlags_NoMouseInputs : 0));   
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);   
         float data_width;
         float data_height;
         do_settings_panel_layout(&data_width, &data_height, landscape, io.DisplaySize.y - statusBarHeight - navigationBarHeight - 2 * style.WindowPadding.y, dpi, pixel_6a_dpi);

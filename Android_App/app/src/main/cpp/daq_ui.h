@@ -27,6 +27,7 @@ public:
     bool changed_since_last();
     int get_height() override;
     char full_path[path_size]; 
+    char file_name[path_size/2]; 
 };
 
 #endif // DAQUI_H

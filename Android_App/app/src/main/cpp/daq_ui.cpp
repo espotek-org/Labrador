@@ -20,23 +20,22 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     }
 
 #define INDENTRIGHT ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(style.CellPadding.x,0.f));
-    const char* ext_storage_path = SDL_GetAndroidExternalStoragePath();
-    const char* user_storage_path = SDL_GetAndroidExternalStoragePath();
+    JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
+    jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
+    jclass MainActivity(env->GetObjectClass(MainActivityObject));
+    jmethodID mfvID = env->GetMethodID(MainActivity, "getDocsDir", "()Ljava/lang/String;");
+    jstring docsdir = (jstring)env->CallObjectMethod(MainActivityObject, mfvID);
+    const char* storage_dir = env->GetStringUTFChars(docsdir,0);
+
     char user_path[path_size];
 
-    const char* mid_user_path = strstr(ext_storage_path, "/Android/data/org.qtproject.example.Labrador/files");
-    strcpy(user_path, "/sdcard");
-    strcat(user_path, mid_user_path);
+    strcpy(user_path, "/Documents/Labrador");
     strcat(user_path, "/");
-    strcpy(full_path, ext_storage_path);
+    strcpy(full_path, storage_dir);
     strcat(full_path, "/");
 
-    int file_name_size = 64;
-    char file_name[file_name_size];
-
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    SDL_PropertiesID* propsIme = (SDL_PropertiesID*) io.UserData; // in-scope in main.cpp:main()
-
+    SDL_PropertiesID* propsIme = (SDL_PropertiesID*) io.UserData; 
 
     ImGui::BeginGroup(); // for bounding rect
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{0.f,0.f});
@@ -45,22 +44,29 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.ItemInnerSpacing.y));
     INDENTRIGHT
-    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("id").x - style.ItemInnerSpacing.x);
-    ImGui::InputText("##iddaq", file_name, file_name_size);
+    ImGui::PushItemWidth(width_pixels - 2 * style.ItemInnerSpacing.x);
+    ImGui::InputText("##iddaq", file_name, IM_COUNTOF(file_name));
+    if(ImGui::IsItemActive())
+        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##iddaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
+
 //     https://developer.android.com/reference/android/R.attr#inputType
     if(ImGui::IsItemActivated()) {
         SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 1);
     } else if (ImGui::IsItemDeactivated()) {
         SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
     }
-    strcpy(file_name, "the_file");
+    if(strcmp(file_name,"")==0) 
+        strcpy(file_name, "daq.txt");
+    else if(strcmp(&file_name[strlen(file_name)-4],".txt")!=0)
+        strcat(file_name, ".txt"); // must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
+
     strcat(user_path, file_name);
     strcat(full_path, file_name);
     INDENTRIGHT
     ImGui::Button("File path");
     if(ImGui::BeginItemTooltip()){
         ImGui::PushTextWrapPos(800);
-        ImGui::Text("%s", full_path);
+        ImGui::Text("%s", user_path);
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
     }
@@ -71,6 +77,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
     INDENTRIGHT
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
+    if(ImGui::IsItemActive())
+        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##dwndaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
+
+
+
     INDENTRIGHT
     ImGui::BeginDisabled(timer_on);
     if(timer_on) {
@@ -78,6 +89,8 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     } else {
         ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.1f s");
     }
+    if(ImGui::IsItemActive())
+        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##Timedaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
     ImGui::EndDisabled();
     duration = ImMin(duration, 10.f);
     duration = ImMax(duration, 0.f);
@@ -91,7 +104,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         }
         ImGui::EndCombo();
     }
-
 
     int ch_sel = 1;
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, (ImGui::GetFontSize() + 2 * style.FramePadding.y - ImGui::CalcTextSize("CH: ").y)/2));

@@ -375,7 +375,7 @@ bool usbCallHandler::poll_daq_status() {
     }
 }
 
-void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples, const char * filename) {
+void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples, const char * filepath) {
     daq_thread_active = true;
     if((channel == 1) || (channel == 3)) {
         if(deviceMode==6) {
@@ -388,14 +388,27 @@ void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples,
         internal_o1_buffer_375_CHB->copy_to_daq();
     }
 
+    SDL_IOStream* iostream = open_file(filepath);
     if((channel == 1) || (channel == 3)) {
         std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
-        SDL_IOStream* iostream = open_file(filename);
-        SDL_CloseIO(iostream);
+        SDL_IOprintf(iostream, "%s\n", "CH A");
+        for(const double& val : *daq_vals)
+            SDL_IOprintf(iostream, "%.1f ", val);
     }
     if((channel == 2) || (channel == 3)) {
         std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
+        SDL_IOprintf(iostream, "%s\n", "CH B");
+        for(const double& val : *daq_vals)
+            SDL_IOprintf(iostream, "%.1f ", val);
     }
+    SDL_CloseIO(iostream);
+
+    JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
+    jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
+    jclass MainActivity(env->GetObjectClass(MainActivityObject));
+    jmethodID scanFileID = env->GetMethodID(MainActivity, "scanFile", "(Ljava/lang/String;)V");
+    jstring jfilename = env->NewStringUTF(filepath);
+    env->CallVoidMethod(MainActivityObject, scanFileID, jfilename);
 
     daq_thread_active = false;
 }
