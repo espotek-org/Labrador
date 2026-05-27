@@ -53,6 +53,7 @@ void virtualTransformUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::TableNextColumn();
         ImGui::PushItemWidth(-1); 
         ImGui::custom_SliderFloat("##offset", "V", &curr_ch_settings->offset, -20.f, 20.f, "%.1f V", ImGuiSliderFlags_ClampOnInput);
+        SKOIA;
         ImGui::TableNextColumn();
         ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() - ImVec2(style.CellPadding.x,0.f));
         ButtonForSlider("Offset", "##offset", ImVec2(ImGui::GetContentRegionAvail().x + style.CellPadding.x,0.f));

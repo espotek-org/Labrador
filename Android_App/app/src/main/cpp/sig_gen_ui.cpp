@@ -24,6 +24,7 @@ void sigGenUI::amp_or_min_slider_and_button(const char* slider_label, const char
             *amp_or_min_delayed = *amp_or_min;
         }
     }
+    SKOIA;
     ImGui::TableNextColumn();
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() - ImVec2(style.CellPadding.x,0.f));
     ButtonForSlider(button_label, slider_label, ImVec2(ImGui::GetContentRegionAvail().x + style.CellPadding.x,0.f));
@@ -92,6 +93,7 @@ void sigGenUI::draw(float width_pixels, inputsUI* inputs_ui)
                 }
             }
         }
+        SKOIA;
 
         ImGui::TableNextColumn();
 

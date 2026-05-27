@@ -7,6 +7,7 @@
 #include "daq_ui.h"
 #include <SDL3/SDL.h>
 #include "imgui_impl_sdl3.h"
+#include "inputs_ui.h"
 void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 {
 
@@ -46,8 +47,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     INDENTRIGHT
     ImGui::PushItemWidth(width_pixels - 2 * style.ItemInnerSpacing.x);
     ImGui::InputText("##iddaq", file_name, IM_COUNTOF(file_name));
-    if(ImGui::IsItemActive())
-        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##iddaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
+    SKOIA;
 
 //     https://developer.android.com/reference/android/R.attr#inputType
     if(ImGui::IsItemActivated()) {
@@ -64,6 +64,12 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     strcat(full_path, file_name);
     INDENTRIGHT
     ImGui::Button("File path");
+    static bool hovered_last_frame = false;
+    // block below: prevent inadvertent inputs to other widgets when closing the tooltip
+    if(ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)||hovered_last_frame) {
+        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetItemID());
+        hovered_last_frame = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+    }
     if(ImGui::BeginItemTooltip()){
         ImGui::PushTextWrapPos(800);
         ImGui::Text("%s", user_path);
@@ -77,11 +83,8 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
     INDENTRIGHT
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
-    if(ImGui::IsItemActive())
-        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##dwndaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
-
-
-
+    downsample_factor = ImMax(downsample_factor,u8_one);
+    SKOIA;
     INDENTRIGHT
     ImGui::BeginDisabled(timer_on);
     if(timer_on) {
@@ -89,8 +92,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     } else {
         ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.1f s");
     }
-    if(ImGui::IsItemActive())
-        ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetID("##Timedaq")); // required for avoiding inadvertent inputs to other widgets when trying to deactivate this widget
+    SKOIA;
     ImGui::EndDisabled();
     duration = ImMin(duration, 10.f);
     duration = ImMax(duration, 0.f);
@@ -113,10 +115,16 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::Text("CH:");
     ImGui::SameLine();
     ALIGN_Y
+    doA&=inputs_ui->ch_enabled(1);
+    ImGui::BeginDisabled(!inputs_ui->ch_enabled(1));
     ImGui::Checkbox("A ", &doA);
+    ImGui::EndDisabled();
     ImGui::SameLine();
     ALIGN_Y
+    doB&=inputs_ui->ch_enabled(2);
+    ImGui::BeginDisabled(!inputs_ui->ch_enabled(2));
     ImGui::Checkbox("B", &doB);
+    ImGui::EndDisabled();
     ImGui::PopStyleVar();
 
     INDENTRIGHT
