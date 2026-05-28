@@ -154,6 +154,17 @@ void inputsUI::draw(float width_pixels, inputsUI* inputs_ui)
         update_device_mode();
 }
 
+bool inputsUI::logic_AB_enabled(int ch)
+{
+    // for argument 'ch': 1==ChA ; 2==ChB, where ChA/B refer to plotted lines.  Except in ScopeLogic and Multimeter modes, ChA is scope or logic Ch1 and ChB is scope or logic Ch2.
+    if(mode == Mode::ScopeLogic)
+        return ch==2;
+    else if (mode == Mode::Multimeter)
+        return false;
+    else
+        return logic_enable[ch-1];
+}
+
 bool inputsUI::ch_enabled(int ch)
 {
     // for argument 'ch': 1==ChA ; 2==ChB, where ChA/B refer to plotted lines.  Except in ScopeLogic and Multimeter modes, ChA is scope or logic Ch1 and ChB is scope or logic Ch2.

@@ -56,13 +56,14 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
     }
     if(strcmp(file_name,"")==0) 
-        strcpy(file_name, "daq.txt");
-    else if(strcmp(&file_name[strlen(file_name)-4],".txt")!=0)
-        strcat(file_name, ".txt"); // must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
+        strcpy(file_name, "filename");
 
     strcat(user_path, file_name);
+    strcat(user_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     strcat(full_path, file_name);
+    strcat(full_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     INDENTRIGHT
+    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.FramePadding.x*2))/2, 0.));
     ImGui::Button("File path");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
@@ -77,15 +78,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::EndTooltip();
     }
     INDENTRIGHT
-
-    in_sample_rate = 375e3;
-    ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1000)/downsample_factor);
-    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
-    INDENTRIGHT
-    ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
-    downsample_factor = ImMax(downsample_factor,u8_one);
-    SKOIA;
-    INDENTRIGHT
     ImGui::BeginDisabled(timer_on);
     if(timer_on) {
         ImGui::InputFloat("##Timedaq", &timer, 0.f, 0.f, "%.1f s");
@@ -97,36 +89,47 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     duration = ImMin(duration, 10.f);
     duration = ImMax(duration, 0.f);
     duration = IM_ROUND(duration * 10)/10.f;
-    INDENTRIGHT
-    if(ImGui::BeginCombo("##daqunits", units_labels[units_sel])) {
-        for(int n=0; n < num_unit_options; n++) {
-            if(ImGui::Selectable(units_labels[n], n==units_sel, ImGuiSelectableFlags_None)) {
-                units_sel = n;
-            }
-        }
-        ImGui::EndCombo();
-    }
 
-    int ch_sel = 1;
+
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, (ImGui::GetFontSize() + 2 * style.FramePadding.y - ImGui::CalcTextSize("CH: ").y)/2));
 #define ALIGN_Y    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() - ImVec2(0.f, (ImGui::GetFontSize() + 2 * style.FramePadding.y - ImGui::CalcTextSize("CH: ").y)/2));
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f,style.ItemSpacing.y));
-    ImGui::Text("CH:");
-    ImGui::SameLine();
-    ALIGN_Y
-    doA&=inputs_ui->ch_enabled(1);
-    ImGui::BeginDisabled(!inputs_ui->ch_enabled(1));
-    ImGui::Checkbox("A ", &doA);
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ALIGN_Y
-    doB&=inputs_ui->ch_enabled(2);
-    ImGui::BeginDisabled(!inputs_ui->ch_enabled(2));
-    ImGui::Checkbox("B", &doB);
-    ImGui::EndDisabled();
+//         ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.FramePadding.y - style.ItemSpacing.y));
+// #define ALIGN_Y ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() - ImVec2(0.f, style.FramePadding.y - style.ItemSpacing.y));
+        ImGui::Text("CH:");
+        ImGui::SameLine();
+        ALIGN_Y
+        ImGui::BeginDisabled(!inputs_ui->ch_enabled(1));
+        ImGui::RadioButton("A ", &ch_sel, 1);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ALIGN_Y
+        ImGui::BeginDisabled(!inputs_ui->ch_enabled(2));
+        ImGui::RadioButton("B", &ch_sel, 2); 
+        ImGui::EndDisabled();
+    ImGui::PopStyleVar();
+    INDENTRIGHT
+    ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
+    if(ImGui::BeginCombo("##daqunits", units_labels[inputs_ui->logic_AB_enabled(ch_sel)][units_sel[ch_sel-1] + 1])) {
+        for(int n=0; n < num_unit_options; n++) {
+            if(ImGui::Selectable(units_labels[inputs_ui->logic_AB_enabled(ch_sel)][n], (n-1)==units_sel[ch_sel-1], (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
+                units_sel[ch_sel-1] = n - 1;// n-1 because n=0 is the header
+            }
+        }
+        ImGui::EndCombo();
+    }
     ImGui::PopStyleVar();
 
+    INDENTRIGHT
+
+    in_sample_rate = 375e3;
+    ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1000)/downsample_factor);
+    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
+    INDENTRIGHT
+    ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
+    downsample_factor = ImMax(downsample_factor,u8_one);
+    SKOIA;
     INDENTRIGHT
     ImGui::BeginDisabled(daq_converting_and_saving);
     if(ImGui::Button("Begin")) {
