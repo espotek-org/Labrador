@@ -3,13 +3,25 @@
 
 #include "ui_tile.h"
 #include <SDL3/SDL.h>
+
+#ifdef PLATFORM_ANDROID
+#include <jni.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *, jobject, jlong);
+#ifdef __cplusplus
+}
+#endif
+#endif // PLATFORM_ANDROID
 class daqUI : public UI_tile
 {
     bool scope750 = false;
     bool changed = false;
     constexpr static int num_unit_options[2] = {3,2};
     const char* analog_unit_labels[num_unit_options[0] + 1] = {"Record:","Volts", "ADC", "None"};
-    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Record:","Bits", "None"};
+    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Record:","Bits", "None"}; // TODO: allow DAQ of decoded chars
     const char** units_labels[2] = {analog_unit_labels, digital_unit_labels};
     int units_sel[2] = {0,0};
     float duration;
@@ -21,6 +33,12 @@ class daqUI : public UI_tile
     const ImU8   u8_one  = 1;
     ImU8   downsample_factor  = 1;
     static const int path_size = 128;
+    void init_file_dir();
+    char storage_dir[path_size] = "-1";
+    bool dir_initiated = false;
+    friend void Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *, jobject);
+    jobject bb;
+        
 
 public:
     daqUI() : UI_tile("DAQ","DAQ",UI_tile::Width::singlet, 8) {};

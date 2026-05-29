@@ -213,10 +213,12 @@ int main(int, char**)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
     virtual_transform_ui.is_visible = true;
-    virtual_transform_ui.is_expanded = false;
-    virtual_transform_ui.next_is_expanded = false;
-    psu_ui.is_expanded = false;
+    virtual_transform_ui.is_expanded = false; virtual_transform_ui.next_is_expanded = false;
+    
+    psu_ui.is_expanded = false; psu_ui.next_is_expanded = false;
     psu_ui.is_visible = false;
+    daq_ui.is_expanded = false; daq_ui.next_is_expanded = false;
+    
     plotUI plot_ui = plotUI();
 
     // Main loop

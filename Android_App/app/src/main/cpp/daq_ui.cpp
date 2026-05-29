@@ -8,6 +8,11 @@
 #include <SDL3/SDL.h>
 #include "imgui_impl_sdl3.h"
 #include "inputs_ui.h"
+
+
+
+
+
 void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 {
     static bool first_time = true;
@@ -17,21 +22,17 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     standard_header(width_pixels);
     if(!is_expanded)
     {
+        first_time = true; // allow re-request of write permission (Android <= 9) when the tile is collapsed/re-expanded
         ImGui::EndGroup();
         return;
     }
+    if(first_time && !dir_initiated) {
+        daqUI::init_file_dir();
+    }
+    first_time = false;
+    ImGui::BeginDisabled(!dir_initiated);
 
 #define INDENTRIGHT ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(style.CellPadding.x,0.f));
-    JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
-    jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
-    jclass MainActivity(env->GetObjectClass(MainActivityObject));
-    jmethodID mfvID = env->GetMethodID(MainActivity, "getDocsDir", "()Ljava/lang/String;");
-    static jstring docsdir;
-    if(first_time) {
-        docsdir = (jstring)env->CallObjectMethod(MainActivityObject, mfvID);
-        first_time = false;
-    }
-    const char* storage_dir = env->GetStringUTFChars(docsdir,0);
 
     char user_path[path_size];
 
@@ -165,6 +166,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
             librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
+    ImGui::EndDisabled(); // dir=="-1"
 
 
     ImGui::EndGroup();
@@ -175,6 +177,17 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f,style.FramePadding.y - style.ItemSpacing.y));
     ImGui::Dummy({0.f,0.f}); // prevents issue with this draw() command affecting the vertical alignment of whatever ui element comes after it
     ImGui::EndGroup();
+}
+
+void daqUI::init_file_dir()
+{
+    static jstring docsdir;
+    JNIEnv *env = (JNIEnv *) SDL_GetAndroidJNIEnv();
+    jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
+    jclass MainActivity(env->GetObjectClass(MainActivityObject));
+    jmethodID mfvID = env->GetMethodID(MainActivity, "getDocsDir", "(J)Ljava/lang/String;");
+    docsdir = (jstring)env->CallObjectMethod(MainActivityObject, mfvID, (jlong) &dir_initiated);
+    strcpy(storage_dir, env->GetStringUTFChars(docsdir,0));
 }
 
 void daqUI::poll_status()
@@ -195,4 +208,14 @@ int daqUI::get_height()
     ImGui::PopStyleVar();
     return height;
 }
+
+#ifdef PLATFORM_ANDROID
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *env, jobject thisobject, jlong dir_initiated_ptr)
+{
+    // modify c++ member variable using a call from java
+    bool* dir_initiated = (bool *) dir_initiated_ptr;
+    *dir_initiated = true;
+}
+
+#endif
 
