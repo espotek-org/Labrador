@@ -348,7 +348,7 @@ public class MainActivity extends SDLActivity {
 
     public String getDocsDir(long in_native_dir_initiated_ptr) {
         native_dir_initiated_ptr = in_native_dir_initiated_ptr;
-        String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador/UhOh";
+        String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador";
         File docs_dir_struct = new File(docs_dir);
         // if/else below can be simplified into docs_dir_struct.mkdirs() when support for Android < 10 is dropped
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){

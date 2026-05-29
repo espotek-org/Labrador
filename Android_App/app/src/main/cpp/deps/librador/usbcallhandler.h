@@ -117,7 +117,8 @@ public:
     void initiateFirmwareFlash();
 
     void spawn_daq_thread(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename);
-    void daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filename);
+    void drive_daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filename);
+    void daq_for_channel(int channel, int numToGet, int interval_samples, int units_sel, SDL_IOStream* iostream);
     bool poll_daq_status();
 private:
 
