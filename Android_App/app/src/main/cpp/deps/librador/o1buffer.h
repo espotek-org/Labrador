@@ -66,6 +66,7 @@ public:
     int m_bufferLen = NUM_SAMPLES_PER_CHANNEL;
     void UartDecode();
     char * getUart_String(bool* parity_check);
+    double get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter, bool daq = false);
 private:
     trigger_settings m_trigger_settings;
     virtual_transform_settings m_virtual_transform_settings;
@@ -77,7 +78,6 @@ private:
     std::vector<double> convertedStream_double_daq;
     std::vector<uint8_t> convertedStream_digital;
     void updateMostRecentAddress(int newAddress);
-    double get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter, bool daq = false);
     double sampleConvert(int sample, double scope_gain, bool twelve_bit_multimeter) const;
     short inverseSampleConvert(double voltageLevel, double scope_gain, bool twelve_bit_multimeter) const;
     enum TriggerSeekState {Invalid, AboveTriggerLevel, BelowTriggerLevel};

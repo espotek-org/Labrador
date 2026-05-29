@@ -374,16 +374,18 @@ bool usbCallHandler::poll_daq_status() {
 }
 
 void usbCallHandler::daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filepath) {
+    o1buffer* buffer_for_daq;
     if((channel == 1) || (channel == 3)) {
         if(deviceMode==6) {
-            internal_o1_buffer_750->copy_to_daq();
+            buffer_for_daq = internal_o1_buffer_750;
         } else {
-            internal_o1_buffer_375_CHA->copy_to_daq();
+            buffer_for_daq = internal_o1_buffer_375_CHA;
         }
     }
     if((channel == 2) || (channel == 3)) {
-        internal_o1_buffer_375_CHB->copy_to_daq();
+        buffer_for_daq = internal_o1_buffer_375_CHB;
     }
+    buffer_for_daq->copy_to_daq();
 
     LIBRADOR_LOG(LOG_DEBUG, "filepath: %s", filepath);
     SDL_IOStream* iostream = open_file(filepath);
@@ -394,9 +396,18 @@ void usbCallHandler::daq(int channel, int numToGet, int interval_samples, int un
             for(const double& val : *daq_vals)
                 SDL_IOprintf(iostream, "%.0f", val);
         } else {
-            std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
-            for(const double& val : *daq_vals)
-                SDL_IOprintf(iostream, "%.1f ", val);
+            if(units_sel[0] == 0) {
+                std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
+                for(const double& val : *daq_vals)
+                    SDL_IOprintf(iostream, "%.1f ", val);
+            } else {
+                int ix;
+                for(int i = 0; i < numToGet; i++) {
+                    int i2 = buffer_for_daq->mostRecentAddressDAQ + i;
+                    ix = i2 < buffer_for_daq->m_bufferLen ? i2 : i2 - buffer_for_daq->m_bufferLen;
+                    SDL_IOprintf(iostream, "%.0f ", buffer_for_daq->get_filtered_sample(ix, -1, 0, 0.0, false, true));
+                }
+            }
         }
     }
     if((channel == 2) || (channel == 3)) {
@@ -406,9 +417,18 @@ void usbCallHandler::daq(int channel, int numToGet, int interval_samples, int un
             for(const double& val : *daq_vals)
                 SDL_IOprintf(iostream, "%.0f", val);
         } else {
-            std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
-            for(const double& val : *daq_vals)
-                SDL_IOprintf(iostream, "%.1f ", val);
+            if(units_sel[0] == 0) {
+                std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
+                for(const double& val : *daq_vals)
+                    SDL_IOprintf(iostream, "%.1f ", val);
+            } else {
+                int ix;
+                for(int i = 0; i < numToGet; i++) {
+                    int i2 = buffer_for_daq->mostRecentAddressDAQ + i;
+                    ix = i2 < buffer_for_daq->m_bufferLen ? i2 : i2 - buffer_for_daq->m_bufferLen;
+                    SDL_IOprintf(iostream, "%.0f ", buffer_for_daq->get_filtered_sample(ix, -1, 0, 0.0, false, true));
+                }
+            }
         }
     }
     SDL_CloseIO(iostream);
