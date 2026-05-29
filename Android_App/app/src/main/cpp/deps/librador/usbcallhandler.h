@@ -87,8 +87,6 @@ public:
     double get_samples_per_second();
     std::vector<double> *getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, bool daq = false);
     std::vector<double> * getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, bool daq = false);
-    void daq_double(int channel, int numToGet, int interval_samples, const char * filename);
-    void daq_singleBit(int channel, int numToGet, int interval_samples);
     std::vector<double> *getMany_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode);
     bool connected = false;
     //Control Commands
@@ -118,7 +116,8 @@ public:
     void set_bootloader_mode_allowed(bool allowed);
     void initiateFirmwareFlash();
 
-    void spawn_daq_thread(int channel, int numToGet, int interval_samples, bool digital, const char* filename);
+    void spawn_daq_thread(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename);
+    void daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filename);
     bool poll_daq_status();
 private:
 

@@ -7,9 +7,9 @@ class daqUI : public UI_tile
 {
     bool scope750 = false;
     bool changed = false;
-    static const int num_unit_options = 3;
-    const char* analog_unit_labels[num_unit_options] = {"Units:","Volts", "ADC"};
-    const char* digital_unit_labels[num_unit_options] = {"Units:","Bits", "Chars"};
+    constexpr static int num_unit_options[2] = {2,1};
+    const char* analog_unit_labels[num_unit_options[0] + 1] = {"Units:","Volts", "ADC"};
+    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Units:","Bits"};
     const char** units_labels[2] = {analog_unit_labels, digital_unit_labels};
     int units_sel[2] = {0,0};
     float duration;

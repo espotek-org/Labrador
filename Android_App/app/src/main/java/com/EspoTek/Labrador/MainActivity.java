@@ -39,9 +39,17 @@ import androidx.core.view.ViewCompat;
 import android.content.pm.ActivityInfo;
 // import android.graphics.Insets;
 
+import android.Manifest;
+//import android.support.v4.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import android.content.pm.PackageManager;
+
+
 // TODO: handle edge cases related to user unplugging board in non-bootloader state, replugging it back in in bootloader state
 public class MainActivity extends SDLActivity {
     private static final String ACTION_USB_PERMISSION = "com.EspoTek.Labrador.USB_PERMISSION";
+    private static final int REQUEST_WRITE_EXTERNAL_STORAGE = 1; // can be anything (>=0 ) b/c used to distinguish between request types in a custom-implemented callback  
     private static final String usbStateChangeAction = "android.hardware.usb.action.USB_STATE";
     private static final String TAG = "com.EspoTek.Labrador";
     public AssetManager mgr;
@@ -338,7 +346,25 @@ public class MainActivity extends SDLActivity {
     public String getDocsDir() {
         String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador";
         File docs_dir_struct = new File(docs_dir);
-        docs_dir_struct.mkdir();
+         boolean didmakedirs = false;
+        // if/else below can be simplified into docs_dir_struct.mkdirs() when support for Android < Tiramisu is dropped
+        Log.d(TAG,"reachedreached: " + didmakedirs);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            didmakedirs = docs_dir_struct.mkdirs();
+        }else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+            
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        REQUEST_WRITE_EXTERNAL_STORAGE);
+                while(ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {;}
+            } else {
+                didmakedirs = docs_dir_struct.mkdirs();
+            }
+        }
+        Log.d(TAG,"didmakedirs: " + didmakedirs);
         return docs_dir;
     }
 

@@ -355,12 +355,10 @@ int usbCallHandler::avrDebug(void){
     return 0;
 }
 
-void usbCallHandler::spawn_daq_thread(int channel, int numToGet, int interval_samples, bool digital, const char* filename) {
-    if(digital) {
-//         daq_thread = new std::thread(&usbCallHandler::faq_singleBit, this, channel, numToGet, interval_samples);
-    } else {
-        daq_thread = new std::thread(&usbCallHandler::daq_double, this, channel, numToGet, interval_samples, filename);
-    }
+void usbCallHandler::spawn_daq_thread(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename) {
+    daq_thread_active = true;
+    daq_thread = new std::thread(&usbCallHandler::daq, this, channel, numToGet, interval_samples, units_sel, filename);
+    daq_thread_active = false;
 }
 
 bool usbCallHandler::poll_daq_status() {
@@ -375,8 +373,7 @@ bool usbCallHandler::poll_daq_status() {
     }
 }
 
-void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples, const char * filepath) {
-    daq_thread_active = true;
+void usbCallHandler::daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filepath) {
     if((channel == 1) || (channel == 3)) {
         if(deviceMode==6) {
             internal_o1_buffer_750->copy_to_daq();
@@ -388,18 +385,31 @@ void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples,
         internal_o1_buffer_375_CHB->copy_to_daq();
     }
 
+    LIBRADOR_LOG(LOG_DEBUG, "filepath: %s", filepath);
     SDL_IOStream* iostream = open_file(filepath);
     if((channel == 1) || (channel == 3)) {
-        std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
         SDL_IOprintf(iostream, "%s\n", "CH A");
-        for(const double& val : *daq_vals)
-            SDL_IOprintf(iostream, "%.1f ", val);
+        if(deviceMode==3 || deviceMode == 4) { // TODO: clean up deviceMode logic; should only need to be checked once
+            std::vector<double>* daq_vals = getMany_singleBit(1, numToGet, interval_samples, 0, true);
+            for(const double& val : *daq_vals)
+                SDL_IOprintf(iostream, "%.0f", val);
+        } else {
+            std::vector<double>* daq_vals = getMany_double(1, numToGet, interval_samples, 0, 0, true);
+            for(const double& val : *daq_vals)
+                SDL_IOprintf(iostream, "%.1f ", val);
+        }
     }
     if((channel == 2) || (channel == 3)) {
-        std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
         SDL_IOprintf(iostream, "%s\n", "CH B");
-        for(const double& val : *daq_vals)
-            SDL_IOprintf(iostream, "%.1f ", val);
+        if(deviceMode==1 || deviceMode == 4) {
+            std::vector<double>* daq_vals = getMany_singleBit(2, numToGet, interval_samples, 0, true);
+            for(const double& val : *daq_vals)
+                SDL_IOprintf(iostream, "%.0f", val);
+        } else {
+            std::vector<double>* daq_vals = getMany_double(2, numToGet, interval_samples, 0, 0, true);
+            for(const double& val : *daq_vals)
+                SDL_IOprintf(iostream, "%.1f ", val);
+        }
     }
     SDL_CloseIO(iostream);
 
@@ -409,8 +419,6 @@ void usbCallHandler::daq_double(int channel, int numToGet, int interval_samples,
     jmethodID scanFileID = env->GetMethodID(MainActivity, "scanFile", "(Ljava/lang/String;)V");
     jstring jfilename = env->NewStringUTF(filepath);
     env->CallVoidMethod(MainActivityObject, scanFileID, jfilename);
-
-    daq_thread_active = false;
 }
 
 std::vector<double>* usbCallHandler::getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, bool daq) {

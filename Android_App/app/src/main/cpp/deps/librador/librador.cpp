@@ -67,14 +67,19 @@ int librador_avr_debug(){
     return internal_librador_object->usb_driver->avrDebug();
 }
 
-int librador_daq(int channel, int numToGet, int interval_samples, bool digital, const char* filename)
+int librador_daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename)
 {
     //     should uncomment!
 //     CHECK_API_INITIALISED
 //     CHECK_USB_INITIALISED
 
-    internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, digital, filename);
+    internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, units_sel, filename);
     return 1;
+}
+
+double librador_get_samples_per_second()
+{
+    return internal_librador_object->usb_driver->get_samples_per_second();
 }
 
 std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode)

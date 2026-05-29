@@ -10,6 +10,7 @@
 #include "inputs_ui.h"
 void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 {
+    static bool first_time = true;
 
     ImGuiStyle& style = ImGui::GetStyle();
     ImGui::BeginGroup();
@@ -25,8 +26,13 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     jobject MainActivityObject = (jobject) SDL_GetAndroidActivity();
     jclass MainActivity(env->GetObjectClass(MainActivityObject));
     jmethodID mfvID = env->GetMethodID(MainActivity, "getDocsDir", "()Ljava/lang/String;");
-    jstring docsdir = (jstring)env->CallObjectMethod(MainActivityObject, mfvID);
+    static jstring docsdir;
+    if(first_time) {
+        docsdir = (jstring)env->CallObjectMethod(MainActivityObject, mfvID);
+        first_time = false;
+    }
     const char* storage_dir = env->GetStringUTFChars(docsdir,0);
+
 
     char user_path[path_size];
 
@@ -111,9 +117,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PopStyleVar();
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
-    if(ImGui::BeginCombo("##daqunits", units_labels[inputs_ui->logic_AB_enabled(ch_sel)][units_sel[ch_sel-1] + 1])) {
-        for(int n=0; n < num_unit_options; n++) {
-            if(ImGui::Selectable(units_labels[inputs_ui->logic_AB_enabled(ch_sel)][n], (n-1)==units_sel[ch_sel-1], (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
+    int ch_units_sel = units_sel[ch_sel-1] + 1;
+    int ch_num_unit_options = num_unit_options[ch_sel];
+    if(ImGui::BeginCombo("##daqunits", units_labels[inputs_ui->logic_AB_enabled(ch_sel)][ch_units_sel])) {
+        for(int n=0; n < ch_num_unit_options + 1; n++) {
+            if(ImGui::Selectable(units_labels[inputs_ui->logic_AB_enabled(ch_sel)][n], n==ch_units_sel, (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
                 units_sel[ch_sel-1] = n - 1;// n-1 because n=0 is the header
             }
         }
@@ -123,8 +131,12 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     INDENTRIGHT
 
-    in_sample_rate = 375e3;
-    ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1000)/downsample_factor);
+    int in_sample_rate = librador_get_samples_per_second();
+    if(inputs_ui->logic_AB_enabled(ch_sel)) {
+        ImGui::Text("%.4g kSa/s", static_cast<float>(8 * in_sample_rate/1e3)/downsample_factor);
+    } else {
+        ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1e3)/downsample_factor);
+    }
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
     INDENTRIGHT
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
@@ -145,13 +157,13 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         if(doA||doB)
             daq_converting_and_saving = true;
         if(doA && doB)
-            librador_daq(3, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+            librador_daq(3, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doA)
-            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doB)
-            librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+            librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else
-            librador_daq(-1, (duration * in_sample_rate) / downsample_factor, downsample_factor, false, full_path);
+            librador_daq(-1, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
 
