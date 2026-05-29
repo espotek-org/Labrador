@@ -210,11 +210,11 @@ int daqUI::get_height()
 }
 
 #ifdef PLATFORM_ANDROID
-JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *env, jobject thisobject, jlong dir_initiated_ptr)
+JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *env, jobject thisobject, jlong dir_initiated_ptr_from_java)
 {
     // modify c++ member variable using a call from java
-    bool* dir_initiated = (bool *) dir_initiated_ptr;
-    *dir_initiated = true;
+    bool* dir_initiated_ptr = (bool *) dir_initiated_ptr_from_java;
+    *dir_initiated_ptr = true;
 }
 
 #endif

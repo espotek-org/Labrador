@@ -36,10 +36,7 @@ class daqUI : public UI_tile
     void init_file_dir();
     char storage_dir[path_size] = "-1";
     bool dir_initiated = false;
-    friend void Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *, jobject);
-    jobject bb;
-        
-
+    friend void Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *, jobject, jlong);
 public:
     daqUI() : UI_tile("DAQ","DAQ",UI_tile::Width::singlet, 8) {};
     void draw(float width, inputsUI* inputs_ui = nullptr) override;
