@@ -61,7 +61,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     } else if (ImGui::IsItemDeactivated()) {
         SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
     }
-    if(strcmp(file_name,"")==0) 
+    if(strcmp(file_name,"")==0 || strstr(file_name,"/")!=nullptr) 
         strcpy(file_name, "filename");
 
     strcat(user_path, file_name);
