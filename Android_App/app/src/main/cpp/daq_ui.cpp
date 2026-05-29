@@ -33,7 +33,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     }
     const char* storage_dir = env->GetStringUTFChars(docsdir,0);
 
-
     char user_path[path_size];
 
     strcpy(user_path, "/Documents/Labrador");
@@ -118,7 +117,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
     int ch_units_sel = units_sel[ch_sel-1] + 1;
-    int ch_num_unit_options = num_unit_options[ch_sel];
+    int ch_num_unit_options = num_unit_options[ch_sel - 1];
     if(ImGui::BeginCombo("##daqunits", units_labels[inputs_ui->logic_AB_enabled(ch_sel)][ch_units_sel])) {
         for(int n=0; n < ch_num_unit_options + 1; n++) {
             if(ImGui::Selectable(units_labels[inputs_ui->logic_AB_enabled(ch_sel)][n], n==ch_units_sel, (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
@@ -151,6 +150,8 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         timer += io.DeltaTime;
     }
     ImGui::SameLine();
+    bool doA = (strcmp(units_labels[inputs_ui->logic_AB_enabled(1)][units_sel[0] + 1], "None") != 0) && inputs_ui->ch_enabled(1);
+    bool doB = (strcmp(units_labels[inputs_ui->logic_AB_enabled(2)][units_sel[1] + 1], "None") != 0) && inputs_ui->ch_enabled(2);
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
         timer = -1.f;
@@ -162,8 +163,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
             librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doB)
             librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
-        else
-            librador_daq(-1, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
 

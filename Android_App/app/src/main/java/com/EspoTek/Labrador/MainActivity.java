@@ -347,8 +347,7 @@ public class MainActivity extends SDLActivity {
         String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador";
         File docs_dir_struct = new File(docs_dir);
          boolean didmakedirs = false;
-        // if/else below can be simplified into docs_dir_struct.mkdirs() when support for Android < Tiramisu is dropped
-        Log.d(TAG,"reachedreached: " + didmakedirs);
+        // if/else below can be simplified into docs_dir_struct.mkdirs() when support for Android < 10 is dropped
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
             didmakedirs = docs_dir_struct.mkdirs();
         }else {
@@ -364,7 +363,6 @@ public class MainActivity extends SDLActivity {
                 didmakedirs = docs_dir_struct.mkdirs();
             }
         }
-        Log.d(TAG,"didmakedirs: " + didmakedirs);
         return docs_dir;
     }
 

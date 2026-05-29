@@ -7,13 +7,12 @@ class daqUI : public UI_tile
 {
     bool scope750 = false;
     bool changed = false;
-    constexpr static int num_unit_options[2] = {2,1};
-    const char* analog_unit_labels[num_unit_options[0] + 1] = {"Units:","Volts", "ADC"};
-    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Units:","Bits"};
+    constexpr static int num_unit_options[2] = {3,2};
+    const char* analog_unit_labels[num_unit_options[0] + 1] = {"Record:","Volts", "ADC", "None"};
+    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Record:","Bits", "None"};
     const char** units_labels[2] = {analog_unit_labels, digital_unit_labels};
     int units_sel[2] = {0,0};
     float duration;
-    bool doA, doB;
     int ch_sel = 1;
     bool daq_converting_and_saving = false;
     float timer = -1.f;
