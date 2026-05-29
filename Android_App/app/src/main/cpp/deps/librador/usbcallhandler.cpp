@@ -386,6 +386,13 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
         buffer_for_daq = internal_o1_buffer_375_CHB;
     }
     buffer_for_daq->copy_to_daq();
+    const char* volts_fmt_template = "%%.%dg ";
+    char volts_fmt[8];
+    if(deviceMode==7) {
+        sprintf(volts_fmt, volts_fmt_template, 4);
+    } else {
+        sprintf(volts_fmt, volts_fmt_template, 3);
+    }
 
     const char* ch_names[2] = {"CH A", "CH B"};
     SDL_IOprintf(iostream, "%s\n", ch_names[channel-1]);
@@ -396,10 +403,12 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
             SDL_IOprintf(iostream, "%.0f", val);
     } else {
         if(units_sel == 0) {
+            // volts
             std::vector<double>* daq_vals = getMany_double(channel, numToGet, interval_samples, 0, 0, true);
             for(const double& val : *daq_vals)
-                SDL_IOprintf(iostream, "%.1f ", val);
+                SDL_IOprintf(iostream, volts_fmt, val);
         } else {
+            // adc units
             int ix;
             for(int i = 0; i < numToGet; i++) {
                 int i2 = buffer_for_daq->mostRecentAddressDAQ + i;
