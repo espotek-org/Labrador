@@ -114,12 +114,12 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
 
-    int ch_units_sel = units_sel[ch_sel-1];
-    if(usbCallHandler::daqUnitIsForScope[ch_units_sel] == inputs_ui->logic_AB_enabled(ch_sel)) {
-        ch_units_sel = usbCallHandler::daqUnitOptions::None;
-        units_sel[ch_sel-1] = (usbCallHandler::daqUnitOptions) ch_units_sel;
+    // calls to librador_daq require that the selected units are valid
+    for(int ch: {1,2}) {
+        units_sel[ch-1] = (inputs_ui->ch_enabled(ch) && (usbCallHandler::daqUnitIsForScope[units_sel[ch-1]] != inputs_ui->logic_AB_enabled(ch))) ? units_sel[ch-1] : usbCallHandler::daqUnitOptions::None;
     }
 
+    int ch_units_sel = units_sel[ch_sel - 1];
     if(ImGui::BeginCombo("##daqunits", usbCallHandler::daq_unit_labels[ch_units_sel])) {
         ImGui::Selectable("Record:", false, ImGuiSelectableFlags_Disabled);
         for(int n=0; n < usbCallHandler::daqUnitOptions::QUANT; n++) {
