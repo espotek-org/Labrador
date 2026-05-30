@@ -118,9 +118,7 @@ void usbCallHandler::iso_polling_function(libusb_context *ctx){
             libusb_handle_events_timeout(ctx, &tv);
         }
     }
-    get_set_iso_thread_active_mutex.lock();
     iso_thread_active = false;
-    get_set_iso_thread_active_mutex.unlock();
     LIBRADOR_LOG(LOG_DEBUG, "iso_polling_function thread finished\n");
 }
 
@@ -845,11 +843,7 @@ void usbCallHandler::setI2cIsDecoding(bool new_decode_on){
 }
 
 bool usbCallHandler::isoThreadIsActive(){
-    bool tempReturn;
-    get_set_iso_thread_active_mutex.lock();
-    tempReturn = iso_thread_active;
-    get_set_iso_thread_active_mutex.unlock();
-    return tempReturn;
+    return iso_thread_active;
 }
 
 #ifdef PLATFORM_ANDROID

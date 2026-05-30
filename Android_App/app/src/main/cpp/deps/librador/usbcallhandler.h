@@ -172,12 +172,11 @@ private:
 
     bool iso_thread_shutdown_requested = false;
     int iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
-    bool iso_thread_active = false;
+    std::atomic<bool> iso_thread_active = false;
     std::atomic<bool> daq_thread_active = false ;
 
     std::mutex iso_thread_shutdown_mutex;
     std::mutex buffer_read_write_mutex;
-    std::mutex get_set_iso_thread_active_mutex;
 
     static SDL_IOStream* open_file(const char * filepath);
 };
