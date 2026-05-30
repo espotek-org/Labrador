@@ -47,7 +47,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.ItemInnerSpacing.y));
     INDENTRIGHT
-    ImGui::PushItemWidth(width_pixels - 2 * style.ItemInnerSpacing.x);
+    ImGui::PushItemWidth(width_pixels - style.CellPadding.x);
     ImGui::InputText("##iddaq", file_name, IM_COUNTOF(file_name));
     SKOIA;
 
@@ -65,7 +65,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     strcat(full_path, file_name);
     strcat(full_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     INDENTRIGHT
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.FramePadding.x*2))/2, 0.));
+    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.CellPadding.x*2))/2, 0.));
     ImGui::Button("File path");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
@@ -81,11 +81,16 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     }
     INDENTRIGHT
     ImGui::BeginDisabled(timer_on);
+    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("\xee\xa4\x85").x - style.CellPadding.x - style.ItemSpacing.x);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {style.ItemSpacing.x/2,style.ItemSpacing.y});
     if(timer_on) {
         ImGui::InputFloat("##Timedaq", &timer, 0.f, 0.f, "%.1f s");
     } else {
         ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.1f s");
     }
+    ImGui::SameLine();
+    ImGui::Text("\xee\xa4\x85");
+    ImGui::PopStyleVar();
     SKOIA;
     ImGui::EndDisabled();
     duration = ImMin(duration, 10.f);
@@ -137,9 +142,13 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     float sample_rate = (inputs_ui->mode == inputsUI::Mode::Scope750 ? 750 : 375) * (inputs_ui->logic_AB_enabled(ch_sel) ? 8 : 1);
     ImGui::Text("%.4g kSa/s", sample_rate/downsample_factor);
-    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
+    ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("\xee\xa4\x86").x - style.FramePadding.x - style.ItemSpacing.x);
     INDENTRIGHT
-    ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {style.ItemSpacing.x/2,style.ItemSpacing.y});
+    ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%u", ImGuiInputTextFlags_None);
+    ImGui::SameLine();
+    ImGui::Text("\xee\xa4\x86");
+    ImGui::PopStyleVar();
     downsample_factor = ImMax(downsample_factor,u8_one);
     SKOIA;
     INDENTRIGHT

@@ -180,15 +180,17 @@ int main(int, char**)
     config.FontDataOwnedByAtlas = false; // prevents imperceptible crash when the app is closed
 //     https://stackoverflow.com/a/13317651/3474552
 
-    float glyph_y_offsets[2] = {3.f, 4.5f};
-    float fontsizes[2] = {13.f, 12.f};
-    char buf[2][2048];
+    const int num_fonts = 3;
+    float glyph_y_offsets[num_fonts] = {3.f, 4.5f, 5.f};
+    float fontsizes[num_fonts] = {13.f, 12.f, 18.f};
+    int bufsize = 4096;
+    char buf[num_fonts][bufsize];
     int fi = 0;
-    for (const char* filename: {"font/waveform-glyphs3.ttf","font/greek_delta.ttf"}) {
+    for (const char* filename: {"font/waveform-glyphs3.ttf","font/greek_delta.ttf","font/daq-glyphs.ttf"}) {
         config.GlyphOffset = { 0.f, glyph_y_offsets[fi] };
         AAsset* asset = AAssetManager_open(mgr, filename, AASSET_MODE_STREAMING);
         int nb_read = 0;
-        nb_read = AAsset_read(asset, buf[fi], 2048);
+        nb_read = AAsset_read(asset, buf[fi], bufsize);
         ImFont* new_font = io.Fonts->AddFontFromMemoryTTF(buf[fi], nb_read, fontsizes[fi], &config);
         AAsset_close(asset);
         fi++;
