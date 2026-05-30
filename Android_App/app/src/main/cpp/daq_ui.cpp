@@ -135,12 +135,8 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     INDENTRIGHT
 
-    int in_sample_rate = librador_get_samples_per_second();
-    if(inputs_ui->logic_AB_enabled(ch_sel)) {
-        ImGui::Text("%.4g kSa/s", static_cast<float>(8 * in_sample_rate/1e3)/downsample_factor);
-    } else {
-        ImGui::Text("%.4g kSa/s", static_cast<float>(in_sample_rate/1e3)/downsample_factor);
-    }
+    float sample_rate = (inputs_ui->mode == inputsUI::Mode::Scope750 ? 750 : 375) * (inputs_ui->logic_AB_enabled(ch_sel) ? 8 : 1);
+    ImGui::Text("%.4g kSa/s", sample_rate/downsample_factor);
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("dwn").x - style.ItemInnerSpacing.x);
     INDENTRIGHT
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%ux", ImGuiInputTextFlags_None);
@@ -164,11 +160,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         if(doA||doB)
             daq_converting_and_saving = true;
         if(doA && doB)
-            librador_daq(3, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(3, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doA)
-            librador_daq(1, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(1, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doB)
-            librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(2, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
     ImGui::EndDisabled(); // !dir_initiated
