@@ -116,10 +116,15 @@ public:
     void set_bootloader_mode_allowed(bool allowed);
     void initiateFirmwareFlash();
 
-    void spawn_daq_thread(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename);
-    void drive_daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filename);
-    void daq_for_channel(int channel, int numToGet, int interval_samples, int units_sel, SDL_IOStream* iostream);
+    // DAQ
+    enum daqUnitOptions {Volts, ADC, Bits, None, QUANT};
+    const static char* daq_unit_labels[] ;//= {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
+    static constexpr bool daqUnitIsForScope[daqUnitOptions::QUANT] = {true, true, false, false};
+    void spawn_daq_thread(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char* filename);
+    void drive_daq(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char * filename);
+    void daq_for_channel(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel, SDL_IOStream* iostream);
     bool poll_daq_status();
+
 private:
 
     unsigned short VID, PID;

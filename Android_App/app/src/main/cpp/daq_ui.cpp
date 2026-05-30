@@ -9,10 +9,6 @@
 #include "imgui_impl_sdl3.h"
 #include "inputs_ui.h"
 
-
-
-
-
 void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 {
     static bool first_time = true;
@@ -117,12 +113,20 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PopStyleVar();
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
-    int ch_units_sel = units_sel[ch_sel-1] + 1;
-    int ch_num_unit_options = num_unit_options[ch_sel - 1];
-    if(ImGui::BeginCombo("##daqunits", units_labels[inputs_ui->logic_AB_enabled(ch_sel)][ch_units_sel])) {
-        for(int n=0; n < ch_num_unit_options + 1; n++) {
-            if(ImGui::Selectable(units_labels[inputs_ui->logic_AB_enabled(ch_sel)][n], n==ch_units_sel, (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
-                units_sel[ch_sel-1] = n - 1;// n-1 because n=0 is the header
+
+    int ch_units_sel = units_sel[ch_sel-1];
+    if(usbCallHandler::daqUnitIsForScope[ch_units_sel] == inputs_ui->logic_AB_enabled(ch_sel)) {
+        ch_units_sel = usbCallHandler::daqUnitOptions::None;
+        units_sel[ch_sel-1] = (usbCallHandler::daqUnitOptions) ch_units_sel;
+    }
+
+    if(ImGui::BeginCombo("##daqunits", usbCallHandler::daq_unit_labels[ch_units_sel])) {
+        ImGui::Selectable("Record:", false, ImGuiSelectableFlags_Disabled);
+        for(int n=0; n < usbCallHandler::daqUnitOptions::QUANT; n++) {
+            if(n!=usbCallHandler::daqUnitOptions::None && usbCallHandler::daqUnitIsForScope[n] == inputs_ui->logic_AB_enabled(ch_sel))
+                continue;
+            if(ImGui::Selectable(usbCallHandler::daq_unit_labels[n], n==ch_units_sel)) {
+                units_sel[ch_sel-1] = (usbCallHandler::daqUnitOptions) n;
             }
         }
         ImGui::EndCombo();
@@ -151,8 +155,9 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         timer += io.DeltaTime;
     }
     ImGui::SameLine();
-    bool doA = (strcmp(units_labels[inputs_ui->logic_AB_enabled(1)][units_sel[0] + 1], "None") != 0) && inputs_ui->ch_enabled(1);
-    bool doB = (strcmp(units_labels[inputs_ui->logic_AB_enabled(2)][units_sel[1] + 1], "None") != 0) && inputs_ui->ch_enabled(2);
+
+    bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
+    bool doB = (units_sel[1] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(2);
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
         timer = -1.f;
@@ -166,7 +171,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
             librador_daq(2, (duration * in_sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
-    ImGui::EndDisabled(); // dir=="-1"
+    ImGui::EndDisabled(); // !dir_initiated
 
 
     ImGui::EndGroup();

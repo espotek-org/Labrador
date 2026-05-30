@@ -61,7 +61,7 @@ LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data(int channel
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq = false);
 
-LIBRADORSHARED_EXPORT int librador_daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename);
+LIBRADORSHARED_EXPORT int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler::daqUnitOptions units_sel[2], const char* filename);
 LIBRADORSHARED_EXPORT bool librador_poll_daq_status();
 
 LIBRADORSHARED_EXPORT std::vector<double> librador_get_time_array(double delay, double timeWindow_seconds, int n_samples);

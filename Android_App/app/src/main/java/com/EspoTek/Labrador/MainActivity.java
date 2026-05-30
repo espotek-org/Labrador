@@ -362,7 +362,6 @@ public class MainActivity extends SDLActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                         REQUEST_WRITE_EXTERNAL_STORAGE);
-//                 while(!have_write_external_storage_permission_response) {;}
             } else {
                 boolean didmakedirs = docs_dir_struct.mkdirs();
                 if(didmakedirs || docs_dir_struct.exists() ) {

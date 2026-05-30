@@ -2,6 +2,7 @@
 #define DAQUI_H
 
 #include "ui_tile.h"
+#include "usbcallhandler.h"
 #include <SDL3/SDL.h>
 
 #ifdef PLATFORM_ANDROID
@@ -19,11 +20,8 @@ class daqUI : public UI_tile
 {
     bool scope750 = false;
     bool changed = false;
-    constexpr static int num_unit_options[2] = {3,2};
-    const char* analog_unit_labels[num_unit_options[0] + 1] = {"Record:","Volts", "ADC", "None"};
-    const char* digital_unit_labels[num_unit_options[1] + 1] = {"Record:","Bits", "None"}; // TODO: allow DAQ of decoded chars
-    const char** units_labels[2] = {analog_unit_labels, digital_unit_labels};
-    int units_sel[2] = {0,0};
+    usbCallHandler::daqUnitOptions units_sel[2] = {usbCallHandler::daqUnitOptions::None, usbCallHandler::daqUnitOptions::None};
+
     float duration;
     int ch_sel = 1;
     bool daq_converting_and_saving = false;
@@ -34,7 +32,7 @@ class daqUI : public UI_tile
     ImU8   downsample_factor  = 1;
     static const int path_size = 128;
     void init_file_dir();
-    char storage_dir[path_size] = "-1";
+    char storage_dir[path_size];
     bool dir_initiated = false;
     friend void Java_com_EspoTek_Labrador_MainActivity_nativeExternalStoragePermissionUpdate(JNIEnv *, jobject, jlong);
 public:

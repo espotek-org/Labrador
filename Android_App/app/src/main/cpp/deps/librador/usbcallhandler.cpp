@@ -73,6 +73,8 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     return;
 }
 
+const char* usbCallHandler::daq_unit_labels[] = {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
+
 int usbCallHandler::begin_iso_thread_shutdown(){
     iso_thread_shutdown_mutex.lock();
     iso_thread_shutdown_requested = true;
@@ -355,7 +357,7 @@ int usbCallHandler::avrDebug(void){
     return 0;
 }
 
-void usbCallHandler::spawn_daq_thread(int channel, int numToGet, int interval_samples, int units_sel[2], const char* filename) {
+void usbCallHandler::spawn_daq_thread(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char* filename) {
     daq_thread_active = true;
     daq_thread = new std::thread(&usbCallHandler::drive_daq, this, channel, numToGet, interval_samples, units_sel, filename);
     daq_thread_active = false;
@@ -373,7 +375,7 @@ bool usbCallHandler::poll_daq_status() {
     }
 }
 
-void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_samples, int units_sel, SDL_IOStream* iostream) {
+void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_samples, daqUnitOptions unit_sel, SDL_IOStream* iostream) {
     o1buffer* buffer_for_daq;
     if(channel==1) {
         // TODO: mutex needed for deviceMode
@@ -396,30 +398,27 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
 
     const char* ch_names[2] = {"CH A", "CH B"};
     SDL_IOprintf(iostream, "%s\n", ch_names[channel-1]);
-    std::vector<double>* daq_vals = getMany_singleBit(channel, numToGet, interval_samples, 0, true);
-    // channel<->deviceMode<->(single_bit vs double) correspondence is checked in getMany_singlebit.  If the channel for the current deviceMode is actually sampling the 'scope volts, then daq_vals will be nullptr here
-    if(daq_vals!=nullptr) {
+    if(unit_sel==usbCallHandler::daqUnitOptions::Bits) {
+        std::vector<double>* daq_vals = getMany_singleBit(channel, numToGet, interval_samples, 0, true);
         for(const double& val : *daq_vals)
             SDL_IOprintf(iostream, "%.0f", val);
-    } else {
-        if(units_sel == 0) {
-            // volts
-            std::vector<double>* daq_vals = getMany_double(channel, numToGet, interval_samples, 0, 0, true);
-            for(const double& val : *daq_vals)
-                SDL_IOprintf(iostream, volts_fmt, val);
-        } else {
-            // adc units
-            int ix;
-            for(int i = 0; i < numToGet; i++) {
-                int i2 = buffer_for_daq->mostRecentAddressDAQ + i;
-                ix = i2 < buffer_for_daq->m_bufferLen ? i2 : i2 - buffer_for_daq->m_bufferLen;
-                SDL_IOprintf(iostream, "%.0f ", buffer_for_daq->get_filtered_sample(ix, -1, 0, 0.0, false, true));
-            }
+    } else if (unit_sel==usbCallHandler::daqUnitOptions::Volts) {
+        // volts
+        std::vector<double>* daq_vals = getMany_double(channel, numToGet, interval_samples, 0, 0, true);
+        for(const double& val : *daq_vals)
+            SDL_IOprintf(iostream, volts_fmt, val);
+    } else if (unit_sel==usbCallHandler::daqUnitOptions::ADC){
+        // adc units
+        int ix;
+        for(int i = 0; i < numToGet; i++) {
+            int i2 = buffer_for_daq->mostRecentAddressDAQ + i;
+            ix = i2 < buffer_for_daq->m_bufferLen ? i2 : i2 - buffer_for_daq->m_bufferLen;
+            SDL_IOprintf(iostream, "%.0f ", buffer_for_daq->get_filtered_sample(ix, -1, 0, 0.0, false, true));
         }
     }
 }
 
-void usbCallHandler::drive_daq(int channel, int numToGet, int interval_samples, int units_sel[2], const char * filepath) {
+void usbCallHandler::drive_daq(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char * filepath) {
     LIBRADOR_LOG(LOG_DEBUG, "filepath: %s", filepath);
     SDL_IOStream* iostream = open_file(filepath);
     if((channel == 1) || (channel == 3)) {
