@@ -61,7 +61,7 @@ float logicDecodeUI::draw_grabber(float grabber_height, const char * label, floa
             ImGui::SameLine();
         }
 
-        ImGui::PushItemWidth(ImGui::CalcTextSize(uart_options_sublabels[k][*curr_options_sel[k] + 1]).x + 2 * style.FramePadding.x);
+        ImGui::PushItemWidth(ImGui::CalcTextSize(uart_options_sublabels[k][*curr_options_sel[k]]).x + 2 * style.FramePadding.x);
 #define POP_COLOR if(need_pop) {ImGui::PopStyleColor(); need_pop = false;}
         
         ImU32 label_col = IM_COL32(255,255,255,255);
@@ -72,12 +72,13 @@ float logicDecodeUI::draw_grabber(float grabber_height, const char * label, floa
             ImGui::PushStyleColor(ImGuiCol_Text, label_col);
             need_pop = true;
         }
-        if(ImGui::BeginCombo("##uart_option_combo", uart_options_sublabels[k][*curr_options_sel[k] + 1], ImGuiComboFlags_NoArrowButton)) {
+        if(ImGui::BeginCombo("##uart_option_combo", uart_options_sublabels[k][*curr_options_sel[k]], ImGuiComboFlags_NoArrowButton)) {
             POP_COLOR
+            ImGui::Selectable(uart_options_headers[k], false, ImGuiSelectableFlags_Disabled);
             for(int n=0; n < sublabels_counts[k]; n++) {
-                if(ImGui::Selectable(uart_options_sublabels[k][n], *curr_options_sel[k]==(n-1), (n==0 ?  ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None))) {
+                if(ImGui::Selectable(uart_options_sublabels[k][n], *curr_options_sel[k]==n)) {
                     uart_changed = true;
-                    *curr_options_sel[k]=n-1; // n-1 because n=0 is the header
+                    *curr_options_sel[k]=n;
                 }
             }
             ImGui::EndCombo();
