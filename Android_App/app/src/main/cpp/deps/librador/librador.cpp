@@ -69,9 +69,8 @@ int librador_avr_debug(){
 
 int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler::daqUnitOptions units_sel[2], const char* filename)
 {
-    //     should uncomment!
-//     CHECK_API_INITIALISED
-//     CHECK_USB_INITIALISED
+    CHECK_API_INITIALISED
+    CHECK_USB_INITIALISED
 
     internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, units_sel, filename);
     return 1;
