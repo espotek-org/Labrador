@@ -182,7 +182,7 @@ int main(int, char**)
 
     const int num_fonts = 3;
     float glyph_y_offsets[num_fonts] = {3.f, 4.5f, 5.f};
-    float fontsizes[num_fonts] = {13.f, 12.f, 18.f};
+    float fontsizes[num_fonts] = {13.f, 12.f, 16.f};
     int bufsize = 4096;
     char buf[num_fonts][bufsize];
     int fi = 0;
