@@ -169,11 +169,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         if(doA||doB)
             daq_converting_and_saving = true;
         if(doA && doB)
-            librador_daq(3, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(3, 1e3*(duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doA)
-            librador_daq(1, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(1, 1e3*(duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
         else if(doB)
-            librador_daq(2, (duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
+            librador_daq(2, 1e3*(duration * sample_rate) / downsample_factor, downsample_factor, units_sel, full_path);
     }
     ImGui::EndDisabled();
     ImGui::EndDisabled(); // !dir_initiated
