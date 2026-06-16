@@ -84,9 +84,9 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("\xee\xa4\x85").x - style.CellPadding.x - style.ItemSpacing.x);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {style.ItemSpacing.x/2,style.ItemSpacing.y});
     if(timer_on) {
-        ImGui::InputFloat("##Timedaq", &timer, 0.f, 0.f, "%.1f s");
+        ImGui::InputFloat("##Timedaq", &timer, 0.f, 0.f, "%.4f s");
     } else {
-        ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.1f s");
+        ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.3f s");
     }
     ImGui::SameLine();
     ImGui::Text("\xee\xa4\x85");
@@ -95,7 +95,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::EndDisabled();
     duration = ImMin(duration, 10.f);
     duration = ImMax(duration, 0.f);
-    duration = IM_ROUND(duration * 10)/10.f;
+    duration = IM_ROUND(duration * 1000)/1000.f;
 
 
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, (ImGui::GetFontSize() + 2 * style.FramePadding.y - ImGui::CalcTextSize("CH: ").y)/2));
