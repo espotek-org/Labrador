@@ -167,7 +167,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
     bool doB = (units_sel[1] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(2);
     INDENTRIGHT
-    ImGui::BeginDisabled(daq_converting_and_saving || !(doA || doB));
+    ImGui::BeginDisabled(daq_converting_and_saving || !(doA || doB) || duration == 0.f);
     if(ImGui::Button("Begin")) {
         timer_on = true;
         timer = 0.f;
