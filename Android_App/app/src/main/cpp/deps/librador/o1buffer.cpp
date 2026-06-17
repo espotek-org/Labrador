@@ -307,7 +307,7 @@ double o1buffer::get_filtered_sample(int index, int filter_type, int filter_size
             return sampleConvert(accum/((double)filter_size), scope_gain, twelve_bit_multimeter);
         break;
         default: //Default to "no filter"
-            return read_buffer[index];
+            return (unsigned char) read_buffer[index];
     }
 }
 
