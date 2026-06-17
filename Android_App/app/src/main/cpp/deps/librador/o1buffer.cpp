@@ -61,9 +61,9 @@ int o1buffer::addVector(int *firstElement, int numElements){
 
     buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
     buffer_mutex2.unlock();
     return 0;
@@ -74,9 +74,9 @@ int o1buffer::addVector(char *firstElement, int numElements){
 
     buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
     buffer_mutex2.unlock();
 
@@ -88,9 +88,9 @@ int o1buffer::addVector(unsigned char *firstElement, int numElements){
 
     buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
     buffer_mutex2.unlock();
     return 0;
@@ -101,13 +101,13 @@ int o1buffer::addVector(short *firstElement, int numElements){
 
     buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     #ifdef MULTIMETER_INVERT
         add(-firstElement[i] >> 4, currentAddress);
     #else
         add(firstElement[i] >> 4, currentAddress);
     #endif
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
     buffer_mutex2.unlock();
     return 0;
