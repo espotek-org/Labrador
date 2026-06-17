@@ -48,7 +48,8 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
         // if the current device's screen is smaller width-wise than the pixel 6a's screen, make sure the singlet-width tiles remain the same width in inches as on the pixel 6a.  do this by transfering space from the duplex-width tiles (which aren't as space-constrained)
         adjustment = ((pixel_6a_screen_width * dpi / pixel_6a_dpi) - static_cast<double>(io.DisplaySize.x))/3.; 
         adjustment = adjustment < 0 ? 0 : adjustment;
-        tile_singlet_width_pixels = (io.DisplaySize.x - style.ItemSpacing.x - 2 * style.WindowPadding.x)/3.;
+        // WindowPadding.x is used between (left/right-wise) each tile and also to the left and right of the tile group
+        tile_singlet_width_pixels = (io.DisplaySize.x - 2 * style.WindowPadding.x - 2 * style.WindowPadding.x)/3.;
     }
     // col1 and grp1 contain singlet-width tiles, col2 and grp2 have duplex-width tiles
     tile_col_heights[0] = 0.f;
@@ -69,9 +70,9 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
 
     // these widths only relevent to two-col tiling
     col1_width = (n_singlet_tiles_visible > 0) ? tile_singlet_width_pixels : 0;
-    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels : 0;
+    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels;
 
-    row_col_tiling = (!landscape && (n_singlet_tiles_visible == 2) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < fmax(tile_col_heights[0], tile_col_heights[1]))) || \
+    row_col_tiling = (!landscape && (n_singlet_tiles_visible >= 2) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < fmax(tile_col_heights[0], tile_col_heights[1]))) || \
         (landscape && (n_singlet_tiles_visible > 0) && (tile_col_heights[1] > 0) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < settings_height_max));
 
     if(landscape) {
@@ -148,7 +149,9 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                         maybe_clicked_background &= !ImGui::IsItemHovered();
                         // items in group 0 are stacked side-by-side; those in group 1 are stacked vertically
                         if(grp==0) {
+                            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.WindowPadding.x, style.ItemSpacing.y));
                             ImGui::SameLine(); // seems to be invalidated after endgroup, which is convenient here
+                            ImGui::PopStyleVar();
                         }
                     }
                 }
@@ -174,7 +177,9 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                         }
                     }
                     ImGui::EndGroup();
+                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.WindowPadding.x, style.ItemSpacing.y));
                     ImGui::SameLine();
+                    ImGui::PopStyleVar();
                 }
             }
             ImGui::NewLine();
