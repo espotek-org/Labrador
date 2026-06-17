@@ -82,11 +82,12 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::Button("File path");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
-    if(ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)||hovered_last_frame) {
+//     if(ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)||hovered_last_frame) {
+    if(ImGui::IsItemClicked()||hovered_last_frame) {
         ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetItemID());
-        hovered_last_frame = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+        hovered_last_frame = !hovered_last_frame ? true : ImGui::IsItemHovered();
     }
-    if(ImGui::BeginItemTooltip()){
+    if(hovered_last_frame && ImGui::BeginTooltip()) {
         ImGui::PushTextWrapPos(800);
         ImGui::Text("%s", user_path);
         ImGui::PopTextWrapPos();

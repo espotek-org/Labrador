@@ -219,7 +219,10 @@ int main(int, char**)
     
     psu_ui.is_expanded = false; psu_ui.next_is_expanded = false;
     psu_ui.is_visible = false;
-    daq_ui.is_expanded = false; daq_ui.next_is_expanded = false;
+//     daq_ui.is_expanded = false; daq_ui.next_is_expanded = false;
+    trigger_ui.next_is_expanded = false;trigger_ui.is_visible = false;
+    virtual_transform_ui.next_is_expanded = false;virtual_transform_ui.is_visible = false;
+    sig_gen_ui.next_is_expanded = false;sig_gen_ui.is_visible = false;
     
     plotUI plot_ui = plotUI();
 

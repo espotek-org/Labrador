@@ -81,9 +81,9 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
         } else {
             if(row_col_tiling) {
                 if (tile_col_heights[1] > 0.f) {
-                    settings_width = 2 * tile_singlet_width_pixels + style.ItemSpacing.x;
+                    settings_width = n_singlet_tiles_visible * tile_singlet_width_pixels + style.ItemSpacing.x;
                 } else if (n_singlet_tiles_visible > 0) {
-                    settings_width = tile_singlet_width_pixels + (n_singlet_tiles_visible == 2) * (tile_singlet_width_pixels + style.ItemSpacing.x);
+                    settings_width = tile_singlet_width_pixels + (n_singlet_tiles_visible - 1) * (tile_singlet_width_pixels + style.ItemSpacing.x);
                 } else {
                     settings_width = 0.f;
                 }
