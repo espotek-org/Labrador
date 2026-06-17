@@ -70,7 +70,7 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
 
     // these widths only relevent to two-col tiling
     col1_width = (n_singlet_tiles_visible > 0) ? tile_singlet_width_pixels : 0;
-    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels;
+    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels : 0;
 
     row_col_tiling = (!landscape && (n_singlet_tiles_visible >= 2) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < fmax(tile_col_heights[0], tile_col_heights[1]))) || \
         (landscape && (n_singlet_tiles_visible > 0) && (tile_col_heights[1] > 0) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < settings_height_max));
@@ -139,8 +139,10 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                     INDENTUP
                 ImGui::BeginGroup();
                 bool first = true;
+                UI_tile::Width grp_width = (UI_tile::Width) grp; //0: singlet; 1: duplex
+
                 for(int i=0; i<n_tiles; i++) {
-                    if (tiles[i]->is_visible && (static_cast<int>(tiles[i]->width) == grp)) {
+                    if (tiles[i]->is_visible && (tiles[i]->width == grp_width)) {
                         if((grp==1)&&(!first)) {
                             INDENTUP
                         }
@@ -159,19 +161,30 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
             }
         } else {
             for(int col : {0,1}) {
+                UI_tile::Width col_width_type = (UI_tile::Width) col; // 0: singlet; 1: duplex
+                int col_width;
+                if(col_width_type == UI_tile::Width::singlet) {
+                    col_width = tile_singlet_width_pixels;
+                } else {
+                    col_width = 2 * tile_singlet_width_pixels + style.WindowPadding.x;
+                }
+
                 if(tile_col_heights[col] > 0)
                 {
                     ImGui::BeginGroup();
                     bool first = true;
                     for(int i=0; i<n_tiles; i++) {
-                        if (tiles[i]->is_visible && (static_cast<int>(tiles[i]->width) == col)) {
+                        if (tiles[i]->is_visible && (tiles[i]->width == col_width_type)) {
                             if(!first)
                                 INDENTUP
                             first=false;
                             if(landscape) {
-                                tiles[i]->draw((static_cast<int>(tiles[i]->width) + 1) * tile_singlet_width_pixels, &inputs_ui);
+                                tiles[i]->draw(col_width, &inputs_ui);
                             } else {
-                                tiles[i]->draw((static_cast<int>(tiles[i]->width) + 1) * tile_singlet_width_pixels + (-2*static_cast<int>(tiles[i]->width) + 1) * adjustment, &inputs_ui);
+                                // widths:
+                                // duplex-width tiles: 2 * tile_singlet_width_pixels - adjustment 
+                                // singlet-width tiles: tile_singlet_width_pixels + adjustment
+                                tiles[i]->draw(col_width, &inputs_ui);
                             }
                             maybe_clicked_background &= !ImGui::IsItemHovered();
                         }
