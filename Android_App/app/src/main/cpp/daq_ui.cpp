@@ -47,7 +47,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.ItemInnerSpacing.y));
     INDENTRIGHT
-    ImGui::PushItemWidth(width_pixels - style.CellPadding.x);
+    ImGui::PushItemWidth(width_pixels - 2 * style.CellPadding.x );
     ImGui::InputText("##iddaq", file_name, IM_COUNTOF(file_name));
     SKOIA;
 
@@ -57,15 +57,28 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     } else if (ImGui::IsItemDeactivated()) {
         SDL_SetNumberProperty(*propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
     }
-    if(strcmp(file_name,"")==0 || strstr(file_name,"/")!=nullptr) 
+    if(daq_finished) {
+        daq_finished = false;
+        timer2 = 1;
+        strcpy(file_name2, file_name);
+    }
+    if(timer2 > 0) {
+        timer2 -= io.DeltaTime;
+        if(timer2 > 0) {
+            strcpy(file_name, "Saved");
+        } else {
+            strcpy(file_name, file_name2);
+        }
+    } else if(strcmp(file_name,"")==0 || strstr(file_name,"/")!=nullptr) {
         strcpy(file_name, "filename");
+    }
 
     strcat(user_path, file_name);
     strcat(user_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     strcat(full_path, file_name);
     strcat(full_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     INDENTRIGHT
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.CellPadding.x*2))/2, 0.));
+//     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.CellPadding.x*2))/2, 0.));
     ImGui::Button("File path");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
@@ -151,8 +164,10 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PopStyleVar();
     downsample_factor = ImMax(downsample_factor,u8_one);
     SKOIA;
+    bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
+    bool doB = (units_sel[1] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(2);
     INDENTRIGHT
-    ImGui::BeginDisabled(daq_converting_and_saving);
+    ImGui::BeginDisabled(daq_converting_and_saving || !(doA || doB));
     if(ImGui::Button("Begin")) {
         timer_on = true;
         timer = 0.f;
@@ -161,8 +176,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     }
     ImGui::SameLine();
 
-    bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
-    bool doB = (units_sel[1] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(2);
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
         timer = -1.f;
@@ -202,8 +215,10 @@ void daqUI::init_file_dir()
 
 void daqUI::poll_status()
 {
-    if(daq_converting_and_saving)
+    if(daq_converting_and_saving) {
         daq_converting_and_saving = librador_poll_daq_status();
+        daq_finished = true;
+    }
 }
 
 int daqUI::get_height()

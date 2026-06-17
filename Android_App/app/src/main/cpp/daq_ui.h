@@ -25,7 +25,9 @@ class daqUI : public UI_tile
     float duration;
     int ch_sel = 1;
     bool daq_converting_and_saving = false;
+    bool daq_finished = false;
     float timer = -1.f;
+    float timer2 = -1.f;
     bool timer_on = false;
     int in_sample_rate;
     const ImU8   u8_one  = 1;
@@ -43,6 +45,7 @@ public:
     int get_height() override;
     char full_path[path_size]; 
     char file_name[path_size/2]; 
+    char file_name2[path_size/2]; 
 };
 
 #endif // DAQUI_H
