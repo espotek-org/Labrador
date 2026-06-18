@@ -78,11 +78,9 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     strcat(full_path, file_name);
     strcat(full_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     INDENTRIGHT
-//     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(-style.ItemInnerSpacing.x + (width_pixels - (ImGui::CalcTextSize("File path").x + style.CellPadding.x*2))/2, 0.));
     ImGui::Button("File path");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
-//     if(ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)||hovered_last_frame) {
     if(ImGui::IsItemClicked()||hovered_last_frame) {
         ImGui::SetKeyOwner(ImGuiKey_MouseLeft, ImGui::GetItemID());
         hovered_last_frame = !hovered_last_frame ? true : ImGui::IsItemHovered();
