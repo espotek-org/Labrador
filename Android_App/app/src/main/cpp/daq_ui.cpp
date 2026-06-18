@@ -86,7 +86,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         hovered_last_frame = !hovered_last_frame ? true : ImGui::IsItemHovered();
     }
     if(hovered_last_frame && ImGui::BeginTooltip()) {
-        ImGui::PushTextWrapPos(800);
+        ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x);
         ImGui::Text("%s", user_path);
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
@@ -100,10 +100,10 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     } else {
         ImGui::InputFloat("##Timedaq", &duration, 0.f, 0.f, "%.3f s");
     }
+    SKOIA;
     ImGui::SameLine();
     ImGui::Text("\xee\xa4\x85");
     ImGui::PopStyleVar();
-    SKOIA;
     ImGui::EndDisabled();
     duration = ImMin(duration, 10.f);
     duration = ImMax(duration, 0.f);
@@ -158,11 +158,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {style.ItemSpacing.x/2,style.ItemSpacing.y});
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%u", ImGuiInputTextFlags_None);
+    SKOIA;
     ImGui::SameLine();
     ImGui::Text("\xee\xa4\x86");
     ImGui::PopStyleVar();
     downsample_factor = ImMax(downsample_factor,u8_one);
-    SKOIA;
     bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
     bool doB = (units_sel[1] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(2);
     INDENTRIGHT
