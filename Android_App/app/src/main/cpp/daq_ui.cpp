@@ -120,9 +120,10 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::SameLine();
         ALIGN_Y
         ImGui::BeginDisabled(!inputs_ui->ch_enabled(1));
-        ImGui::RadioButton("A ", &ch_sel, 1);
+        ImGui::RadioButton("A", &ch_sel, 1);
         ImGui::EndDisabled();
         ImGui::SameLine();
+        ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(style.ItemInnerSpacing.x, 0.f));
         ALIGN_Y
         ImGui::BeginDisabled(!inputs_ui->ch_enabled(2));
         ImGui::RadioButton("B", &ch_sel, 2); 
@@ -157,10 +158,14 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("\xee\xa4\x86").x - style.FramePadding.x - style.ItemSpacing.x);
     INDENTRIGHT
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {style.ItemSpacing.x/2,style.ItemSpacing.y});
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, {0.,style.ItemSpacing.y});
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
     ImGui::InputScalar("##dwndaq", ImGuiDataType_U8, &downsample_factor,  &u8_one, NULL, "%u", ImGuiInputTextFlags_None);
     SKOIA;
     ImGui::SameLine();
     ImGui::Text("\xee\xa4\x86");
+    ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
     ImGui::PopStyleVar();
     downsample_factor = ImMax(downsample_factor,u8_one);
     bool doA = (units_sel[0] != usbCallHandler::daqUnitOptions::None) && inputs_ui->ch_enabled(1);
