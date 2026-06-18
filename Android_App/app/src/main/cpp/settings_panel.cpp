@@ -12,9 +12,7 @@ const int n_tiles = 7;
 UI_tile* tiles[n_tiles] = {&inputs_ui, &trigger_ui, &virtual_transform_ui, &sig_gen_ui, &psu_ui, &logic_decode_ui, &daq_ui}; 
 
 float pixel_6a_screen_width = 1080.f;
-float pixel_6a_setting_panel_aspect = 1.13; // width to height
 float settings_height_max;
-float adjustment;
 float tile_singlet_width_pixels;
 float settings_width;
 bool row_col_tiling;
@@ -29,25 +27,22 @@ bool collapse_settings = false;
 
 ImVec2 settings_window_center;
 
-// singlet-width tiles are (tile_singlet_width_pixels + adjustment) wide
-// duplex-width tiles are (2 * tile_singlet_width_pixels - adjustment) wide
+// singlet-width tiles are tile_singlet_width_pixels wide
+// duplex-width tiles are 2 * tile_singlet_width_pixels wide
 // two-col tiling: two columns of tiles side-by-side, the one on the left containing singlet-width tiles and the one on the right containing duplex-width tiles
 // row-col tiling: draw singlet-width tiles in the top row; below this row, draw duplex-width tiles in a column
 void do_settings_panel_layout(float* data_width, float* data_height, bool landscape, int y_size, float dpi, float pixel_6a_dpi) {
     ImGuiIO& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
 
-    adjustment = 0.f;
     // should compute these values only once, but there's no way to get the navigation/status bar heights in landscape mode when in portrait mode or vice-versa; it's necessary to wait until the device actually enters a given orientation to access the heights
     // in landscape mode, allow scrolling the settings panel in the y direction, so there's no need to account for different y sizes across devices
     if(landscape) { 
         settings_height_max = y_size;
         *data_height = y_size;
-        tile_singlet_width_pixels = settings_height_max * pixel_6a_setting_panel_aspect / 3.f;
+        // make the tile width in inches approximately match that on the pixel 6a
+        tile_singlet_width_pixels = (pixel_6a_screen_width * dpi / pixel_6a_dpi) / 3;
     } else {
-        // if the current device's screen is smaller width-wise than the pixel 6a's screen, make sure the singlet-width tiles remain the same width in inches as on the pixel 6a.  do this by transfering space from the duplex-width tiles (which aren't as space-constrained)
-        adjustment = ((pixel_6a_screen_width * dpi / pixel_6a_dpi) - static_cast<double>(io.DisplaySize.x))/3.; 
-        adjustment = adjustment < 0 ? 0 : adjustment;
         // WindowPadding.x is used between (left/right-wise) each tile and also to the left and right of the tile group
         tile_singlet_width_pixels = (io.DisplaySize.x - 2 * style.WindowPadding.x - 2 * style.WindowPadding.x)/3.;
     }
@@ -72,8 +67,10 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
     col1_width = (n_singlet_tiles_visible > 0) ? tile_singlet_width_pixels : 0;
     col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels : 0;
 
-    row_col_tiling = (!landscape && (n_singlet_tiles_visible >= 2) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < fmax(tile_col_heights[0], tile_col_heights[1]))) || \
-        (landscape && (n_singlet_tiles_visible > 0) && (tile_col_heights[1] > 0) && ((tile_col_heights[1] + singlet_tile_height_when_row_col_tiling) < settings_height_max));
+    float row_col_tiling_height = (tile_col_heights[1] + singlet_tile_height_when_row_col_tiling);
+    float two_col_tiling_height = fmax(tile_col_heights[0], tile_col_heights[1]);
+
+    row_col_tiling = (row_col_tiling_height < two_col_tiling_height) && (landscape ? (two_col_tiling_height > settings_height_max) : true);
 
     if(landscape) {
         if(collapse_settings) {
@@ -89,8 +86,7 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
                 }
             } else {
                 settings_width = col1_width + col2_width + ((col1_width>0)&&(col2_width>0)) * style.ItemSpacing.x;
-                float max_col_height = fmax(tile_col_heights[0], tile_col_heights[1]);
-                if(max_col_height > settings_height_max) {
+                if(two_col_tiling_height > settings_height_max) {
                     settings_width += style.ScrollbarSize;
                 }
             }
@@ -178,14 +174,7 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                             if(!first)
                                 INDENTUP
                             first=false;
-                            if(landscape) {
-                                tiles[i]->draw(col_width, &inputs_ui);
-                            } else {
-                                // widths:
-                                // duplex-width tiles: 2 * tile_singlet_width_pixels - adjustment 
-                                // singlet-width tiles: tile_singlet_width_pixels + adjustment
-                                tiles[i]->draw(col_width, &inputs_ui);
-                            }
+                            tiles[i]->draw(col_width, &inputs_ui);
                             maybe_clicked_background &= !ImGui::IsItemHovered();
                         }
                     }
