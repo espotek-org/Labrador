@@ -55,7 +55,7 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
     for(int i=0; i < n_tiles; i++) {
         if(tiles[i]->is_visible) {
             float height = tiles[i]->next_is_expanded ? tiles[i]->get_height() : tiles[i]->get_collapsed_height();
-            tile_col_heights[static_cast<int>(tiles[i]->width)] += height;
+            tile_col_heights[tiles[i]->width == UI_tile::Width::singlet ? 0 : 1] += height;
             if(tiles[i]->width == UI_tile::Width::singlet) {
                 singlet_tile_height_when_row_col_tiling = fmax(singlet_tile_height_when_row_col_tiling, height);
                 n_singlet_tiles_visible++;
@@ -63,34 +63,32 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
         }
     }
 
-    // these widths only relevent to two-col tiling
     col1_width = (n_singlet_tiles_visible > 0) ? tile_singlet_width_pixels : 0;
-    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels : 0;
+    col2_width = (tile_col_heights[1] > 0) ? 2 * tile_singlet_width_pixels + style.WindowPadding.x : 0;
 
     float row_col_tiling_height = (tile_col_heights[1] + singlet_tile_height_when_row_col_tiling);
-    float two_col_tiling_height = fmax(tile_col_heights[0], tile_col_heights[1]);
+    float two_col_tiling_height = ImMax(tile_col_heights[0], tile_col_heights[1]);
 
     row_col_tiling = (row_col_tiling_height < two_col_tiling_height) && (landscape ? (two_col_tiling_height > settings_height_max) : true);
+    if(row_col_tiling) {
+        settings_height = singlet_tile_height_when_row_col_tiling + tile_col_heights[1];
+    } else {
+        settings_height = fmax(tile_col_heights[0], tile_col_heights[1]);
+    }
 
     if(landscape) {
         if(collapse_settings) {
             *data_width = ImGui::GetContentRegionAvail().x;
         } else {
             if(row_col_tiling) {
-                if (tile_col_heights[1] > 0.f) {
-                    settings_width = n_singlet_tiles_visible * tile_singlet_width_pixels + style.ItemSpacing.x;
-                } else if (n_singlet_tiles_visible > 0) {
-                    settings_width = tile_singlet_width_pixels + (n_singlet_tiles_visible - 1) * (tile_singlet_width_pixels + style.ItemSpacing.x);
-                } else {
-                    settings_width = 0.f;
-                }
+                settings_width = ImMax(col2_width, n_singlet_tiles_visible * (tile_singlet_width_pixels + style.WindowPadding.x) - style.WindowPadding.x);
             } else {
-                settings_width = col1_width + col2_width + ((col1_width>0)&&(col2_width>0)) * style.ItemSpacing.x;
-                if(two_col_tiling_height > settings_height_max) {
-                    settings_width += style.ScrollbarSize;
-                }
+                settings_width = col1_width + col2_width + ((col1_width>0)&&(col2_width>0)) * style.WindowPadding.x;
             }
-            settings_width = fmax(settings_width, ImGui::GetFontSize() + 2 * style.FramePadding.x);
+            if(settings_height > settings_height_max) {
+                settings_width += style.ScrollbarSize;
+            }
+            settings_width = ImMax(settings_width, ImGui::GetFontSize() + 2 * style.FramePadding.x);
             *data_width = ImGui::GetContentRegionAvail().x - style.ItemSpacing.x - settings_width;
         }
     } else {
@@ -99,11 +97,6 @@ void do_settings_panel_layout(float* data_width, float* data_height, bool landsc
         if(collapse_settings) {
             *data_height = ImGui::GetContentRegionAvail().y;
         } else {
-            if(row_col_tiling) {
-                settings_height = singlet_tile_height_when_row_col_tiling + tile_col_heights[1];
-            } else {
-                settings_height = fmax(tile_col_heights[0], tile_col_heights[1]);
-            }
             settings_height = fmax(settings_height, ImGui::GetFontSize() + 2 * style.ItemSpacing.y);
             *data_height = ImGui::GetContentRegionAvail().y - settings_height;
         }
@@ -125,7 +118,7 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
         ImVec2 settings_start_pos = ImGui::GetCursorScreenPos();
         ImGui::SetNextItemAllowOverlap();
         if(ImGui::InvisibleButton("open ui_tile selector", {0.f, 0.f})) {
-                maybe_clicked_background = true;
+            maybe_clicked_background = true;
         }
         ImGui::SetCursorScreenPos(settings_start_pos);
 
@@ -135,15 +128,15 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                     INDENTUP
                 ImGui::BeginGroup();
                 bool first = true;
-                UI_tile::Width grp_width = (UI_tile::Width) grp; //0: singlet; 1: duplex
+                UI_tile::Width grp_width_type = (UI_tile::Width) grp; //0: singlet; 1: duplex
 
                 for(int i=0; i<n_tiles; i++) {
-                    if (tiles[i]->is_visible && (tiles[i]->width == grp_width)) {
+                    if (tiles[i]->is_visible && (tiles[i]->width == grp_width_type)) {
                         if((grp==1)&&(!first)) {
                             INDENTUP
                         }
                         first = false;
-                        tiles[i]->draw(tile_singlet_width_pixels + grp * (tile_singlet_width_pixels + style.ItemSpacing.x), &inputs_ui);
+                        tiles[i]->draw(grp_width_type == UI_tile::Width::singlet ? tile_singlet_width_pixels : (2 * tile_singlet_width_pixels + style.WindowPadding.x), &inputs_ui);
                         maybe_clicked_background &= !ImGui::IsItemHovered();
                         // items in group 0 are stacked side-by-side; those in group 1 are stacked vertically
                         if(grp==0) {
@@ -158,12 +151,6 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
         } else {
             for(int col : {0,1}) {
                 UI_tile::Width col_width_type = (UI_tile::Width) col; // 0: singlet; 1: duplex
-                int col_width;
-                if(col_width_type == UI_tile::Width::singlet) {
-                    col_width = tile_singlet_width_pixels;
-                } else {
-                    col_width = 2 * tile_singlet_width_pixels + style.WindowPadding.x;
-                }
 
                 if(tile_col_heights[col] > 0)
                 {
@@ -174,7 +161,7 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
                             if(!first)
                                 INDENTUP
                             first=false;
-                            tiles[i]->draw(col_width, &inputs_ui);
+                            tiles[i]->draw(col_width_type == UI_tile::Width::singlet ? tile_singlet_width_pixels : (2 * tile_singlet_width_pixels + style.WindowPadding.x), &inputs_ui);
                             maybe_clicked_background &= !ImGui::IsItemHovered();
                         }
                     }
