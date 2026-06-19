@@ -320,9 +320,9 @@ int main(int, char**)
             ImGui::SameLine();
         }
 
+        draw_selector_popup(landscape, orientation_changed);
         draw_settings_panel(landscape, screen_keyboard_shown);
         draw_collapse_button(landscape, dataWindowBottomLeft, dataWindowBottomRight);
-        draw_selector_popup(landscape, orientation_changed);
 
         ImGui::End();
 

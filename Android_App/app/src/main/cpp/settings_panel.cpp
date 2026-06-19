@@ -117,7 +117,7 @@ void draw_settings_panel(bool landscape, bool screen_keyboard_shown) {
         ImGuiContext& g = *GImGui;
         ImVec2 settings_start_pos = ImGui::GetCursorScreenPos();
         ImGui::SetNextItemAllowOverlap();
-        if(ImGui::InvisibleButton("open ui_tile selector", {0.f, 0.f})) {
+        if(ImGui::InvisibleButton("open ui_tile selector", ImGui::GetContentRegionAvail() + ImVec2(0.f, ImGui::GetScrollY()))) {
             maybe_clicked_background = true;
         }
         ImGui::SetCursorScreenPos(settings_start_pos);
