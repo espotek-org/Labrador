@@ -44,7 +44,7 @@ jobs:
           UPLOADTOOL_BODY: |-
             ## Android
 
-            Download `Labrador-<version>-release-signed.apk` for manual installation on Android 5.0 "Lollipop" or later (API Level 21).
+            Download `Labrador-<version>-release-signed.apk` for manual installation on Android 7.1 "Nougat" or later (API Level 25).
 
             ## Linux (including Raspberry Pi)
 

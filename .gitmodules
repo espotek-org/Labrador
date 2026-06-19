@@ -1,3 +1,15 @@
 [submodule "libdfuprog/dfu-programmer"]
 	path = libdfuprog/dfu-programmer
 	url = https://github.com/dfu-programmer/dfu-programmer
+[submodule "Android_App/app/src/main/cpp/deps/implot"]
+	path = Android_App/app/src/main/cpp/deps/implot
+	url = https://github.com/brentfpage/implot.git
+	branch = for_labrador_android_app
+[submodule "Android_App/app/src/main/cpp/deps/imgui"]
+	path = Android_App/app/src/main/cpp/deps/imgui
+	url = https://github.com/brentfpage/imgui.git
+	branch = for_labrador_android_app
+[submodule "Android_App/app/src/main/cpp/deps/SDL"]
+	path = Android_App/app/src/main/cpp/deps/SDL
+	url = https://github.com/brentfpage/SDL.git
+	branch = for_labrador_app

@@ -378,6 +378,7 @@ void genericUsbDriver::setGain(double newGain){
     qDebug("newGain = %f", newGain);
     qDebug("gainMask = %x", gainMask);
     usbSendControl(0x40, 0xa5, deviceMode, gainMask, 0, NULL);
+    usbSendControl(0x40, 0xa5, (deviceMode == 5 ? 0 : deviceMode), gainMask, 0, NULL);
 }
 
 void genericUsbDriver::avrDebug(void){
@@ -385,7 +386,6 @@ void genericUsbDriver::avrDebug(void){
 
     qDebug() << "unified debug is of size" << sizeof(unified_debug);
     /*
-#ifndef PLATFORM_ANDROID
     unified_debug *udsPtr = (unified_debug *) inBuffer;
     uint16_t trfcnt0 = (udsPtr->trfcntH0 << 8) + udsPtr->trfcntL0;
     uint16_t trfcnt1 = (udsPtr->trfcntH1 << 8) + udsPtr->trfcntL1;
@@ -406,7 +406,6 @@ void genericUsbDriver::avrDebug(void){
     qDebug() << "CALB = " << udsPtr->CALB;
     qDebug() << "dma_ch0_cnt = " << dma_ch0_cnt;
     qDebug() << "dma_ch1_cnt = " << dma_ch1_cnt;
-#endif
 */
 }
 

@@ -33,17 +33,14 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - name: Install Java
+        uses: actions/setup-java@v5
         with:
-          aqtversion: '==3.3.*'
-          version: '5.14.2'
-          host: 'linux'
-          target: 'android'
-          arch: 'android'
+          distribution: 'jetbrains'
+          java-version: '25'
 
       - name: Install SDK
-        run: ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install 'platforms;android-31' 'build-tools;31.0.0' 'ndk;21.3.6528147'
+        run: ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install 'platforms;android-36' 'build-tools;36.1.0' 'ndk;28.2.13676358'
 
       # Secrets should be the base64 portion of the PEM format
       # (i.e. the stuff between the BEGIN/END lines):
@@ -71,36 +68,21 @@ jobs:
       # be signed with debug keys.
 
       - name: Build Android package
-        working-directory: Desktop_Interface
+        working-directory: Android_App
         run: |
-          export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/21.3.6528147"
           APK_BASENAME="Labrador-$(git rev-parse --short HEAD)"
           if [ -e cert.cer ] && [ -e cert.p8 ]; then
-            qmake -config release
-            make -j$(nproc)
-            make INSTALL_ROOT=android-build install
-            JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-Labrador-deployment-settings.json --output android-build --aab --android-platform android-31 --verbose --gradle --release
-            ${ANDROID_SDK_ROOT}/build-tools/31.0.0/apksigner sign --in android-build/build/outputs/apk/release/android-build-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
+            ./gradlew assembleRelease
+            ${ANDROID_SDK_ROOT}/build-tools/36.1.0/apksigner sign --in app/build/outputs/apk/release/app-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
           else
-            qmake -config debug
-            make -j$(nproc)
-            make INSTALL_ROOT=android-build install
-            JAVA_HOME=${JAVA_HOME_8_X64} androiddeployqt --input android-Labrador-deployment-settings.json --output android-build --aab --android-platform android-31 --verbose --gradle
-            cp android-build/build/outputs/apk/debug/android-build-debug.apk ${APK_BASENAME}-debug.apk
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk ${APK_BASENAME}-debug.apk
           fi
-          cp android-build/build/outputs/bundle/release/android-build-release.aab ${APK_BASENAME}-release-unsigned.aab
 
       - name: Upload apk artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-apk
-          path: Desktop_Interface/Labrador*.apk
-          compression-level: 0
-          if-no-files-found: error
-      - name: Upload aab artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: asset-aab
-          path: Desktop_Interface/Labrador*.aab
+          path: Android_App/Labrador*.apk
           compression-level: 0
           if-no-files-found: error

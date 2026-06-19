@@ -1,0 +1,34 @@
+cmake_minimum_required(VERSION 3.16)
+project(libdfuprog VERSION 1.0 LANGUAGES C CXX)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+add_library(libdfuprog STATIC
+    config.h
+    dfu-programmer/src/arguments.c dfu-programmer/src/arguments.h
+    dfu-programmer/src/atmel.c dfu-programmer/src/atmel.h
+    dfu-programmer/src/commands.c dfu-programmer/src/commands.h
+    dfu-programmer/src/dfu.c dfu-programmer/src/dfu.h
+    dfu-programmer/src/dfu-bool.h
+    dfu-programmer/src/dfu-device.h
+    dfu-programmer/src/intel_hex.c dfu-programmer/src/intel_hex.h
+    dfu-programmer/src/stm32.c dfu-programmer/src/stm32.h
+    dfu-programmer/src/util.c dfu-programmer/src/util.h
+    libdfuprog.c libdfuprog.h
+)
+
+target_include_directories(libdfuprog PRIVATE
+    dfu-programmer/src
+    ../Android_App/app/src/main/cpp/deps/librador/librador_deps/libusb
+)
+
+target_compile_definitions(libdfuprog PRIVATE
+    HAVE_CONFIG_H
+    PLATFORM_ANDROID
+)
+
+install(TARGETS libdfuprog
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)

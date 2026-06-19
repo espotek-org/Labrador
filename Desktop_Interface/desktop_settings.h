@@ -41,8 +41,6 @@ extern unsigned char expected_variant;
 //#define MAX_CONSOLE_BLOCK_COUNT 512
 #define SERIAL_BUFFER_LENGTH 8192
 
-#define ANDROID_SCALE_INSENSITIVITY 1.2
-
 #define NUM_BYTES_STORED_PER_DAQ_SAMPLE 9
 
 #endif // DESKTOP_SETTINGS_H

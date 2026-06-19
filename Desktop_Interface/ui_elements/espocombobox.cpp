@@ -11,11 +11,7 @@ espoComboBox::espoComboBox(QWidget *parent) : QComboBox(parent)
 
 void espoComboBox::readWaveformList(void)
 {
-#if defined(PLATFORM_ANDROID)
-    QFile file("assets:/waveforms/_list.wfl");
-#else
     QFile file(QStandardPaths::locate(QStandardPaths::AppDataLocation, "waveforms/_list.wfl"));
-#endif
 
     qDebug() << "opening" << file.fileName();
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))

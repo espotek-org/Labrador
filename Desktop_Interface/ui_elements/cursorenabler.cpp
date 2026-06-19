@@ -3,16 +3,10 @@
 cursorEnabler::cursorEnabler(QWidget *parent) : QLabel(parent)
 {
     this->setVisible(0);
-#ifdef PLATFORM_ANDROID
-    this->m_turnedOn = false;
-#endif
 }
 
 void cursorEnabler::setTurnedOn(bool enabled){
     m_turnedOn = enabled;
-#ifdef PLATFORM_ANDROID
-    this->m_turnedOn = false;
-#endif
 }
 
 void cursorEnabler::clickDetected(QMouseEvent* event){
