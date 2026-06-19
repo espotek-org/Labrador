@@ -408,7 +408,7 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
         // adc units
         int ix;
         for(int i = 0; i < numToGet; i++) {
-            int i2 = buffer_for_daq->mostRecentAddressDAQ - i;
+            int i2 = buffer_for_daq->mostRecentAddressDAQ + (i - (numToGet-1)) * interval_samples;
             ix = i2 >= 0 ? i2 : i2 + buffer_for_daq->m_bufferLen;
             SDL_IOprintf(iostream, "%.0f ", buffer_for_daq->get_filtered_sample(ix, -1, 0, 0.0, false, true));
         }
