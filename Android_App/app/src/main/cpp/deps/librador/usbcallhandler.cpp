@@ -398,13 +398,13 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
     SDL_IOprintf(iostream, "%s\n", ch_names[channel-1]);
     if(unit_sel==usbCallHandler::daqUnitOptions::Bits) {
         std::vector<double>* daq_vals = getMany_singleBit(channel, numToGet, interval_samples, 0, true);
-        for(const double& val : *daq_vals)
-            SDL_IOprintf(iostream, "%.0f", val);
+        for(auto it = (*daq_vals).rbegin(); it != (*daq_vals).rend(); it++)
+            SDL_IOprintf(iostream, "%.0f", *it);
     } else if (unit_sel==usbCallHandler::daqUnitOptions::Volts) {
         // volts
         std::vector<double>* daq_vals = getMany_double(channel, numToGet, interval_samples, 0, 0, true);
-        for(const double& val : *daq_vals)
-            SDL_IOprintf(iostream, volts_fmt, val);
+        for(auto it = (*daq_vals).rbegin(); it != (*daq_vals).rend(); it++)
+            SDL_IOprintf(iostream, volts_fmt, *it);
     } else if (unit_sel==usbCallHandler::daqUnitOptions::ADC){
         // adc units
         int ix;

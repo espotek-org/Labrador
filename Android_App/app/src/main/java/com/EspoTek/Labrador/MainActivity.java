@@ -322,17 +322,6 @@ public class MainActivity extends SDLActivity {
         usb_permission_request_allowed = true;
     }
 
-//     public int openFile(String filename) {
-//         File file = new File(filename);
-//         ParcelFileDescriptor filePfd;
-// //         DocumentFile file;
-//         filePfd = getContentResolver().openAssetFileDescriptor(file.toURI(), "w");
-//         int fd = filePfd.getFd();
-// 
-// 
-// 
-//     }
-// 
     public String initFile(String filename) {
         File file = new File(filename);
         try{
