@@ -427,10 +427,9 @@ int o1buffer::setPaused(bool is_paused, int mostRecentAddressDelta, bool hard){
 }
 
 void o1buffer::copy_to_daq(){
-    buffer_mutex2.lock();
+    // caller should hold a mutex protection on 'buffer' access
     mostRecentAddressDAQ = mostRecentAddress;
     memcpy(buffer_daq, buffer, sizeof(int)*NUM_SAMPLES_PER_CHANNEL);
-    buffer_mutex2.unlock();
 }
 
 bool o1buffer::getPaused(){

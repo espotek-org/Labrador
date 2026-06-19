@@ -385,7 +385,6 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
     } else {
         buffer_for_daq = internal_o1_buffer_375_CHB;
     }
-    buffer_for_daq->copy_to_daq();
     const char* volts_fmt_template = "%%.%dg ";
     char volts_fmt[8];
     if(deviceMode==7) {
@@ -419,6 +418,19 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
 void usbCallHandler::drive_daq(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char * filepath) {
     LIBRADOR_LOG(LOG_DEBUG, "filepath: %s", filepath);
     SDL_IOStream* iostream = open_file(filepath);
+    buffer_read_write_mutex.lock(); 
+    if((channel == 1) || (channel == 3)) {
+        if(deviceMode==6) {
+            internal_o1_buffer_750->copy_to_daq();
+        } else {
+            internal_o1_buffer_375_CHA->copy_to_daq();
+        }
+    }
+    if((channel == 2) || (channel == 3)) {
+        internal_o1_buffer_375_CHB->copy_to_daq();
+    }
+    buffer_read_write_mutex.unlock(); 
+
     if((channel == 1) || (channel == 3)) {
         daq_for_channel(1, numToGet, interval_samples, units_sel[0], iostream);
     }
