@@ -47,7 +47,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f, style.ItemInnerSpacing.y));
     INDENTRIGHT
-    ImGui::PushItemWidth(width_pixels - 2 * style.CellPadding.x );
+    ImGui::PushItemWidth(width_pixels - 2 * style.CellPadding.x - 2 *style.FramePadding.x - ImGui::CalcTextSize("?").x);
     ImGui::InputText("##iddaq", file_name, IM_COUNTOF(file_name));
     SKOIA;
 
@@ -77,8 +77,10 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     strcat(user_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
     strcat(full_path, file_name);
     strcat(full_path, ".txt");// must have .txt suffix to allow mediascanner to index the file as a Document, put it in Recents
-    INDENTRIGHT
-    ImGui::Button("File path");
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
+    ImGui::SameLine();
+    ImGui::PopStyleVar();
+    ImGui::Button("?");
     static bool hovered_last_frame = false;
     // block below: prevent inadvertent inputs to other widgets when closing the tooltip
     if(ImGui::IsItemClicked()||hovered_last_frame) {
@@ -130,7 +132,6 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::EndDisabled();
     ImGui::PopStyleVar();
     INDENTRIGHT
-    ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
 
     // calls to librador_daq require that the selected units are valid
     for(int ch: {1,2}) {
@@ -138,8 +139,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
     }
 
     int ch_units_sel = units_sel[ch_sel - 1];
+    ImGui::BeginDisabled(!inputs_ui->ch_enabled(ch_sel));
     if(ImGui::BeginCombo("##daqunits", usbCallHandler::daq_unit_labels[ch_units_sel])) {
+        ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
         ImGui::Selectable("Record:", false, ImGuiSelectableFlags_Disabled);
+        ImGui::PopStyleVar();
         for(int n=0; n < usbCallHandler::daqUnitOptions::QUANT; n++) {
             if(n!=usbCallHandler::daqUnitOptions::None && usbCallHandler::daqUnitIsForScope[n] == inputs_ui->logic_AB_enabled(ch_sel))
                 continue;
@@ -149,11 +153,11 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         }
         ImGui::EndCombo();
     }
-    ImGui::PopStyleVar();
+    ImGui::EndDisabled();
 
     INDENTRIGHT
 
-    float sample_rate = (inputs_ui->mode == inputsUI::Mode::Scope750 ? 750 : 375) * (inputs_ui->logic_AB_enabled(ch_sel) ? 8 : 1);
+    float sample_rate = !inputs_ui->ch_enabled(ch_sel) ? 0 : ((inputs_ui->mode == inputsUI::Mode::Scope750 ? 750 : 375) * (inputs_ui->logic_AB_enabled(ch_sel) ? 8 : 1));
     ImGui::Text("%.4g kSa/s", sample_rate/downsample_factor);
     ImGui::PushItemWidth(width_pixels - ImGui::CalcTextSize("\xee\xa4\x86").x - style.FramePadding.x - style.ItemSpacing.x);
     INDENTRIGHT
@@ -179,6 +183,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         timer += io.DeltaTime;
     }
     ImGui::SameLine();
+    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x - 2*style.FramePadding.x - ImGui::CalcTextSize("End").x - style.CellPadding.x,0.f));
 
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
@@ -232,7 +237,7 @@ int daqUI::get_height()
     style = ImGui::GetStyle();
     int height = 2 * style.ItemSpacing.y + ImGui::GetFontSize() + \
                  ImGui::GetFontSize() + style.ItemInnerSpacing.y + style.ItemSpacing.y + \
-                 7 * (ImGui::GetFontSize() + (style.FramePadding.y)*2 + style.ItemSpacing.y);
+                 6 * (ImGui::GetFontSize() + (style.FramePadding.y)*2 + style.ItemSpacing.y);
 
     ImGui::PopStyleVar();
     return height;
