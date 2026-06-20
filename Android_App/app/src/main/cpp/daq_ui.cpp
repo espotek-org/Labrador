@@ -12,6 +12,7 @@
 void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
 {
     static bool first_time = true;
+    float rhsx = ImGui::GetCursorScreenPos().x + width_pixels;
 
     ImGuiStyle& style = ImGui::GetStyle();
     ImGui::BeginGroup();
@@ -184,7 +185,7 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         timer += io.DeltaTime;
     }
     ImGui::SameLine();
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x - 2*style.FramePadding.x - ImGui::CalcTextSize("End").x - style.CellPadding.x,0.f));
+    ImGui::SetCursorScreenPos(ImVec2(rhsx - 2*style.FramePadding.x - ImGui::CalcTextSize("End").x - style.CellPadding.x,ImGui::GetCursorScreenPos().y));
 
     if(ImGui::Button("End") || (timer >= duration)) {
         timer_on = false;
