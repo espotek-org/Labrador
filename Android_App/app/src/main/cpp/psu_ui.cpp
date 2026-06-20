@@ -26,6 +26,7 @@ void psuUI::draw(float width_pixels, inputsUI* inputs_ui)
     if(ImGui::custom_SliderFloat("##psu_slider", "V", &psu, 4.5f, 12.0f, "%.1f V", ImGuiSliderFlags_ClampOnInput) || ImGui::IsItemDeactivatedAfterEdit()) {
         need_usb_send = true;
     }
+    SKOIA;
     ImGui::SameLine();
     ImGui::EndGroup();
 

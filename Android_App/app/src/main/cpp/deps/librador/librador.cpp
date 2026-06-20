@@ -67,6 +67,20 @@ int librador_avr_debug(){
     return internal_librador_object->usb_driver->avrDebug();
 }
 
+int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler::daqUnitOptions units_sel[2], const char* filename)
+{
+    CHECK_API_INITIALISED
+    CHECK_USB_INITIALISED
+
+    internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, units_sel, filename);
+    return 1;
+}
+
+double librador_get_samples_per_second()
+{
+    return internal_librador_object->usb_driver->get_samples_per_second();
+}
+
 std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode)
 {
     VECTOR_API_INIT_CHECK
@@ -102,7 +116,7 @@ std::vector<double> librador_get_time_array(double delay, double timeWindow_seco
 }
 
 
-std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds){
+std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq){
     VECTOR_API_INIT_CHECK
     VECTOR_USB_INIT_CHECK
 
@@ -116,7 +130,7 @@ std::vector<double> * librador_get_digital_data(int channel, double timeWindow_s
     int delay_subsamples = round(delay_seconds * subsamples_per_second);
 //     int numToGet = round(timeWindow_seconds * subsamples_per_second)/interval_subsamples;
 
-    LIBRADOR_LOG(LOG_DEBUG, "interval_subsamples = %d\ndelay_subsamples = %d\nnumToGet=%d\n", interval_subsamples, delay_subsamples, numToGet);
+    LIBRADOR_LOG(LOG_DEBUG, "interval_subsamples = %f\ndelay_subsamples = %d\nnumToGet=%d\n", interval_subsamples, delay_subsamples, numToGet);
 
     return internal_librador_object->usb_driver->getMany_singleBit(channel, numToGet, interval_subsamples, delay_subsamples);
 }
@@ -405,4 +419,10 @@ bool librador_iso_thread_is_active()
 {
     return internal_librador_object->usb_driver->isoThreadIsActive();
 }
+
+bool librador_poll_daq_status()
+{
+    return internal_librador_object->usb_driver->poll_daq_status();
+}
+
 

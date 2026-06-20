@@ -127,7 +127,8 @@ int main(int, char**)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     SDL_PropertiesID propsIme = SDL_CreateProperties(); // for allowing specification of keyboard type (numeric, alpha, ...)
-    SDL_SetNumberProperty(propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2);
+//     android text input mode codes: https://developer.android.com/reference/android/R.attr#inputType
+    SDL_SetNumberProperty(propsIme, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2|2002);
     io.UserData = &propsIme;
 
     // Setup Dear ImGui style
@@ -179,15 +180,17 @@ int main(int, char**)
     config.FontDataOwnedByAtlas = false; // prevents imperceptible crash when the app is closed
 //     https://stackoverflow.com/a/13317651/3474552
 
-    float glyph_y_offsets[2] = {3.f, 4.5f};
-    float fontsizes[2] = {13.f, 12.f};
-    char buf[2][2048];
+    const int num_fonts = 3;
+    float glyph_y_offsets[num_fonts] = {3.f, 4.5f, 5.f};
+    float fontsizes[num_fonts] = {13.f, 12.f, 16.f};
+    int bufsize = 4096;
+    char buf[num_fonts][bufsize];
     int fi = 0;
-    for (const char* filename: {"font/waveform-glyphs3.ttf","font/greek_delta.ttf"}) {
+    for (const char* filename: {"font/waveform-glyphs3.ttf","font/greek_delta.ttf","font/daq-glyphs.ttf"}) {
         config.GlyphOffset = { 0.f, glyph_y_offsets[fi] };
         AAsset* asset = AAssetManager_open(mgr, filename, AASSET_MODE_STREAMING);
         int nb_read = 0;
-        nb_read = AAsset_read(asset, buf[fi], 2048);
+        nb_read = AAsset_read(asset, buf[fi], bufsize);
         ImFont* new_font = io.Fonts->AddFontFromMemoryTTF(buf[fi], nb_read, fontsizes[fi], &config);
         AAsset_close(asset);
         fi++;
@@ -212,10 +215,15 @@ int main(int, char**)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
     virtual_transform_ui.is_visible = true;
-    virtual_transform_ui.is_expanded = false;
-    virtual_transform_ui.next_is_expanded = false;
-    psu_ui.is_expanded = false;
+    virtual_transform_ui.is_expanded = false; virtual_transform_ui.next_is_expanded = false;
+    
+    psu_ui.is_expanded = false; psu_ui.next_is_expanded = false;
     psu_ui.is_visible = false;
+//     daq_ui.is_expanded = false; daq_ui.next_is_expanded = false;
+    trigger_ui.next_is_expanded = false;trigger_ui.is_visible = false;
+    virtual_transform_ui.next_is_expanded = false;virtual_transform_ui.is_visible = false;
+    sig_gen_ui.next_is_expanded = false;sig_gen_ui.is_visible = false;
+    
     plotUI plot_ui = plotUI();
 
     // Main loop
@@ -280,16 +288,18 @@ int main(int, char**)
 
         plot_ui.recompute_x_bounds(inputs_ui.changed_since_last(), inputs_ui.mode);
         logic_decode_ui.update(&inputs_ui);
+        daq_ui.poll_status();
 
         ImGui::SetNextWindowPos(ImVec2(0.f,statusBarHeight));
         ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x,io.DisplaySize.y - statusBarHeight - navigationBarHeight));
 
         ImGuiStyle& style = ImGui::GetStyle();
 
-        bool screen_keyboard_shown = SDL_ScreenKeyboardShown(window);
+//         bool screen_keyboard_shown = SDL_ScreenKeyboardShown(window);
+        bool screen_keyboard_shown = false;
         ImGui::Begin("MainWindow",
                      &show_mainwindow,
-                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | (screen_keyboard_shown ? ImGuiWindowFlags_NoMouseInputs : 0));   
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);   
         float data_width;
         float data_height;
         do_settings_panel_layout(&data_width, &data_height, landscape, io.DisplaySize.y - statusBarHeight - navigationBarHeight - 2 * style.WindowPadding.y, dpi, pixel_6a_dpi);
@@ -310,9 +320,9 @@ int main(int, char**)
             ImGui::SameLine();
         }
 
+        draw_selector_popup(landscape, orientation_changed);
         draw_settings_panel(landscape, screen_keyboard_shown);
         draw_collapse_button(landscape, dataWindowBottomLeft, dataWindowBottomRight);
-        draw_selector_popup(landscape, orientation_changed);
 
         ImGui::End();
 

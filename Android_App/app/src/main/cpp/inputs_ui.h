@@ -20,6 +20,7 @@ public:
     bool logic_on();
     bool scopelogic_mode();
     int get_height() override;
+    bool logic_AB_enabled(int ch);
 };
 
 #endif // INPUTSUI_H

@@ -9,7 +9,7 @@
 
 //TODO: incorporate mostRecentAddressPaused into getSinceLast?
 //TODO: triggering is finicky when the trigger level is ~0 b/c m_triggerSensitivity becomes too small?
-std::mutex buffer_related_settings_mutex;
+std::mutex buffer_mutex2;
 
 //o1buffer is an object that has o(1) access times for its elements.
 //At the moment it's basically an array, but I'm keeping it as an object so it can be changed to something more memory efficient later.
@@ -18,6 +18,7 @@ o1buffer::o1buffer(double sps)
 {
     buffer = (int *) (malloc(sizeof(int)*NUM_SAMPLES_PER_CHANNEL));
     buffer_paused = (int *) (malloc(sizeof(int)*NUM_SAMPLES_PER_CHANNEL));
+    buffer_daq = (int *) (malloc(sizeof(int)*NUM_SAMPLES_PER_CHANNEL));
     m_is_triggered = (bool *) (malloc(sizeof(bool)*NUM_SAMPLES_PER_CHANNEL));
     m_samples_per_second = sps;
     m_uart_decoder = new uartStyleDecoder(this);
@@ -58,26 +59,26 @@ void o1buffer::add(int value, int address){
 int o1buffer::addVector(int *firstElement, int numElements){
     int currentAddress = mostRecentAddress;
 
-    buffer_related_settings_mutex.lock();
+    buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
-    buffer_related_settings_mutex.unlock();
+    buffer_mutex2.unlock();
     return 0;
 }
 
 int o1buffer::addVector(char *firstElement, int numElements){
     int currentAddress = mostRecentAddress;
 
-    buffer_related_settings_mutex.lock();
+    buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
-    buffer_related_settings_mutex.unlock();
+    buffer_mutex2.unlock();
 
     return 0;
 }
@@ -85,37 +86,39 @@ int o1buffer::addVector(char *firstElement, int numElements){
 int o1buffer::addVector(unsigned char *firstElement, int numElements){
     int currentAddress = mostRecentAddress;
 
-    buffer_related_settings_mutex.lock();
+    buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
         add(firstElement[i], currentAddress);
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
-    buffer_related_settings_mutex.unlock();
+    buffer_mutex2.unlock();
     return 0;
 }
 
 int o1buffer::addVector(short *firstElement, int numElements){
     int currentAddress = mostRecentAddress;
 
-    buffer_related_settings_mutex.lock();
+    buffer_mutex2.lock();
     for(int i=0; i< numElements; i++){
+        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     #ifdef MULTIMETER_INVERT
         add(-firstElement[i] >> 4, currentAddress);
     #else
         add(firstElement[i] >> 4, currentAddress);
     #endif
         checkTriggered(currentAddress);
-        currentAddress = (currentAddress + 1) % NUM_SAMPLES_PER_CHANNEL;
     }
-    buffer_related_settings_mutex.unlock();
+    buffer_mutex2.unlock();
     return 0;
 }
 
 
-int o1buffer::get(int address){
+int o1buffer::get(int address, bool daq){
     int *read_buffer;
-    if(m_virtual_transform_settings.is_paused) {
+    if(daq) {
+        read_buffer = buffer_daq;
+    } else if(m_virtual_transform_settings.is_paused) {
         read_buffer = buffer_paused;
     } else {
         read_buffer = buffer;
@@ -138,9 +141,15 @@ inline void o1buffer::updateMostRecentAddress(int newAddress){
 
 //This function places samples in a buffer than can be plotted on the streamingDisplay.
 //A small delay, is added in case the packets arrive out of order.
-std::vector<double> *o1buffer::getMany_double(int numToGet, double interval_samples, int delay_samples, int filter_mode, double scope_gain, bool twelve_bit_multimeter){
+std::vector<double> *o1buffer::getMany_double(int numToGet, double interval_samples, int delay_samples, int filter_mode, double scope_gain, bool twelve_bit_multimeter, bool daq){
+    std::vector<double>* outvec;
+    if(daq) {
+        outvec = &convertedStream_double_daq;
+    } else {
+        outvec = &convertedStream_double;
+    }
     //Resize the vector
-    convertedStream_double.resize(numToGet);
+    outvec->resize(numToGet);
 
     //Copy raw samples out.
     int tempAddress;
@@ -148,54 +157,60 @@ std::vector<double> *o1buffer::getMany_double(int numToGet, double interval_samp
 
     if(m_virtual_transform_settings.is_ac)
     {
-        tempAddress = (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress) - delay_samples - round(interval_samples*numToGet/2.);
+        tempAddress = (daq ? mostRecentAddressDAQ : (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress)) - delay_samples - round(interval_samples*numToGet/2.);
         if(tempAddress < 0)
             tempAddress += NUM_SAMPLES_PER_CHANNEL;
-        window_mean = get_filtered_sample(tempAddress, 1, round(interval_samples * numToGet), scope_gain, twelve_bit_multimeter);
+        window_mean = get_filtered_sample(tempAddress, 1, round(interval_samples * numToGet), scope_gain, twelve_bit_multimeter, daq);
         m_ac_offset_adc_units = inverseSampleConvert(window_mean + (twelve_bit_multimeter ? 0 : voltage_ref), scope_gain, twelve_bit_multimeter);
     } else {
         m_ac_offset_adc_units = 0;
     }
 
     for(int i=0;i<numToGet;i++){
-        tempAddress = (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress) - delay_samples - round(interval_samples * i);
+        tempAddress = (daq ? mostRecentAddressDAQ : (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress)) - delay_samples - round(interval_samples * i);
         if(tempAddress < 0){
             tempAddress += NUM_SAMPLES_PER_CHANNEL;
         }
-        double *data = convertedStream_double.data();
+        double *data = outvec->data();
         if(m_virtual_transform_settings.is_ac)
-            data[i] = m_virtual_transform_settings.gain * (get_filtered_sample(tempAddress, 0, round(interval_samples), scope_gain, twelve_bit_multimeter) - window_mean) + m_virtual_transform_settings.offset;
+            data[i] = m_virtual_transform_settings.gain * (get_filtered_sample(tempAddress, 0, round(interval_samples), scope_gain, twelve_bit_multimeter, daq) - window_mean) + m_virtual_transform_settings.offset;
         else
-            data[i] = m_virtual_transform_settings.gain * get_filtered_sample(tempAddress, filter_mode, round(interval_samples), scope_gain, twelve_bit_multimeter) + m_virtual_transform_settings.offset;
-        //convertedStream_double.replace(i, buffer[tempAddress]);
+            data[i] = m_virtual_transform_settings.gain * get_filtered_sample(tempAddress, filter_mode, round(interval_samples), scope_gain, twelve_bit_multimeter, daq) + m_virtual_transform_settings.offset;
+//         outvec->replace(i, buffer[tempAddress]);
     }
-    return &convertedStream_double;
+    return outvec;
 }
 
 //Reads each int as 8 bools.  Upper 3 bytes are ignored.
-std::vector<double> *o1buffer::getMany_singleBit(int numToGet, double interval_subsamples, int delay_subsamples){
+std::vector<double> *o1buffer::getMany_singleBit(int numToGet, double interval_subsamples, int delay_subsamples, bool daq){
+    std::vector<double>* outvec;
+    if(daq) {
+        outvec = &convertedStream_double_daq;
+    } else {
+        outvec = &convertedStream_double;
+    }
     //Resize the vector
-    convertedStream_double.resize(numToGet);
+    outvec->resize(numToGet);
 
     //Copy raw samples out.
     int tempAddress;
     int subsample_current_delay;
     uint8_t mask;
-    double *data = convertedStream_double.data();
+    double *data = outvec->data();
     int tempInt;
 
     for(int i=0;i<numToGet;i++){
         subsample_current_delay = delay_subsamples + round(interval_subsamples * i);
-        tempAddress = (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress) - subsample_current_delay / 8;
+        tempAddress = (daq ? mostRecentAddressDAQ : (m_virtual_transform_settings.is_paused ? mostRecentAddressPaused : mostRecentAddress)) - subsample_current_delay / 8;
         mask = 0x01 << (subsample_current_delay % 8);
         if(tempAddress < 0){
             tempAddress += NUM_SAMPLES_PER_CHANNEL;
         }
-        tempInt = get(tempAddress);
+        tempInt = get(tempAddress, daq);
         data[i] = (((uint8_t)tempInt) & mask) ? 1. : 0.;
         data[i] = data[i] * m_virtual_transform_settings.gain + m_virtual_transform_settings.offset;
     }
-    return &convertedStream_double;
+    return outvec;
 }
 
 std::vector<double> *o1buffer::getSinceLast(int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode, double scope_gain, bool twelve_bit_multimeter){
@@ -261,12 +276,14 @@ int o1buffer::distanceFromMostRecentAddress(int index){
 }
 
 //replace with get_filtered_sample
-double o1buffer::get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter){
+double o1buffer::get_filtered_sample(int index, int filter_type, int filter_size, double scope_gain, bool twelve_bit_multimeter, bool daq){
     double accum = 0;
     int currentPos = index - (filter_size / 2);
     int end = currentPos + filter_size;
     int *read_buffer;
-    if(m_virtual_transform_settings.is_paused) {
+    if(daq) {
+        read_buffer = buffer_daq;
+    } else if(m_virtual_transform_settings.is_paused) {
         read_buffer = buffer_paused;
     } else {
         read_buffer = buffer;
@@ -290,7 +307,7 @@ double o1buffer::get_filtered_sample(int index, int filter_type, int filter_size
             return sampleConvert(accum/((double)filter_size), scope_gain, twelve_bit_multimeter);
         break;
         default: //Default to "no filter"
-            return read_buffer[index];
+            return (unsigned char) read_buffer[index];
     }
 }
 
@@ -335,12 +352,12 @@ void o1buffer::resetTrigger(double scope_gain, bool twelve_bit_multimeter)
     double actual_trigger_level = (m_trigger_settings.trigger_level - m_virtual_transform_settings.offset)/m_virtual_transform_settings.gain;
 
     short new_triggerLevelADC = inverseSampleConvert(actual_trigger_level, scope_gain, twelve_bit_multimeter);
-    buffer_related_settings_mutex.lock();
+    buffer_mutex2.lock();
     memset(m_is_triggered, false, sizeof(bool) * NUM_SAMPLES_PER_CHANNEL);
     m_triggerSeekState = TriggerSeekState::Invalid;
     m_triggerLevelADC = new_triggerLevelADC;
     m_triggerSensitivity = static_cast<short>((1 + abs(actual_trigger_level * kTriggerSensitivityMultiplier )) * TOP / 128.);
-    buffer_related_settings_mutex.unlock();
+    buffer_mutex2.unlock();
 
     LIBRADOR_LOG(LOG_DEBUG, "Trigger Level: %d", m_triggerLevelADC);
     LIBRADOR_LOG(LOG_DEBUG, "Trigger sensitivity: %d", m_triggerSensitivity);
@@ -368,9 +385,9 @@ void o1buffer::checkTriggered(int mostRecentAddress) {
     } 
 }
 
-int o1buffer::getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool* single_shot_reached, int* trigger_delay_out) {
+int o1buffer::getDelayIncludingFromTrigger(int delay_samples, int window_samples, bool daq, bool* single_shot_reached, int* trigger_delay_out) {
     int tempAddress = mostRecentAddress - delay_samples;
-    if((m_trigger_settings.trigger_type == TriggerType::Disabled) || (m_virtual_transform_settings.is_paused))
+    if((m_trigger_settings.trigger_type == TriggerType::Disabled) || (m_virtual_transform_settings.is_paused) || daq)
         return delay_samples;
 //     for (int i=0; i<(NUM_SAMPLES_PER_CHANNEL - delay_samples - window_samples); i++) {
     for (int trigger_delay=0; trigger_delay<window_samples ; trigger_delay++) {
@@ -400,13 +417,19 @@ int o1buffer::getDelayIncludingFromTrigger(int delay_samples, int window_samples
 // mostRecentAddressDelta is useful for single-shot triggering: makes sure that, immediately after the single-shot trigger, getDelayIncludingFromTrigger can set trigger_delay = 0 and the trigger point will be on the rhs of the screen.  Then, the user can pan around freely while getDelayIncludingFromTrigger continues to set trigger_delay = 0.  As a side-effect, this causes the initial mostRecentAddressDelta samples to be plotted as though they occurred ~10s (or whatever the max window is) previously, but this is not a huge price to pay.  TODO : instead of using this approach, instead snap delay_samples s.t. the trigger point appears on the rhs of the screen?
 int o1buffer::setPaused(bool is_paused, int mostRecentAddressDelta, bool hard){
     if(is_paused && (!m_virtual_transform_settings.is_paused || hard)) {
-        buffer_related_settings_mutex.lock();
+        buffer_mutex2.lock();
         m_virtual_transform_settings.is_paused = is_paused;
         memcpy(buffer_paused, buffer, sizeof(int)*NUM_SAMPLES_PER_CHANNEL);
         mostRecentAddressPaused = mostRecentAddress + mostRecentAddressDelta;
-        buffer_related_settings_mutex.unlock();
+        buffer_mutex2.unlock();
     }
     return 0;
+}
+
+void o1buffer::copy_to_daq(){
+    // caller should hold a mutex protection on 'buffer' access
+    mostRecentAddressDAQ = mostRecentAddress;
+    memcpy(buffer_daq, buffer, sizeof(int)*NUM_SAMPLES_PER_CHANNEL);
 }
 
 bool o1buffer::getPaused(){

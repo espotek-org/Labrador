@@ -48,6 +48,8 @@ target_include_directories(labrador-imgui-android PRIVATE
         deps/SDL/src
         # for SDL_build_config.h
         deps/SDL/include/build_config
+        # for SDL_iostream_c.h
+        deps/SDL/src/io
     )
 
 target_compile_definitions(labrador-imgui-android PRIVATE 

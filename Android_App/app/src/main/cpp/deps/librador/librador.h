@@ -59,7 +59,10 @@ LIBRADORSHARED_EXPORT uint8_t librador_get_device_firmware_variant();
 
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, int filter_mode);
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
-LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds);
+LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq = false);
+
+LIBRADORSHARED_EXPORT int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler::daqUnitOptions units_sel[2], const char* filename);
+LIBRADORSHARED_EXPORT bool librador_poll_daq_status();
 
 LIBRADORSHARED_EXPORT std::vector<double> librador_get_time_array(double delay, double timeWindow_seconds, int n_samples);
 
@@ -81,6 +84,7 @@ LIBRADORSHARED_EXPORT void * librador_logger_get_userdata(void);
 LIBRADORSHARED_EXPORT void librador_set_trigger_settings(int ch, o1buffer::trigger_settings new_trigger_settings);
 LIBRADORSHARED_EXPORT void librador_set_virtual_transform_settings(int ch, o1buffer::virtual_transform_settings new_virtual_transform_settings);
 
+LIBRADORSHARED_EXPORT double librador_get_samples_per_second();
 LIBRADORSHARED_EXPORT void librador_set_uart_decode_settings(int ch, UartSettings new_settings);
 LIBRADORSHARED_EXPORT void librador_set_i2c_is_decoding(bool new_decode_on);
 LIBRADORSHARED_EXPORT char * librador_get_uart_string(int ch, bool* parity_check);

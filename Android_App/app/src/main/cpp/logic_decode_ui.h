@@ -24,8 +24,7 @@ class logicDecodeUI : public UI_tile
       57600,
       115200
     };
-    const char* baud_rate_labels[num_baud_options+1] = {
-      "Baud:",
+    const char* baud_rate_labels[num_baud_options] = {
       "300",
       "600",
       "1200",
@@ -41,7 +40,8 @@ class logicDecodeUI : public UI_tile
 
     static const int num_parity_options = 3;
     const UartParity parities[num_parity_options] = {UartParity::None, UartParity::Even, UartParity::Odd};
-    const char* parity_labels[num_parity_options+1] = {"Parity:", "None", "Even", "Odd"};
+    const char* parity_labels[num_parity_options] = {"None", "Even", "Odd"};
+    const char* uart_options_headers[2] = {"Baud:","Parity:"};
 
     struct uart_settings {
         bool decode_on = false;

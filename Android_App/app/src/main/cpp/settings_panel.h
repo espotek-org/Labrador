@@ -12,6 +12,7 @@
 #include "custom_imgui.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "daq_ui.h"
 
 extern inputsUI inputs_ui;
 extern triggerUI trigger_ui;
@@ -19,6 +20,7 @@ extern virtualTransformUI virtual_transform_ui;
 extern sigGenUI sig_gen_ui;
 extern psuUI psu_ui;
 extern logicDecodeUI logic_decode_ui;
+extern daqUI daq_ui;
 
 void do_settings_panel_layout(float* data_width, float* data_height, bool landscape, int y_size, float dpi, float pixel_6a_dpi);
 void draw_settings_panel(bool landscape, bool screen_keyboard_shown);

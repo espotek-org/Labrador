@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import android.os.Build;
+import android.os.Environment;
 import android.content.res.Configuration;
 
 import org.libsdl.app.SDLActivity;
@@ -29,15 +30,26 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.lang.String;
+import java.io.File;
+// import androidx.documentfile.provider.DocumentFile;
+import android.media.MediaScannerConnection;
 
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.ViewCompat;
 import android.content.pm.ActivityInfo;
 // import android.graphics.Insets;
 
+import android.Manifest;
+//import android.support.v4.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import android.content.pm.PackageManager;
+
+
 // TODO: handle edge cases related to user unplugging board in non-bootloader state, replugging it back in in bootloader state
 public class MainActivity extends SDLActivity {
     private static final String ACTION_USB_PERMISSION = "com.EspoTek.Labrador.USB_PERMISSION";
+    private static final int REQUEST_WRITE_EXTERNAL_STORAGE = 1; // can be anything (>=0 ) b/c used to distinguish between request types in a custom-implemented callback  
     private static final String usbStateChangeAction = "android.hardware.usb.action.USB_STATE";
     private static final String TAG = "com.EspoTek.Labrador";
     public AssetManager mgr;
@@ -47,6 +59,9 @@ public class MainActivity extends SDLActivity {
     public boolean bootloader_mode_allowed = false; // modified by usbcallhandler
     private native void nativeRespondToStartupOrUsbStateChange(boolean is_plugged_in, int file_descriptor, boolean bootloader_mode); // fn in librador.cpp.  **this fn initiates librador**
     private native void nativeInitiateFirmwareFlash();
+    private native void nativeExternalStoragePermissionUpdate(long nativeboolptr);
+
+    private long native_dir_initiated_ptr;
 
     @Override
     protected String[] getLibraries() {
@@ -305,5 +320,74 @@ public class MainActivity extends SDLActivity {
             connection.close();
         }
         usb_permission_request_allowed = true;
+    }
+
+    public String initFile(String filename) {
+        File file = new File(filename);
+        try{
+            file.createNewFile();
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
+        file.setReadable(true, false);
+        file.setWritable(true, false);
+        return file.toURI().toString();
+    }
+
+    public String getDocsDir(long in_native_dir_initiated_ptr) {
+        native_dir_initiated_ptr = in_native_dir_initiated_ptr;
+        String docs_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/Labrador";
+        File docs_dir_struct = new File(docs_dir);
+        // if/else below can be simplified into docs_dir_struct.mkdirs() when support for Android < 10 is dropped
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            boolean didmakedirs = docs_dir_struct.mkdirs();
+            if(didmakedirs || docs_dir_struct.exists()) {
+                nativeExternalStoragePermissionUpdate(in_native_dir_initiated_ptr);
+            }
+        }else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        REQUEST_WRITE_EXTERNAL_STORAGE);
+            } else {
+                boolean didmakedirs = docs_dir_struct.mkdirs();
+                if(didmakedirs || docs_dir_struct.exists() ) {
+                    nativeExternalStoragePermissionUpdate(in_native_dir_initiated_ptr);
+                }
+            }
+        }
+        return docs_dir;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_WRITE_EXTERNAL_STORAGE:
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0 &&
+                        grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    getDocsDir(native_dir_initiated_ptr);
+                    // Permission is granted. Continue the action or workflow
+                    // in your app.
+                }  else {
+                    // Explain to the user that the feature is unavailable because
+                    // the feature requires a permission that the user has denied.
+                    // At the same time, respect the user's decision. Don't link to
+                    // system settings in an effort to convince the user to change
+                    // their decision.
+                }
+                return;
+            }
+            // Other 'case' lines to check for other
+            // permissions this app might request.
+        }
+
+    public void scanFile(String filepath) {
+    MediaScannerConnection
+        .scanFile(MainActivity.getContext(), new String[] {filepath},
+                  new String[] {"text/plain"}, null);
     }
 }

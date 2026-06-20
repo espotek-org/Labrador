@@ -62,6 +62,7 @@ void triggerUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::TableNextColumn();
         ImGui::PushItemWidth(-1); 
         ImGui::custom_SliderFloat("##trigger level", "V", &curr_ch_trigger_settings->trigger_level, -20.f, 20.f, "%.1f V", ImGuiSliderFlags_ClampOnInput);
+        SKOIA;
         ImGui::TableNextColumn();
         ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() - ImVec2(style.CellPadding.x,0.f));
         ButtonForSlider("Level", "##trigger level", ImVec2(ImGui::GetContentRegionAvail().x + style.CellPadding.x,0.f));

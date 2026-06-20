@@ -12,6 +12,7 @@ extern "C"
 #include <thread>
 #include <vector>
 #include <chrono>
+#include <atomic>
 
 #ifdef PLATFORM_ANDROID
 #include <jni.h>
@@ -68,6 +69,8 @@ typedef struct fGenSettings{
         return temp_control_transfer_error_value - 1000; \
     }
 
+struct SDL_IOStream;
+
 class usbCallHandler
 {
 public:
@@ -82,8 +85,8 @@ public:
     int avrDebug(void);
     int send_device_reset();
     double get_samples_per_second();
-    std::vector<double> *getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode);
-    std::vector<double> * getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples);
+    std::vector<double> *getMany_double(int channel, int numToGet, double interval_samples, int delay_sample, int filter_mode, bool daq = false);
+    std::vector<double> * getMany_singleBit(int channel, int numToGet, double interval_subsamples, int delay_subsamples, bool daq = false);
     std::vector<double> *getMany_sincelast(int channel, int feasible_window_begin, int feasible_window_end, int interval_samples, int filter_mode);
     bool connected = false;
     //Control Commands
@@ -112,6 +115,16 @@ public:
     void respondToStartupOrUsbStateChange(bool is_plugged_in, int file_descriptor, bool bootloader_mode);
     void set_bootloader_mode_allowed(bool allowed);
     void initiateFirmwareFlash();
+
+    // DAQ
+    enum daqUnitOptions {Volts, ADC, Bits, None, QUANT};
+    const static char* daq_unit_labels[] ;//= {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
+    static constexpr bool daqUnitIsForScope[daqUnitOptions::QUANT] = {true, true, false, false};
+    void spawn_daq_thread(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char* filename);
+    void drive_daq(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel[2], const char * filename);
+    void daq_for_channel(int channel, int numToGet, int interval_samples, daqUnitOptions units_sel, SDL_IOStream* iostream);
+    bool poll_daq_status();
+
 private:
 
     unsigned short VID, PID;
@@ -124,6 +137,7 @@ private:
     libusb_transfer *isoCtx[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
     unsigned char dataBuffer[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
     std::thread *iso_polling_thread = nullptr;
+    std::thread *daq_thread = nullptr;
     //Control Vars
     uint8_t fGenTriple = 0;
     fGenSettings functionGen_CH1;
@@ -158,11 +172,13 @@ private:
 
     bool iso_thread_shutdown_requested = false;
     int iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
-    bool iso_thread_active = false;
+    std::atomic<bool> iso_thread_active = false;
+    std::atomic<bool> daq_thread_active = false ;
 
     std::mutex iso_thread_shutdown_mutex;
     std::mutex buffer_read_write_mutex;
-    std::mutex get_set_iso_thread_active_mutex;
+
+    static SDL_IOStream* open_file(const char * filepath);
 };
 
 template <typename T>
