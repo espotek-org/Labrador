@@ -5,6 +5,13 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.EspoTek.Labrador"
 
@@ -25,8 +32,27 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProperties.getProperty("storeFile")
+                ?: error("Missing storeFile in keystore.properties")
+            val storePasswordValue = keystoreProperties.getProperty("storePassword")
+                ?: error("Missing storePassword in keystore.properties")
+            val keyAliasValue = keystoreProperties.getProperty("keyAlias")
+                ?: error("Missing keyAlias in keystore.properties")
+            val keyPasswordValue = keystoreProperties.getProperty("keyPassword")
+                ?: error("Missing keyPassword in keystore.properties")
+
+            storeFile = file(storeFilePath)
+            storePassword = storePasswordValue
+            keyAlias = keyAliasValue
+            keyPassword = keyPasswordValue
+        }
+    }
+    
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -60,8 +86,6 @@ dependencies {
     implementation("com.google.android.material:material:1.2.1")
     implementation("com.android.support.constraint:constraint-layout:1.0.2")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    //implementation("androidx.documentfile:documentfile:1.1.0")
-
     // implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     // implementation("androidx.appcompat:appcompat:1.0.2")
 }
