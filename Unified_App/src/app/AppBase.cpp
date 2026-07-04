@@ -1,0 +1,256 @@
+#include "AppBase.h"
+
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_opengl3.h"
+#include "implot.h"
+#include "platform/paths.h"
+#include "platform/file_dialog.h"
+#include "platform/android_ui.h"
+
+#include <cstring>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if defined(IMGUI_IMPL_OPENGL_ES2) || defined(IMGUI_IMPL_OPENGL_ES3)
+#include <SDL3/SDL_opengles2.h>
+#else
+#include <SDL3/SDL_opengl.h>
+#endif
+
+AppBase::AppBase(const char* title)
+{
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+        throw std::runtime_error(std::string("SDL_Init: ") + SDL_GetError());
+
+    // GL + GLSL version per platform (see docs/PLAN.md renderer matrix)
+    const char* glsl_version;
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+    // Raspberry Pi floor: GLES 2.0 (Pi 3 / VC4 and newer)
+    glsl_version = "#version 100";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#elif defined(IMGUI_IMPL_OPENGL_ES3)
+    // Android
+    glsl_version = "#version 300 es";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#elif defined(__APPLE__)
+    glsl_version = "#version 150";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#else
+    glsl_version = "#version 130";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
+
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
+#ifdef __ANDROID__
+    // Scale UI relative to a reference device (Pixel 6a) so widgets are a
+    // consistent physical size across phones — Brent's approach, since scaling
+    // by SDL's content scale alone doesn't give consistent sizing on Android.
+    const float ref_scale = 2.625f; // Pixel 6a content scale
+    const float ref_dpi = 428.6f;   // Pixel 6a dpi
+    // Brent's mobile widgets are designed for the full Pixel-6a reference
+    // scale, so no density fudge (the old <1 factor was a hack for stretching
+    // the desktop widgets onto a phone — retired with the mobile frontend).
+    m_main_scale = (ref_scale / ref_dpi) * androidGetDpi();
+#else
+    m_main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#endif
+    if (m_main_scale <= 0.0f)
+        m_main_scale = 1.0f;
+
+    SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
+        | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
+#ifdef __ANDROID__
+    // Fullscreen on the device; size is taken from the display bounds
+    SDL_Rect bounds;
+    SDL_zero(bounds);
+    SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &bounds);
+    m_window = SDL_CreateWindow(title, bounds.w, bounds.h, window_flags);
+#else
+    m_window = SDL_CreateWindow(title,
+        (int)(1200 * m_main_scale), (int)(800 * m_main_scale), window_flags);
+#endif
+    if (m_window == nullptr)
+        throw std::runtime_error(std::string("SDL_CreateWindow: ") + SDL_GetError());
+
+    m_gl_context = SDL_GL_CreateContext(m_window);
+    if (m_gl_context == nullptr)
+        throw std::runtime_error(std::string("SDL_GL_CreateContext: ") + SDL_GetError());
+
+    SDL_GL_MakeCurrent(m_window, m_gl_context);
+    SDL_GL_SetSwapInterval(1);
+    SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    SDL_ShowWindow(m_window);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImPlot::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+#ifdef __ANDROID__
+    // Ask the on-screen keyboard for a numeric-with-decimal/sign layout, since
+    // nearly every text field in the app is a number (Brent's approach).
+    // Android inputType TYPE_CLASS_NUMBER|FLAG_DECIMAL|FLAG_SIGNED = 2|2002.
+    static SDL_PropertiesID ime_props = SDL_CreateProperties();
+    SDL_SetNumberProperty(ime_props, SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER, 2 | 2002);
+    io.UserData = &ime_props;
+#endif
+
+    ImGui::StyleColorsDark();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ChildRounding = 5.0f;
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.8f);
+    style.Colors[ImGuiCol_ChildBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.0f);
+    style.ScaleAllSizes(m_main_scale);
+    style.FontScaleDpi = m_main_scale;
+
+    ImGui_ImplSDL3_InitForOpenGL(m_window, m_gl_context);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+
+    loadFonts();
+}
+
+// Hand the atlas an ImGui-allocated copy it can own (dynamic fonts in 1.92
+// keep reading the data for the atlas lifetime).
+static void* fontDataForAtlas(const std::vector<unsigned char>& buf)
+{
+    void* p = IM_ALLOC(buf.size());
+    memcpy(p, buf.data(), buf.size());
+    return p;
+}
+
+void AppBase::loadFonts()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.FontSizeBase = 18.0f;
+
+    // Fonts load from memory so the same path works on desktop and from the
+    // Android APK's assets.
+    std::vector<unsigned char> roboto = loadAsset("fonts/Roboto-Medium.ttf");
+    ImFont* default_font
+        = io.Fonts->AddFontFromMemoryTTF(fontDataForAtlas(roboto), (int)roboto.size());
+    if (default_font == nullptr)
+        throw std::runtime_error("Failed to load Roboto-Medium.ttf");
+
+    // Merged fallbacks: arrows/greek (arial), check marks (seguisym), and
+    // Brent's instrument glyph fonts (waveform shapes, delta, DAQ icons).
+    ImFontConfig config;
+    config.MergeMode = true;
+    // ImGui 1.92 requires a non-zero reference size when a merge font sets a
+    // GlyphOffset (the offset is expressed relative to that size). Sizes for
+    // the glyph fonts are Brent's tuned values.
+    struct MergeFont { const char* file; float size; float y_offset; };
+    const MergeFont merge_fonts[] = {
+        { "fonts/arial.ttf", 18.0f, 0.0f },
+        { "fonts/seguisym.ttf", 18.0f, 0.0f },
+        { "fonts/waveform-glyphs3.ttf", 13.0f, 3.0f },
+        { "fonts/greek_delta.ttf", 12.0f, 4.5f },
+        { "fonts/daq-glyphs.ttf", 16.0f, 5.0f },
+    };
+    for (const MergeFont& mf : merge_fonts)
+    {
+        config.GlyphOffset = ImVec2(0.0f, mf.y_offset);
+        std::vector<unsigned char> data = loadAsset(mf.file);
+        ImFont* merged = io.Fonts->AddFontFromMemoryTTF(
+            fontDataForAtlas(data), (int)data.size(), mf.size, &config);
+        if (merged == nullptr)
+            throw std::runtime_error(std::string("Failed to load font: ") + mf.file);
+    }
+}
+
+AppBase::~AppBase()
+{
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImPlot::DestroyContext();
+    ImGui::DestroyContext();
+
+    SDL_GL_DestroyContext(m_gl_context);
+    SDL_DestroyWindow(m_window);
+    SDL_Quit();
+}
+
+void AppBase::Run()
+{
+    StartUp();
+
+    if (m_smoke_frames > 0)
+        SDL_GL_SetSwapInterval(0);  // don't block on vsync for an invisible CI window
+
+    int frames_rendered = 0;
+    while (!m_done)
+    {
+        if (m_smoke_frames > 0 && frames_rendered++ >= m_smoke_frames)
+            m_done = true;
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            ImGui_ImplSDL3_ProcessEvent(&event);
+            if (event.type == SDL_EVENT_QUIT)
+                m_done = true;
+            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED
+                && event.window.windowID == SDL_GetWindowID(m_window))
+                m_done = true;
+        }
+
+        if (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED)
+        {
+            SDL_Delay(10);
+            continue;
+        }
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        // Usable content rect: full display minus Android system bars.
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+#ifdef __ANDROID__
+        const float status_h = (float)androidStatusBarHeight();
+        const float nav_h = (float)androidNavigationBarHeight();
+        m_content_x = 0.0f;
+        m_content_y = status_h;
+        m_content_w = display.x;
+        m_content_h = display.y - status_h - nav_h;
+#else
+        m_content_x = 0.0f;
+        m_content_y = 0.0f;
+        m_content_w = display.x;
+        m_content_h = display.y;
+#endif
+
+        PumpFileDialogResults();
+        Update();
+
+        ImGui::Render();
+        int display_w, display_h;
+        SDL_GetWindowSizeInPixels(m_window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(m_clear_color.x * m_clear_color.w, m_clear_color.y * m_clear_color.w,
+            m_clear_color.z * m_clear_color.w, m_clear_color.w);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        SDL_GL_SwapWindow(m_window);
+    }
+
+    ShutDown();
+}

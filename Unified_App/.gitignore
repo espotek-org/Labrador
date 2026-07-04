@@ -1,0 +1,13 @@
+build/
+build-*/
+.cache/
+compile_commands.json
+android/.gradle/
+android/local.properties
+android/keystore.properties
+android/app/build/
+android/app/.cxx/
+*.dmg
+*.AppImage
+# ImGui writes this runtime window-state file next to the binary / in CWD
+imgui.ini

@@ -1,0 +1,7 @@
+pipeID 0 = 129
+libusb context is null
+Libusb context initialised
+KERNEL DRIVER INACTIVEInterface claimed!
+BOARD IS RUNNING FIRMWARE VERSION 0x0007EXPECTING FIRMWARE VERSION 0x0007FIRMWARE VARIANT = 0x02EXPECTED VARIANT = 0x02usbCallHandler::setup_usb_iso()
+creating iso polling threadiso_polling_function thread spawned
+Trigger Level: -9Trigger sensitivity: 1Trigger Level: -9Trigger sensitivity: 1Trigger Level: -9Trigger sensitivity: 1Resetting I2C

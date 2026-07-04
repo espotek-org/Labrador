@@ -1,0 +1,32 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    { "name": "macos", "inherits": "base" },
+    { "name": "linux", "inherits": "base" },
+    {
+      "name": "pi",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "LABRADOR_GLES2": "ON" }
+    },
+    { "name": "windows", "inherits": "base" },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "macos", "configurePreset": "macos" },
+    { "name": "linux", "configurePreset": "linux" },
+    { "name": "pi", "configurePreset": "pi" },
+    { "name": "windows", "configurePreset": "windows" },
+    { "name": "debug", "configurePreset": "debug" }
+  ]
+}

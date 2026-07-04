@@ -1,0 +1,30 @@
+libusb: warning [darwin_abort_transfers] aborting all transactions on interface 0 pipe 1
+libusb: warning [darwin_abort_transfers] aborting all transactions on interface 0 pipe 1
+libusb: warning [handle_timeout] async cancel failed -5
+libusb: warning [darwin_abort_transfers] aborting all transactions on interface 0 pipe 1
+libusb: warning [handle_timeout] async cancel failed -5
+libusb: warning [darwin_abort_transfers] aborting all transactions on interface 0 pipe 1
+libusb: warning [handle_timeout] async cancel failed -5
+libusb: warning [darwin_transfer_status] transfer error: device not responding (value = 0xe00002ed)
+libusb: warning [darwin_transfer_status] transfer error: timed out
+libusb: error [submit_iso_transfer] failed to get pipe properties: -536870208
+libusb: warning [darwin_transfer_status] transfer error: unknown error (0xe000400e) (value = 0xe000400e)
+libusb: warning [darwin_transfer_status] transfer error: unknown error (0xe000400e) (value = 0xe000400e)
+libusb: warning [darwin_transfer_status] transfer error: unknown error (0xe000400e) (value = 0xe000400e)
+libusb: warning [darwin_close] USBDeviceClose: no connection to an IOService
+libc++abi: terminating due to uncaught exception of type std::__1::system_error: thread::join failed: Invalid argument
+pipeID 0 = 129
+libusb context is null
+Libusb context initialised
+KERNEL DRIVER INACTIVEInterface claimed!
+BOARD IS RUNNING FIRMWARE VERSION 0x0007EXPECTING FIRMWARE VERSION 0x0007FIRMWARE VARIANT = 0x02EXPECTED VARIANT = 0x02usbCallHandler::setup_usb_iso()
+creating iso polling threadiso_polling_function thread spawned
+Trigger Level: -9Trigger sensitivity: 1Trigger Level: -9Trigger sensitivity: 1Trigger Level: -9Trigger sensitivity: 1Resetting I2Cdesktop_flash_firmware: /Users/chrises/git/labrador/Unified_App/build/macos/assets/firmware/labrafirm_0007_02.hex
+bootloader_mode_allowed setresetting device: unimportant error LIBUSB_ERROR_NO_DEVICE for send_control_transfer expectedError re-arming the endpoint!
+Transfer not being rearmed!  3 armed transfers remaining
+Transfer not being rearmed!  2 armed transfers remaining
+Transfer not being rearmed!  1 armed transfers remaining
+Transfer not being rearmed!  0 armed transfers remaining
+send_control_transfer FAILED with error LIBUSB_ERROR_IOiso_polling_function thread finished
+send_control_transfer FAILED with error LIBUSB_ERROR_IOInterface released
+Device Closed

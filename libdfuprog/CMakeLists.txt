@@ -19,13 +19,25 @@ add_library(libdfuprog STATIC
 
 target_include_directories(libdfuprog PRIVATE
     dfu-programmer/src
-    ../Android_App/app/src/main/cpp/deps/librador/librador_deps/libusb
 )
 
-target_compile_definitions(libdfuprog PRIVATE
-    HAVE_CONFIG_H
-    PLATFORM_ANDROID
-)
+if(ANDROID)
+    # Android build: libusb headers from the in-tree copy; the app links the
+    # prebuilt libusb .so and drives dfuprog with an already-open device handle.
+    target_include_directories(libdfuprog PRIVATE
+        ../Android_App/app/src/main/cpp/deps/librador/librador_deps/libusb
+    )
+    target_compile_definitions(libdfuprog PRIVATE
+        HAVE_CONFIG_H
+        PLATFORM_ANDROID
+    )
+else()
+    # Desktop: system libusb; dfuprog manages its own context and discovery.
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(DFUPROG_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
+    target_link_libraries(libdfuprog PUBLIC PkgConfig::DFUPROG_LIBUSB)
+    target_compile_definitions(libdfuprog PRIVATE HAVE_CONFIG_H)
+endif()
 
 install(TARGETS libdfuprog
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

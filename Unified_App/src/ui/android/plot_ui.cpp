@@ -1,0 +1,324 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "implot.h"
+#include "imgui_internal.h"
+#include "implot_internal.h"
+#include "plot_ui.h"
+#include "librador.h"
+
+void plotUI::recompute_x_bounds(bool mode_changed, inputsUI::Mode mode)
+{
+    if(mode_changed)
+    {
+        if(mode==inputsUI::Mode::Scope750) {
+            time_window = std::min(5., time_window);
+            delay = std::min(5. - time_window, delay);
+            ImPlot::SetNextAxisLimits(ImAxis_X1, -(delay+time_window), -delay, ImPlotCond_Always);
+            x_constraint_min = -5.;
+            x_constraint_max = 0.;
+//         } else if (xy) {
+//             xmin = ymin;
+//             xmax = ymax;
+//             ImPlot::SetNextAxisLimits(ImAxis_X1, xmin, xmax, ImPlotCond_Always);
+//             x_constraint_min = -20.;
+//             x_constraint_max = 20.;
+        } else {
+            time_window = std::min(max_time_window_375khz, time_window);
+            delay = std::min(max_time_window_375khz - time_window, delay);
+            ImPlot::SetNextAxisLimits(ImAxis_X1, -(delay+time_window), -delay, ImPlotCond_Always);
+            x_constraint_min = -max_time_window_375khz;
+            x_constraint_max = 0.;
+        }
+    } else {
+//         if(!xy) {
+            delay = -xmax;
+            time_window = (xmax - xmin);
+//         }
+    }
+}
+
+void get_ref_line_label(char * label, int size, char X_or_Y, ImPlotAxis ax, double ref_a, double ref_b) {
+
+    double ref_1 = ImMin(ref_a, ref_b);
+    double ref_2 = ImMax(ref_a, ref_b);
+    double difference = ref_2 - ref_1;
+    int max_prec = 3 - floor(ImLog10(ImMin(ax.Range.Max - ax.Range.Min, ImAbs(ref_2 - ref_1))));
+
+    int n_sig_figs_needed_1 = max_prec + floor(ImLog10(ImAbs(ref_1)));
+    int n_sig_figs_needed_2 = max_prec + floor(ImLog10(ImAbs(ref_2)));
+    int n_sig_figs_needed_diff = max_prec + floor(ImLog10(difference));
+
+    n_sig_figs_needed_1 = ImMax(ImMin(n_sig_figs_needed_1, 8),0);
+    n_sig_figs_needed_2 = ImMax(ImMin(n_sig_figs_needed_2, 8),0);
+    n_sig_figs_needed_diff = ImMax(ImMin(n_sig_figs_needed_diff, 8),0);
+
+    int buf_size = 64;
+    char label_template[buf_size];
+    ImFormatString(label_template, buf_size, "%%c1: %%.%dg\n%%c2: %%.%dg\n\xee\xa4\x84%%c: %%.%dg", n_sig_figs_needed_1, n_sig_figs_needed_2, n_sig_figs_needed_diff);
+
+    ImFormatString(label, size, label_template, X_or_Y, ref_1, X_or_Y, ref_2, X_or_Y, difference);
+}
+
+void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled, bool chB_enabled, double data_width, double plot_height)
+{
+    std::vector<double> *from_librador_chA;
+    std::vector<double> *from_librador_chB;
+    std::vector<double> blank_data{};
+    std::vector<double> time_array;
+
+    if(iso_thread_active){
+        time_array = librador_get_time_array(delay, time_window, GRAPH_SAMPLES);
+        switch(mode) {
+        case inputsUI::Mode::Ch1Scope:
+            from_librador_chA = librador_get_analog_data(1,time_window,GRAPH_SAMPLES,delay, 0);
+            break;
+        case inputsUI::Mode::ScopeLogic:
+            from_librador_chA = librador_get_analog_data(1,time_window,GRAPH_SAMPLES,delay, 0);
+            from_librador_chB = librador_get_digital_data(2,time_window,GRAPH_SAMPLES,delay);
+            break;
+        case inputsUI::Mode::ScopeScope:
+            from_librador_chA = librador_get_analog_data(1,time_window,GRAPH_SAMPLES,delay, 0);
+            from_librador_chB = librador_get_analog_data(2,time_window,GRAPH_SAMPLES,delay, 0);
+            break;
+        case inputsUI::Mode::Ch1Logic:
+            from_librador_chA = librador_get_digital_data(1,time_window,GRAPH_SAMPLES,delay);
+            break;
+        case inputsUI::Mode::LogicLogic:
+            from_librador_chA = librador_get_digital_data(1,time_window,GRAPH_SAMPLES,delay);
+            from_librador_chB = librador_get_digital_data(2,time_window,GRAPH_SAMPLES,delay);
+            break;
+        case inputsUI::Mode::None:
+            break;
+        case inputsUI::Mode::Scope750:
+            from_librador_chA = librador_get_analog_data(1,time_window,GRAPH_SAMPLES,delay, 0);
+            break;
+        case inputsUI::Mode::Multimeter:
+            from_librador_chA = librador_get_analog_data(1,time_window,GRAPH_SAMPLES,delay, 0);
+            break;
+        }
+    } else {
+        from_librador_chA = &blank_data;
+        from_librador_chB = &blank_data;
+        time_array = blank_data;
+    }
+
+    ImGui::BeginChild("plot",ImVec2(data_width, plot_height));
+    {
+        if (ImPlot::BeginPlot("##scope traces", ImGui::GetContentRegionAvail(),ImPlotFlags_NoMouseText)) {
+            ImPlot::SetupAxes("time (s)","volts");
+
+            ImPlot::SetupAxisFormat(ImAxis_X1, ImPlot::Formatter_Offset_Plus_Delta, (void*) "%g");
+            ImPlot::SetupAxisFormat(ImAxis_Y1, ImPlot::Formatter_Offset_Plus_Delta, (void*) "%g");
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, x_constraint_min, x_constraint_max);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, -max_voltage, max_voltage);
+            ImPlot::SetupAxesLimits(xmin, xmax, ymin, ymax, ImPlotCond_Once);
+
+            ImPlotSpec spec = ImPlotSpec();
+            spec.LineWeight = 2;
+            if(chA_enabled)
+                ImPlot::PlotLine("CH A", time_array.data(), from_librador_chA->data(), from_librador_chA->size(), spec);
+            if(chB_enabled)
+                ImPlot::PlotLine("CH B", time_array.data(), from_librador_chB->data(), from_librador_chB->size(), spec);
+
+            ImGuiContext& g = *GImGui;
+
+            if(ImPlot::IsAxisActivated(ImAxis_X1)) {
+                double mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_X1);
+                cursor_drag_tool_toggle = ImAbs(x_ref_1 - mouse_down_clicked_val) > ImAbs(x_ref_2 - mouse_down_clicked_val);
+            }
+
+            ImPlotDragToolFlags x1_drag_tool_flags = cursor_drag_tool_toggle ? ImPlotDragToolFlags_NoAxisInputs : 0;
+            ImPlotDragToolFlags x2_drag_tool_flags = cursor_drag_tool_toggle ? 0 : ImPlotDragToolFlags_NoAxisInputs;
+
+            if(ImPlot::IsAxisClicked(ImAxis_X1)) {
+                if(!enable_x_ref_lines) {
+                    x_ref_1 = ImPlot::getMouseDownClickedVal(ImAxis_X1);
+                    x_ref_2 = ImPlot::getMouseDownClickedVal(ImAxis_X1);
+                }
+                enable_x_ref_lines = true;
+                if(g.IO.MouseClickedLastCount[0]==2) {
+                    enable_x_ref_lines = false;
+                }
+            }
+
+            if(enable_x_ref_lines) {
+                ImPlot::DragLineX(0,&x_ref_1,ImVec4(1,1,1,1), 1.f, x1_drag_tool_flags);
+                ImPlot::DragLineX(1,&x_ref_2,ImVec4(1,1,1,1), 1.f, x2_drag_tool_flags);
+            }
+
+            if(ImPlot::IsAxisActivated(ImAxis_Y1)) {
+                double mouse_down_clicked_val = ImPlot::getMouseDownClickedVal(ImAxis_Y1);
+                cursor_drag_tool_toggle = ImAbs(y_ref_1 - mouse_down_clicked_val) > ImAbs(y_ref_2 - mouse_down_clicked_val);
+            }
+
+            ImPlotDragToolFlags y1_drag_tool_flags = cursor_drag_tool_toggle ? ImPlotDragToolFlags_NoAxisInputs : 0;
+            ImPlotDragToolFlags y2_drag_tool_flags = cursor_drag_tool_toggle ? 0 : ImPlotDragToolFlags_NoAxisInputs;
+
+            if(ImPlot::IsAxisClicked(ImAxis_Y1)) {
+                if(!enable_y_ref_lines) {
+                    y_ref_1 = ImPlot::getMouseDownClickedVal(ImAxis_Y1);
+                    y_ref_2 = ImPlot::getMouseDownClickedVal(ImAxis_Y1);
+                }
+                enable_y_ref_lines = true;
+                if(g.IO.MouseClickedLastCount[0]==2) {
+                    enable_y_ref_lines = false;
+                }
+            }
+
+            if(enable_y_ref_lines) {
+                ImPlot::DragLineY(0,&y_ref_1,ImVec4(1,1,1,1), 1.f, y1_drag_tool_flags);
+                ImPlot::DragLineY(1,&y_ref_2,ImVec4(1,1,1,1), 1.f, y2_drag_tool_flags);
+            }
+
+            ImPlotRect axes_limits = ImPlot::GetPlotLimits();
+            if(ImPlot::IsAxisLongPressed(ImAxis_X1)) {
+                ImGui::SetNextWindowPos(ImGui::GetWindowPos() + ImGui::GetWindowSize()/2.,0,{0.5,0.5});
+                ImGui::OpenPopup("select x lims");
+            }
+            if(ImGui::BeginPopup("select x lims")) {
+                ImGuiStyle& style = ImGui::GetStyle();
+                ImGui::Text("X-axis limits:");
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-000000000. s").x + 2 * style.FramePadding.x);
+                double window = xmax - xmin;
+                double delay = ImAbs(-xmax); // fabs to prevent signed 0
+                int n_prec = 3;
+                int max_prec = n_prec - floor(ImLog10(ImAbs(window))); //
+
+                char min_label_template[32];
+                int n_sig_figs_needed_min = max_prec + floor(ImLog10(ImAbs(xmin)));
+                n_sig_figs_needed_min = ImMax(ImMin(n_sig_figs_needed_min, 8),0);
+                ImFormatString(min_label_template, 32, "%%.%dg s", n_sig_figs_needed_min);
+                double xmin_saved = xmin;
+                if(ImGui::InputDouble("Min", &xmin, 0.f, 0.f, min_label_template)) {
+                    if(xmin < 0) {
+                        xmin = ImMax(x_constraint_min, xmin);
+                        xmin = ImMin(x_constraint_max, xmin);
+                    } else {
+                        xmin = xmin_saved;
+                    }
+                }
+
+                bool modified = false;
+                char window_label_template[32];
+                ImFormatString(window_label_template, 32, "%%.%dg s", n_prec);
+                if(ImGui::InputDouble("Window", &window, 0.f, 0.f, window_label_template)) {
+                    if(window <= 0) {
+                        window = xmax - xmin;
+                    } else {
+                        window = ImMax((double) window, min_window_size);
+                        modified = true;
+                    }
+                }
+
+                char delay_label_template[32];
+                int n_sig_figs_needed_delay = max_prec + (delay != 0 ? floor(ImLog10(ImAbs(delay))) : 0);
+                n_sig_figs_needed_delay = ImMax(ImMin(n_sig_figs_needed_delay, 8),0);
+                ImFormatString(delay_label_template, 32, "%%.%dg s", n_sig_figs_needed_delay);
+                if(ImGui::InputDouble("Delay", &delay, 0.f, 0.f, delay_label_template)) {
+                    if(delay < 0) {
+                        delay = fabs(-xmax);
+                    } else {
+                        modified = true;
+                    }
+                }
+                if(modified) {
+                    double new_xmin = -delay - window;
+                    double new_xmax = -delay;
+                    new_xmin = ImMax(x_constraint_min, new_xmin);
+                    new_xmin = ImMin(x_constraint_max - min_window_size, new_xmin);
+                    new_xmax = ImMax(new_xmin + min_window_size, new_xmax);
+                    new_xmax = ImMin(x_constraint_max, new_xmax);
+                    if(new_xmin!=new_xmax) {
+                        xmin = new_xmin;
+                        xmax = new_xmax;
+                    }
+                }
+                ImGui::EndPopup();
+            } else {
+                xmin = axes_limits.X.Min;
+                xmax = axes_limits.X.Max;
+            }
+
+            if(ImPlot::IsAxisLongPressed(ImAxis_Y1)) {
+                ImGui::SetNextWindowPos(ImGui::GetWindowPos() + ImGui::GetWindowSize()/2.,0,{0.5,0.5});
+                ImGui::OpenPopup("select y lims");
+            }
+            if(ImGui::BeginPopup("select y lims")) {
+                ImGuiStyle& style = ImGui::GetStyle();
+                ImGui::Text("Y-axis limits:");
+                ImGui::PushItemWidth(ImGui::CalcTextSize("-000000000. V").x + 2 * style.FramePadding.x);
+                int n_sig_figs_needed = ymin != ymax ? ImMax(ImLog10(ImMax(ImAbs(ymin),ImAbs(ymax)) / ImAbs(ymin-ymax)),0.) + 3 : 0;
+                n_sig_figs_needed = ImMin(n_sig_figs_needed, 8);
+                char label_template[32];
+                ImFormatString(label_template, 32, "%%.%dg V", n_sig_figs_needed);
+                double ymax_saved = ymax;
+                if(ImGui::InputDouble("Max", &ymax, 0.f, 0.f, label_template)) {
+                    ymax = ImMin(max_voltage, ymax);
+                    if(ymax <= ymin) {
+                        ymax = ymax_saved;
+                    }
+                }
+                double ymin_saved = ymin;
+                if(ImGui::InputDouble("Min", &ymin, 0.f, 0.f, label_template)) {
+                    ymin = ImMax(-max_voltage, ymin);
+                    if(ymin >= ymax) {
+                        ymin = ymin_saved;
+                    }
+                }
+                ImGui::EndPopup();
+            } else {
+                ymin = axes_limits.Y.Min;
+                ymax = axes_limits.Y.Max;
+            }
+
+            ImPlotPlot* mainplot = ImPlot::GetCurrentPlot();
+            ImPlot::EndPlot();
+
+            ImPlot::SetNextAxisLimits(ImAxis_X1, xmin, xmax, ImPlotCond_Always);
+            ImPlot::SetNextAxisLimits(ImAxis_Y1, ymin, ymax, ImPlotCond_Always);
+
+            int buffer_size = 64;
+            char x_ref_line_label[buffer_size];
+            char y_ref_line_label[buffer_size];
+            if(enable_x_ref_lines) {
+                get_ref_line_label(x_ref_line_label, buffer_size, 'X', mainplot->XAxis(0), x_ref_1, x_ref_2);
+            } else {
+                x_ref_line_label[0] = '\0';
+            }
+            if(enable_y_ref_lines) {
+                get_ref_line_label(y_ref_line_label, buffer_size, 'Y', mainplot->YAxis(0), y_ref_1, y_ref_2);
+            } else {
+                y_ref_line_label[0] = '\0';
+            }
+
+
+            if(enable_x_ref_lines || enable_y_ref_lines) {
+                ImGuiStyle& style = ImGui::GetStyle();
+
+                ImPlotContext& gp = *GImPlot;
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {2 * style.ItemSpacing.x, style.ItemSpacing.y});
+                float ref_legend_width = ImGui::CalcTextSize(x_ref_line_label).x + ImGui::CalcTextSize(y_ref_line_label).x + (enable_x_ref_lines && enable_y_ref_lines) * style.ItemSpacing.x + 2 * style.FramePadding.x;
+                float ref_legend_height = ImMax(ImGui::CalcTextSize(x_ref_line_label).y, ImGui::CalcTextSize(y_ref_line_label).y) + 2 * style.FramePadding.y;
+
+                ImGui::SetCursorScreenPos(mainplot->PlotRect.Max - ImVec2(ref_legend_width, ref_legend_height) - gp.Style.LegendPadding );
+                ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                draw_list->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(ref_legend_width, ref_legend_height), ImGui::GetColorU32(ImGuiCol_WindowBg,.75));
+                ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + style.FramePadding);
+
+                ImGui::BeginGroup();
+                if(enable_x_ref_lines) {
+                    ImGui::Text("%s", x_ref_line_label);
+                }
+                if(enable_x_ref_lines && enable_y_ref_lines) {
+                    ImGui::SameLine();
+                }
+                if(enable_y_ref_lines) {
+                    ImGui::Text("%s", y_ref_line_label);
+                }
+                ImGui::EndGroup();
+                ImGui::PopStyleVar();
+            }
+
+        }
+    }
+    ImGui::EndChild();
+}
