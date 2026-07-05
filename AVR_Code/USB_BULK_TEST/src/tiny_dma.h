@@ -41,5 +41,9 @@ void tiny_dma_loop_mode_7(void);
 
 void tiny_dma_delayed_set(unsigned char mode);
 
+#ifdef AIO_INTERFACE
+void tiny_dma_apply_transport(void);
+#endif
+
 
 #endif /* TINY_DMA_H_ */

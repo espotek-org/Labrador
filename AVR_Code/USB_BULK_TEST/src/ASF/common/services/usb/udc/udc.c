@@ -1217,8 +1217,27 @@ static bool udc_reqvend(void){
 		case 0xa9:  //Variant Version Request
 			udd_set_setup_payload(&variant, udd_g_ctrlreq.req.wLength);
 			return 1;
+#ifdef AIO_INTERFACE
+		case 0xab:  //AIO debug state
+			aio_dbg[0] = active_transport;
+			aio_dbg[6] = usb_state;
+			aio_dbg[7] = global_mode;
+			udd_set_setup_payload((uint8_t *) aio_dbg, udd_g_ctrlreq.req.wLength);
+			return 1;
+#endif
 		case 0xaa:  //Soft reset Iso
 			return main_vendor_enable();
+		case 0xac:  //Store calibration page to EEPROM
+			if(udd_g_ctrlreq.req.wLength != EEPROM_PAGE_SIZE){
+				return 0;
+			}
+			udd_set_setup_payload((uint8_t *) eeprom_cal_buffer, EEPROM_PAGE_SIZE);
+			udd_g_ctrlreq.callback = eeprom_cal_write; //commit after the data stage
+			return 1;
+		case 0xad:  //Retrieve calibration page from EEPROM
+			eeprom_cal_read();
+			udd_set_setup_payload((uint8_t *) eeprom_cal_buffer, udd_g_ctrlreq.req.wLength);
+			return 1;
 		default:
 			return 0;
 	}

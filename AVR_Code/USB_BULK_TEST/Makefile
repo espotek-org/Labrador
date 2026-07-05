@@ -105,16 +105,18 @@ src/ASF/xmega/drivers/usb/usb_device.o
 
 DEPS = $(OBJS:%.o=%.d)
 
-VERSION = 0007
-VARIANTS = 01 02
+VERSION = 000C
+VARIANTS = 01 02 03
 EXEEXTS = .elf .map .lss .hex .srec .eep
 EXES = $(foreach variant,$(VARIANTS),$(foreach ext,$(EXEEXTS),labrafirm_$(VERSION)_$(variant)$(ext)))
 
 .PHONY: $(VARIANTS)
 01: labrafirm_$(VERSION)_01.hex
 02: labrafirm_$(VERSION)_02.hex
+03: labrafirm_$(VERSION)_03.hex
 labrafirm_$(VERSION)_01.elf: DEFINES += FIRMWARE_VERSION_ID=0x$(VERSION)
 labrafirm_$(VERSION)_02.elf: DEFINES += FIRMWARE_VERSION_ID=0x$(VERSION) SINGLE_ENDPOINT_INTERFACE
+labrafirm_$(VERSION)_03.elf: DEFINES += FIRMWARE_VERSION_ID=0x$(VERSION) AIO_INTERFACE
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
@@ -128,10 +130,10 @@ labrafirm_$(VERSION)_%.elf: $(OBJS)
 	$(OBJDUMP) -h -S $@ > $(@:%.elf=%.lss)
 
 %.hex: %.elf
-	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i 's/\r$$//' $@ && chmod -x $@
+	$(OBJCOPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i.sedbak 's/\r$$//' $@ && rm -f $@.sedbak && chmod -x $@
 
 %.srec: %.elf
-	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i 's/\r$$//' $@ && chmod -x $@
+	$(OBJCOPY) -O srec -R .eeprom -R .fuse -R .lock -R .signature $< $@ && sed -i.sedbak 's/\r$$//' $@ && rm -f $@.sedbak && chmod -x $@
 
 %.eep: %.elf
 	$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary $< $@ && chmod -x $@ || exit 0

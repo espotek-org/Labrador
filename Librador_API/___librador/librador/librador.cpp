@@ -44,18 +44,36 @@ int librador_exit(){
     return 0;
 }
 
-int librador_setup_usb(){
+int librador_setup_usb_control(){
     CHECK_API_INITIALISED
     int error;
-    //Setup USB for Control (EP0) transfers.
     error = internal_librador_object->usb_driver->setup_usb_control();
     if(error < 0){
         return error;
     }
-    //Setup USB for Isochronous transfers.
+    return 0;
+}
+
+int librador_setup_usb_iso(){
+    CHECK_API_INITIALISED
+    int error;
     error = internal_librador_object->usb_driver->setup_usb_iso();
     if(error < 0){
         return error - 1000;
+    }
+    return 0;
+}
+
+int librador_setup_usb(){
+    CHECK_API_INITIALISED
+    int error;
+    error = librador_setup_usb_control();
+    if(error < 0){
+        return error;
+    }
+    error = librador_setup_usb_iso();
+    if(error < 0){
+        return error;
     }
     return 0;
 }

@@ -105,15 +105,35 @@
 //! Interface number is 0 because it is the unique interface
 #define  UDI_VENDOR_IFACE_NUMBER 0
 
+#ifdef AIO_INTERFACE
+//! AIO layout: three interfaces, each streaming transport on its own endpoints
+//!  iface 0 alt 1: iso IN 0x81..0x86 (128 bytes each) + iso IN 0x89 (8-byte meta)
+//!  iface 1 alt 1: iso IN 0x87 (1023 bytes) + iso IN 0x8a (8-byte meta)
+//!  iface 2 alt 1: bulk IN 0x88 (64 bytes; header framed in-stream)
+//! The meta endpoints carry {magic, seq, checksum, mode} describing the
+//! previous frame's payload so the host can detect drops and DMA stomps.
+#define  UDI_AIO_IFACE_ISO6   0
+#define  UDI_AIO_IFACE_ISO1   1
+#define  UDI_AIO_IFACE_BULK   2
+#define  UDI_AIO_EP_ISO1_IN     (7 | USB_EP_DIR_IN)
+#define  UDI_AIO_EP_BULK_IN     (8 | USB_EP_DIR_IN)
+#define  UDI_AIO_EP_ISO6_META   (9 | USB_EP_DIR_IN)
+#define  UDI_AIO_EP_ISO1_META  (10 | USB_EP_DIR_IN)
+#endif
+
 /**
  * \name UDD Configuration
  */
 //@{
+#ifdef AIO_INTERFACE
+#define USB_DEVICE_MAX_EP     10
+#else
 //! Maximum 6 endpoints used by vendor interface
 #define UDI_VENDOR_EP_NB_INT  ((UDI_VENDOR_EPS_SIZE_INT_FS)?2:0)
 #define UDI_VENDOR_EP_NB_BULK ((UDI_VENDOR_EPS_SIZE_BULK_FS)?2:0)
 #define UDI_VENDOR_EP_NB_ISO  ((UDI_VENDOR_EPS_SIZE_ISO_FS)?2:0)
 #define USB_DEVICE_MAX_EP     (UDI_VENDOR_EP_NB_INT+UDI_VENDOR_EP_NB_BULK+UDI_VENDOR_EP_NB_ISO)
+#endif
 //@}
 
 //@}
