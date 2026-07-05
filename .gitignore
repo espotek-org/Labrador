@@ -86,4 +86,4 @@ keystore.properties
 Android_App/app/.cxx/
 Android_App/app/build/
 Android_App/build/
-libdfuprog/build/
+libdfuprog/build/AVR_Code/aio_test/aio_transport_test

@@ -137,6 +137,14 @@
 	#endif
 #endif
 
+#ifdef AIO_INTERFACE
+//! AIO transports: 6x128 iso (iface 0), 1x1023 iso (iface 1), 1x64 bulk (iface 2)
+#define UDI_AIO_EPS_SIZE_ISO1_FS   1023
+#define UDI_AIO_EPS_SIZE_BULK_FS     64
+//! Per-frame metadata endpoints on the iso interfaces
+#define UDI_AIO_EPS_SIZE_META_FS      8
+#endif
+
 //! endpoints size for high speed
 #define UDI_VENDOR_EPS_SIZE_INT_HS    64
 #define UDI_VENDOR_EPS_SIZE_BULK_HS  512

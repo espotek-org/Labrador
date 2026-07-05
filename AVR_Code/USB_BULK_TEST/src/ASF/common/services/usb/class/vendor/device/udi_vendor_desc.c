@@ -61,8 +61,13 @@
  * @{
  */
 
+#ifdef AIO_INTERFACE
+//! Three interfaces: iso6 / iso1 / bulk transports
+#define  USB_DEVICE_NB_INTERFACE       3
+#else
 //! Only one interface for this device
 #define  USB_DEVICE_NB_INTERFACE       1
+#endif
 
 //! USB Device Descriptor
 UDC_DATA(4)
@@ -116,7 +121,11 @@ UDC_DESC_STORAGE usb_dev_qual_desc_t udc_device_qual = {
 COMPILER_PACK_SET(1)
 typedef struct {
 	usb_conf_desc_t conf;
+#ifdef AIO_INTERFACE
+	udi_aio_desc_t udi_aio;
+#else
 	udi_vendor_desc_t udi_vendor;
+#endif
 } udc_desc_t;
 COMPILER_PACK_RESET()
 
@@ -131,7 +140,11 @@ UDC_DESC_STORAGE udc_desc_t udc_desc_fs = {
 	.conf.iConfiguration       = 0,
 	.conf.bmAttributes         = USB_CONFIG_ATTR_MUST_SET | USB_DEVICE_ATTR,
 	.conf.bMaxPower            = USB_CONFIG_MAX_POWER(USB_DEVICE_POWER),
+#ifdef AIO_INTERFACE
+	.udi_aio                   = UDI_AIO_DESC_FS,
+#else
 	.udi_vendor                = UDI_VENDOR_DESC_FS,
+#endif
 };
 
 #ifdef USB_DEVICE_HS_SUPPORT
@@ -157,9 +170,17 @@ UDC_DESC_STORAGE udc_desc_t udc_desc_hs = {
 //@{
 
 //! Associate an UDI for each USB interface
+#ifdef AIO_INTERFACE
+UDC_DESC_STORAGE udi_api_t *udi_apis[USB_DEVICE_NB_INTERFACE] = {
+	&udi_api_aio_iso6,
+	&udi_api_aio_iso1,
+	&udi_api_aio_bulk,
+};
+#else
 UDC_DESC_STORAGE udi_api_t *udi_apis[USB_DEVICE_NB_INTERFACE] = {
 	&udi_api_vendor,
 };
+#endif
 
 //! Add UDI with USB Descriptors FS
 UDC_DESC_STORAGE udc_config_speed_t   udc_config_lsfs[1] = {{

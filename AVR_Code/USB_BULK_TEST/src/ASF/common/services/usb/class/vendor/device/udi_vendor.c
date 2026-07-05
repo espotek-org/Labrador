@@ -83,6 +83,66 @@ UDC_DESC_STORAGE udi_api_t udi_api_vendor = {
 };
 //@}
 
+#ifdef AIO_INTERFACE
+/**
+ * AIO: one UDI per transport interface.  Each tracks its own alternate
+ * setting; streaming starts when the host selects alternate setting 1 and
+ * stops when it returns to 0 (or the interface is disabled by a reset).
+ * All Labrador control traffic is device-directed vendor requests handled
+ * in udc_process_setup()/udc_reqvend(), so the per-interface setup handlers
+ * just reuse the classic vendor hooks.
+ */
+static uint8_t udi_aio_alt[3] = {0, 0, 0};
+
+static bool udi_aio_enable_common(uint8_t iface)
+{
+	udi_aio_alt[iface] = udc_get_interface_desc()->bAlternateSetting;
+	if (1 == udi_aio_alt[iface]) {
+		return main_aio_iface_enable(iface);
+	}
+	return true;
+}
+
+static void udi_aio_disable_common(uint8_t iface)
+{
+	if (1 == udi_aio_alt[iface]) {
+		main_aio_iface_disable(iface);
+	}
+}
+
+static bool udi_aio_iso6_enable(void)  { return udi_aio_enable_common(0); }
+static void udi_aio_iso6_disable(void) { udi_aio_disable_common(0); }
+static uint8_t udi_aio_iso6_getsetting(void) { return udi_aio_alt[0]; }
+static bool udi_aio_iso1_enable(void)  { return udi_aio_enable_common(1); }
+static void udi_aio_iso1_disable(void) { udi_aio_disable_common(1); }
+static uint8_t udi_aio_iso1_getsetting(void) { return udi_aio_alt[1]; }
+static bool udi_aio_bulk_enable(void)  { return udi_aio_enable_common(2); }
+static void udi_aio_bulk_disable(void) { udi_aio_disable_common(2); }
+static uint8_t udi_aio_bulk_getsetting(void) { return udi_aio_alt[2]; }
+
+UDC_DESC_STORAGE udi_api_t udi_api_aio_iso6 = {
+	.enable = udi_aio_iso6_enable,
+	.disable = udi_aio_iso6_disable,
+	.setup = udi_vendor_setup,
+	.getsetting = udi_aio_iso6_getsetting,
+	.sof_notify = NULL,
+};
+UDC_DESC_STORAGE udi_api_t udi_api_aio_iso1 = {
+	.enable = udi_aio_iso1_enable,
+	.disable = udi_aio_iso1_disable,
+	.setup = udi_vendor_setup,
+	.getsetting = udi_aio_iso1_getsetting,
+	.sof_notify = NULL,
+};
+UDC_DESC_STORAGE udi_api_t udi_api_aio_bulk = {
+	.enable = udi_aio_bulk_enable,
+	.disable = udi_aio_bulk_disable,
+	.setup = udi_vendor_setup,
+	.getsetting = udi_aio_bulk_getsetting,
+	.sof_notify = NULL,
+};
+#endif // AIO_INTERFACE
+
 
 /**
  * \ingroup udi_vendor_group
@@ -102,9 +162,7 @@ static uint8_t udi_vendor_alternate_setting = 0;
 bool udi_vendor_enable(void)
 {
 	udi_vendor_alternate_setting = udc_get_interface_desc()->bAlternateSetting;
-	if (0 == udi_vendor_alternate_setting) {
-		// Call application callback
-		// to notify that interface is enabled
+	if (1 == udi_vendor_alternate_setting) {
 		if (!UDI_VENDOR_ENABLE_EXT()) {
 			return false;
 		}

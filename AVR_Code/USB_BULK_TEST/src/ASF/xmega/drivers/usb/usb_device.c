@@ -378,7 +378,12 @@ static udd_ep_job_t udd_ep_job[USB_DEVICE_MAX_EP * 2];
  * \warning The isochronous endpoint is not protected by this system
  * and the user must always use a buffer corresponding at endpoint size
  */
-#ifdef USB_DEVICE_LOW_SPEED
+#if defined(AIO_INTERFACE)
+//Labrador has no OUT endpoints (all data endpoints are IN; EP0 uses its own
+//control buffer), so this cache is never written.  Keep it minimal to leave
+//SRAM for the larger AIO endpoint table.
+static uint8_t udd_ep_out_cache_buffer[1][1];
+#elif defined(USB_DEVICE_LOW_SPEED)
 static uint8_t udd_ep_out_cache_buffer[USB_DEVICE_MAX_EP][8];
 #else
 static uint8_t udd_ep_out_cache_buffer[USB_DEVICE_MAX_EP][64];
