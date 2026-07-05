@@ -115,21 +115,10 @@
 #define  UDI_AIO_IFACE_ISO6   0
 #define  UDI_AIO_IFACE_ISO1   1
 #define  UDI_AIO_IFACE_BULK   2
-#define  UDI_AIO_IFACE_INT    3
 #define  UDI_AIO_EP_ISO1_IN     (7 | USB_EP_DIR_IN)
 #define  UDI_AIO_EP_BULK_IN     (8 | USB_EP_DIR_IN)
 #define  UDI_AIO_EP_ISO6_META   (9 | USB_EP_DIR_IN)
 #define  UDI_AIO_EP_ISO1_META  (10 | USB_EP_DIR_IN)
-//Interrupt transport (iface 3, alt 1): 12 x 64-byte data endpoints
-//(0x81..0x8c, addresses shared with the other transports - only one
-//interface's alt setting 1 is ever active) + one 64-byte header endpoint
-//0x8d carrying {magic, seq16, checksum, mode}.  Interrupt IN at
-//bInterval=1 gets a reserved transaction slot every frame (like iso) with
-//CRC+retry (unlike iso), and does not touch the macOS Tahoe
-//getEndpointMult panic path (iso endpoints only).
-#define  UDI_AIO_INT_DATA_EPS  12
-#define  UDI_AIO_EP_INT_FIRST   (1 | USB_EP_DIR_IN)
-#define  UDI_AIO_EP_INT_HDR    (13 | USB_EP_DIR_IN)
 #endif
 
 /**
@@ -137,7 +126,7 @@
  */
 //@{
 #ifdef AIO_INTERFACE
-#define USB_DEVICE_MAX_EP     13
+#define USB_DEVICE_MAX_EP     10
 #else
 //! Maximum 6 endpoints used by vendor interface
 #define UDI_VENDOR_EP_NB_INT  ((UDI_VENDOR_EPS_SIZE_INT_FS)?2:0)

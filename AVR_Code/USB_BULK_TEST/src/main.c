@@ -338,46 +338,6 @@ static void main_aio_meta_fill_and_arm(udd_ep_id_t meta_ep)
 	}
 }
 
-static void main_aio_int_kick(void)
-{
-	//Interrupt transport: 12 x 64-byte data endpoints + one header
-	//endpoint, all re-armed every SOF with slices of the frame the host
-	//should receive this millisecond.  The host controller polls each
-	//endpoint once per frame (reserved periodic bandwidth), so the whole
-	//frame drains inside the deadline by schedule, not by luck.
-	unsigned char i;
-	unsigned char state;
-	volatile unsigned char *base;
-	aio_seq++;
-	if (global_mode >= 5) {
-		unsigned short written = BUFFER_SIZE - DMA.CH0.TRFCNT;
-		if (written > BUFFER_SIZE) written = 0;
-		state = (written < PACKET_SIZE) ? 1 : 0;
-	} else {
-		state = usb_state;
-	}
-	base = &isoBuf[state * PACKET_SIZE];
-	bulk_hdr[0] = AIO_HDR_MAGIC0;
-	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
-	bulk_hdr[2] = aio_seq & 0xff;
-	bulk_hdr[3] = (aio_seq >> 8) & 0xff;
-	bulk_hdr[4] = PACKET_SIZE & 0xff;
-	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
-	bulk_hdr[6] = aio_frame_csum(state);
-	bulk_hdr[7] = global_mode;
-	//Fresh arms every frame: abort first so a slice the host missed
-	//(retry, hiccup) is replaced rather than left to go stale.
-	for (i = 0; i < UDI_AIO_INT_DATA_EPS; i++) {
-		udd_ep_abort(UDI_AIO_EP_INT_FIRST + i);
-		udd_ep_run(UDI_AIO_EP_INT_FIRST + i, false,
-				(uint8_t *)&base[i * UDI_AIO_EPS_SIZE_INT_FS],
-				UDI_AIO_EPS_SIZE_INT_FS, NULL);
-	}
-	udd_ep_abort(UDI_AIO_EP_INT_HDR);
-	udd_ep_run(UDI_AIO_EP_INT_HDR, false, (uint8_t *)bulk_hdr,
-			UDI_AIO_EPS_SIZE_INT_FS, NULL);
-}
-
 static void main_aio_meta_kick(udd_ep_id_t meta_ep)
 {
 	//Latch this frame's header; the meta endpoint re-arms itself from its
@@ -525,9 +485,6 @@ void main_sof_action(void)
 				case TRANSPORT_BULK:
 					main_aio_bulk_kick();
 					break;
-				case TRANSPORT_INT:
-					main_aio_int_kick();
-					break;
 				case TRANSPORT_ISO6:
 					main_aio_meta_kick(UDI_AIO_EP_ISO6_META);
 					break;
@@ -610,9 +567,6 @@ static void main_aio_arm_endpoints(void)
 			udd_ep_abort(UDI_AIO_EP_BULK_IN);
 			bulk_busy = 0;
 			break;
-		case TRANSPORT_INT:
-			//Endpoints are armed every SOF by main_aio_int_kick.
-			break;
 	}
 }
 
@@ -622,7 +576,6 @@ bool main_aio_iface_enable(uint8_t iface)
 		case UDI_AIO_IFACE_ISO6: active_transport = TRANSPORT_ISO6; break;
 		case UDI_AIO_IFACE_ISO1: active_transport = TRANSPORT_ISO1; break;
 		case UDI_AIO_IFACE_BULK: active_transport = TRANSPORT_BULK; break;
-		case UDI_AIO_IFACE_INT:  active_transport = TRANSPORT_INT; break;
 		default: return false;
 	}
 	//The DMA regime (repeat vs. single-shot, block length, priority) depends
@@ -642,7 +595,6 @@ void main_aio_iface_disable(uint8_t iface)
 		case UDI_AIO_IFACE_ISO6: if(active_transport != TRANSPORT_ISO6) return; break;
 		case UDI_AIO_IFACE_ISO1: if(active_transport != TRANSPORT_ISO1) return; break;
 		case UDI_AIO_IFACE_BULK: if(active_transport != TRANSPORT_BULK) return; break;
-		case UDI_AIO_IFACE_INT:  if(active_transport != TRANSPORT_INT) return; break;
 		default: return;
 	}
 	active_transport = TRANSPORT_NONE;

@@ -31,6 +31,11 @@
 #define HDR_MAGIC0  0xEB
 #define HDR_MAGIC1_BULK 0x57
 #define HDR_MAGIC1_META 0x58
+// Bulk transfers are padded to 64-byte multiples so the stream never
+// contains a short packet: 64-byte header block (8 meaningful bytes +
+// 56 zero pad) then a 768-byte payload block (750 data + 18 pad).
+#define BULK_HDR_XFER      64
+#define BULK_PAYLOAD_XFER 768
 
 static libusb_device_handle *g_h = nullptr;
 
@@ -140,7 +145,8 @@ static void test_bulk(int seconds, Stats &st) {
             }
         }
 
-        // Parse frames: [EB 57 seqL seqH lenL lenH csum mode] + payload(len)
+        // Parse frames: 64-byte header block [EB 57 seqL seqH lenL lenH csum
+        // mode + zero pad] then 768-byte payload block (750 data + 18 pad).
         while (true) {
             // resync to magic
             while (stream.size() >= 2 &&
@@ -157,14 +163,15 @@ static void test_bulk(int seconds, Stats &st) {
                 st.hdr_bad++;
                 continue;
             }
-            if (stream.size() < (size_t)(8 + len)) break;
+            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
             uint8_t actual = 0;
-            for (size_t i = 0; i < len; i++) actual ^= stream[8 + i];
+            for (size_t i = 0; i < len; i++) actual ^= stream[BULK_HDR_XFER + i];
             st.note_seq(seq);
             st.frames++;
             st.bytes += len;
             if (actual == csum) st.csum_ok++; else st.csum_bad++;
-            stream.erase(stream.begin(), stream.begin() + 8 + len);
+            stream.erase(stream.begin(),
+                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
         }
     }
     double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -429,9 +436,10 @@ static void bulk_histogram(int seconds, const char *label) {
             if (stream.size() < 8) break;
             uint16_t len = stream[4] | (stream[5] << 8);
             if (len != PACKET_SIZE) { stream.pop_front(); continue; }
-            if (stream.size() < (size_t)(8 + len)) break;
-            for (size_t i = 0; i < len; i++) { hist[stream[8 + i]]++; total++; }
-            stream.erase(stream.begin(), stream.begin() + 8 + len);
+            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
+            for (size_t i = 0; i < len; i++) { hist[stream[BULK_HDR_XFER + i]]++; total++; }
+            stream.erase(stream.begin(),
+                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
         }
     }
     // Percentiles + two-cluster measure
@@ -546,83 +554,6 @@ static void test_bulk_async_threaded(int seconds) {
     libusb_release_interface(g_h, 2);
 }
 
-// ------------------------------------------------------------ interrupt ----
-// 12 x 64B data EPs (0x81..0x8c) + header EP 0x8d, all bInterval=1.
-// Every packet is a full 64 bytes, so interrupt URBs fill completely.
-struct IntStream {
-    libusb_transfer *xfer = nullptr;
-    std::vector<uint8_t> buf;
-    std::vector<std::vector<uint8_t>> chunks;
-    uint64_t packets = 0, errors = 0;
-    volatile bool stopping = false, done = false;
-};
-static void int_cb(libusb_transfer *t) {
-    IntStream *s = (IntStream *)t->user_data;
-    if (t->status != LIBUSB_TRANSFER_COMPLETED || s->stopping) { s->done = true; return; }
-    for (int off = 0; off + 64 <= t->actual_length; off += 64) {
-        s->chunks.emplace_back(t->buffer + off, t->buffer + off + 64);
-        s->packets++;
-    }
-    if (libusb_submit_transfer(t)) s->done = true;
-}
-static bool int_start(IntStream &s, uint8_t ep) {
-    s.buf.resize(64 * 33);
-    s.xfer = libusb_alloc_transfer(0);
-    libusb_fill_interrupt_transfer(s.xfer, g_h, ep, s.buf.data(), (int)s.buf.size(), int_cb, &s, 0);
-    return libusb_submit_transfer(s.xfer) == 0;
-}
-static void int_stop(IntStream &s) {
-    if (!s.xfer) return;
-    s.stopping = true;
-    libusb_cancel_transfer(s.xfer);
-    for (int i = 0; i < 20 && !s.done; i++) { timeval tv{0,100000}; libusb_handle_events_timeout(nullptr,&tv); }
-    libusb_free_transfer(s.xfer); s.xfer = nullptr;
-}
-static void test_int(int seconds, Stats &st) {
-    printf("\n=== INTERRUPT transport (iface 3, EP 0x81-0x8c + hdr 0x8d) ===\n");
-    if (libusb_claim_interface(g_h, 3)) { fprintf(stderr, "claim(3) failed\n"); return; }
-    if (libusb_set_interface_alt_setting(g_h, 3, 1)) {
-        fprintf(stderr, "set_alt(3,1) failed\n");
-        libusb_release_interface(g_h, 3);
-        return;
-    }
-    printf("[+] alt setting 1 selected, streaming...\n");
-    IntStream data[12], hdr;
-    auto t0 = std::chrono::steady_clock::now();
-    bool ok = true;
-    for (int i = 0; i < 12; i++) ok = ok && int_start(data[i], (uint8_t)(0x81 + i));
-    ok = ok && int_start(hdr, 0x8d);
-    if (!ok) fprintf(stderr, "int_start failed\n");
-    else run_iso_events(seconds);
-    for (int i = 0; i < 12; i++) int_stop(data[i]);
-    int_stop(hdr);
-    double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    size_t nframes = SIZE_MAX;
-    for (int i = 0; i < 12; i++) nframes = std::min(nframes, data[i].chunks.size());
-    if (nframes == SIZE_MAX) nframes = 0;
-    printf("[i] per-EP packets: %llu..%llu, hdr packets: %zu, frames: %zu\n",
-           (unsigned long long)data[0].packets, (unsigned long long)data[11].packets,
-           hdr.chunks.size(), nframes);
-    std::vector<std::vector<uint8_t>> whole(nframes);
-    for (size_t k = 0; k < nframes; k++) {
-        auto &w = whole[k];
-        w.reserve(PACKET_SIZE);
-        for (int i = 0; i < 12 && w.size() < PACKET_SIZE; i++) {
-            size_t need = std::min<size_t>(64, PACKET_SIZE - w.size());
-            w.insert(w.end(), data[i].chunks[k].begin(), data[i].chunks[k].begin() + need);
-        }
-    }
-    std::vector<MetaRec> metas;
-    for (auto &c : hdr.chunks) {
-        if (c.size() >= 8 && c[0] == HDR_MAGIC0 && c[1] == HDR_MAGIC1_BULK)
-            metas.push_back({(uint16_t)(c[2] | (c[3] << 8)), c[6], c[6]});
-        else st.hdr_bad++;
-    }
-    iso_validate("interrupt", secs, whole, metas, st);
-    libusb_set_interface_alt_setting(g_h, 3, 0);
-    libusb_release_interface(g_h, 3);
-}
-
 // ---------------------------------------------------------------- main ----
 
 int main(int argc, char **argv) {
@@ -656,7 +587,6 @@ int main(int argc, char **argv) {
     if (which == "iso6" || which == "all") test_iso6(seconds, s6);
     if (which == "sig"  || which == "all") test_signal();
     if (which == "appthread") test_bulk_async_threaded(seconds);
-    if (which == "int") { Stats si; test_int(seconds, si); }
 
     libusb_close(g_h);
     libusb_exit(nullptr);

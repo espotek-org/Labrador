@@ -21,7 +21,6 @@
 	#define TRANSPORT_ISO6 1
 	#define TRANSPORT_ISO1 2
 	#define TRANSPORT_BULK 3
-	#define TRANSPORT_INT  4
 #endif
 
 //#define VERO

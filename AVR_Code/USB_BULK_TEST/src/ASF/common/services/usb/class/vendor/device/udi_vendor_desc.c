@@ -62,8 +62,8 @@
  */
 
 #ifdef AIO_INTERFACE
-//! Four interfaces: iso6 / iso1 / bulk / interrupt transports
-#define  USB_DEVICE_NB_INTERFACE       4
+//! Three interfaces: iso6 / iso1 / bulk transports
+#define  USB_DEVICE_NB_INTERFACE       3
 #else
 //! Only one interface for this device
 #define  USB_DEVICE_NB_INTERFACE       1
@@ -175,7 +175,6 @@ UDC_DESC_STORAGE udi_api_t *udi_apis[USB_DEVICE_NB_INTERFACE] = {
 	&udi_api_aio_iso6,
 	&udi_api_aio_iso1,
 	&udi_api_aio_bulk,
-	&udi_api_aio_int,
 };
 #else
 UDC_DESC_STORAGE udi_api_t *udi_apis[USB_DEVICE_NB_INTERFACE] = {

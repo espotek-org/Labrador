@@ -105,7 +105,7 @@ src/ASF/xmega/drivers/usb/usb_device.o
 
 DEPS = $(OBJS:%.o=%.d)
 
-VERSION = 000B
+VERSION = 000C
 VARIANTS = 01 02 03
 EXEEXTS = .elf .map .lss .hex .srec .eep
 EXES = $(foreach variant,$(VARIANTS),$(foreach ext,$(EXEEXTS),labrafirm_$(VERSION)_$(variant)$(ext)))
