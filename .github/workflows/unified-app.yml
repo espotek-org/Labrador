@@ -1,0 +1,113 @@
+# Unified_App CI: build the app on every desktop platform (plus a GLES2 build
+# standing in for the Raspberry Pi, and the Android APK), and run the smoke
+# test where a GL context is available headlessly (Linux under Xvfb).
+#
+# Deliberately NO artifact uploads for now: the repo is public and workflow
+# artifacts on public repos are downloadable by anyone — maintainers build the
+# branch locally to test. Uncomment the upload steps when we're ready to
+# distribute builds.
+name: unified-app
+
+on:
+  push:
+    paths: ['Unified_App/**', 'libdfuprog/**', '.github/workflows/unified-app.yml']
+  pull_request:
+    paths: ['Unified_App/**', 'libdfuprog/**', '.github/workflows/unified-app.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: Unified_App
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: brew install ninja pkg-config libusb
+      - name: Configure
+        run: cmake --preset macos
+      - name: Build
+        run: cmake --build --preset macos
+      # macOS runners have no window server session for SDL, so build-only.
+      # - uses: actions/upload-artifact@v4   # disabled: no public uploads yet
+      #   with: { name: labrador-macos, path: Unified_App/build/macos/labrador }
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libusb-1.0-0-dev libgl1-mesa-dev libgl1-mesa-dri xvfb \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
+            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
+      - name: Configure
+        run: cmake --preset linux
+      - name: Build
+        run: cmake --build --preset linux
+      - name: Smoke test (Xvfb + software GL)
+        run: |
+          cd build/linux
+          xvfb-run -a -s "-screen 0 1600x1000x24" \
+            env LIBGL_ALWAYS_SOFTWARE=1 LABRADOR_LAYOUT=desktop ./labrador --smoke
+          xvfb-run -a -s "-screen 0 1600x1000x24" \
+            env LIBGL_ALWAYS_SOFTWARE=1 LABRADOR_LAYOUT=compact ./labrador --smoke
+
+  # GLES2 build approximates the Raspberry Pi target (Pi 3 floor) on arm64.
+  linux-arm-gles2:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libusb-1.0-0-dev libgles2-mesa-dev libgl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
+            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
+      - name: Configure
+        run: cmake --preset pi
+      - name: Build
+        run: cmake --build --preset pi
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: Unified_App
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-libusb
+      - name: Configure
+        run: cmake --preset windows
+      - name: Build
+        run: cmake --build --preset windows
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Build APK
+        working-directory: Unified_App/android
+        run: ./gradlew assembleDebug --no-daemon
