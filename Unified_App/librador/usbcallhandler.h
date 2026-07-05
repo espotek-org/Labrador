@@ -58,6 +58,13 @@ extern "C"
 #define AIO_HDR_MAGIC0 0xEB
 #define AIO_HDR_MAGIC1_BULK 0x57
 #define AIO_HDR_MAGIC1_META 0x58
+// Bulk framing: every transfer is padded to a 64-byte multiple so the
+// stream never contains a short packet (a short packet would terminate a
+// queued URB early and collapse the read-ahead runway).  Each frame is a
+// 64-byte header block (8 meaningful bytes, zero pad) followed by a
+// 768-byte payload block (750 data + 18 pad) - a fixed 832-byte stride.
+#define AIO_BULK_HDR_XFER 64
+#define AIO_BULK_PAYLOAD_XFER 768
 #define MAX_DATA_ENDPOINTS 6
 // Bulk URB queue depth: the host controller keeps draining the pipe into
 // pre-queued kernel buffers even while the app's event thread is busy, so
@@ -69,7 +76,7 @@ extern "C"
 
 // Single source of truth for the firmware the app expects on the board.
 // Flip these together with the .hex shipped in the app assets.
-#define EXPECTED_FIRMWARE_VERSION 0x000A
+#define EXPECTED_FIRMWARE_VERSION 0x000C
 #define DEFINED_EXPECTED_VARIANT 3
 #define LABRADOR_BOOTLOADER_PID 0x2fe4
 // "Gobindar" state (Qt Desktop_Interface GOBINDAR_PID): a misconfigured/
@@ -269,7 +276,11 @@ private:
     uint16_t last_seq = 0;
     // Recent reassembled-frame checksums for meta (lag-1) pairing:
     // ring indexed by frame counter, holds the XOR of each 750-byte frame.
-    static const int CSUM_RING_SIZE = 16;
+    // Must exceed the largest frame backlog between a data URB completion
+    // and the matching meta URB completion: iso URBs batch 33 frames, and
+    // data/meta URBs can complete a full batch apart, so 16 was too small
+    // (every meta missed the ring and counted as unvalidated).
+    static const int CSUM_RING_SIZE = 128;
     unsigned char frame_csum_ring[CSUM_RING_SIZE];
     bool frame_csum_valid[CSUM_RING_SIZE];
     uint64_t data_frame_counter = 0;

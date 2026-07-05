@@ -191,7 +191,9 @@ void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
     else frames_unvalidated++;
 }
 
-// Bulk stream parser: [EB 57 seqL seqH lenL lenH csum mode] + payload.
+// Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum
+// mode + zero pad] followed by a 768-byte payload block (750 data + 18
+// pad); fixed 832-byte stride.
 void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
     // Diagnostic: raw stream capture (LABRADOR_DUMP_BULK=<path>, first 1 MB)
     static FILE *dump_fp = nullptr;
@@ -217,10 +219,10 @@ void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
         if(bulk_stream.size() - pos < 8) break;
         uint16_t len = bulk_stream[pos+4] | (bulk_stream[pos+5] << 8);
         if(len != ISO_PACKET_SIZE){ pos++; continue; }
-        if(bulk_stream.size() - pos < (size_t)(8 + len)) break;
+        if(bulk_stream.size() - pos < (size_t)(AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER)) break;
         uint16_t seq = bulk_stream[pos+2] | (bulk_stream[pos+3] << 8);
         unsigned char csum = bulk_stream[pos+6];
-        unsigned char *payload = bulk_stream.data() + pos + 8;
+        unsigned char *payload = bulk_stream.data() + pos + AIO_BULK_HDR_XFER;
         if(seq_started){
             uint16_t expect = (uint16_t)(last_seq + 1);
             if(seq != expect){
@@ -240,7 +242,7 @@ void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
             frames_bad_checksum++;
             dispatch_lost_frames(1);
         }
-        pos += 8 + len;
+        pos += AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER;
     }
     bulk_stream.erase(bulk_stream.begin(), bulk_stream.begin() + pos);
 }
