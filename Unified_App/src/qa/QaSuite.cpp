@@ -932,6 +932,97 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     IM_CHECK_LT(hi - lo, 0.8);
 }
 
+// A USB reset must not silence the signal generators: onDeviceConnected
+// re-pushes the widgets' current settings (SGControl::markDirty), so a
+// generator that was running keeps running after the link comes back.
+// Regression test for reconnect going dark (reset() used to send turnOff).
+static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
+{
+    for (int i = 0; i < 20; i++)
+    {
+        if (librador_is_connected() && librador_iso_thread_is_active())
+            break;
+        ctx->SleepNoSkip(0.25f, 0.25f);
+    }
+    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    {
+        ctx->LogWarning("No Labrador board connected - skipping hardware test");
+        return;
+    }
+
+    // Both channels sampling so OSC2 sees the SG2 loopback
+    SetMainRef(ctx);
+    ImGuiTestItemInfo toolbar = ctx->WindowInfo("//Main Window/##toolbar");
+    IM_CHECK(toolbar.Window != nullptr);
+    ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+    ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
+    ctx->SleepNoSkip(0.5f, 0.1f);
+
+    // Drive SG2 through the UI like a user: Signals page, power toggle ON.
+    EnsureSidePanelVisible(ctx);
+    ctx->MenuClick("View/Side Panel Page/Signals");
+    ctx->Yield(3);
+    ImGuiTestItemInfo signals_w = ctx->WindowInfo("//Main Window/##sidepanel/Signals");
+    IM_CHECK(signals_w.Window != nullptr);
+    const ImGuiID toggle_id
+        = ctx->GetID("sg2/Signal Generator 2 (SG2)_toggle", signals_w.Window->ID);
+    if (ctx->ItemInfo(toggle_id, ImGuiTestOpFlags_NoError).ID == 0)
+    {
+        // Collapsible section may be closed from a previous session
+        ctx->ItemClick("**/Signal Generator 2");
+        ctx->Yield(2);
+    }
+    auto toggle_on = [&]() {
+        ImGuiTestItemInfo info = ctx->ItemInfo(toggle_id);
+        return (info.ID != 0) && (info.StatusFlags & ImGuiItemStatusFlags_Checked) != 0;
+    };
+    if (!toggle_on())
+    {
+        ctx->ItemClick(toggle_id);
+        ctx->Yield(2);
+    }
+    IM_CHECK(toggle_on());
+    ctx->SleepNoSkip(1.5f, 0.1f); // default 1 kHz sine onto the loopback wire
+
+    auto osc2_vpp = [&]() -> double {
+        std::vector<double>* d = librador_get_analog_data(2, 0.05, 5000, 0.0, 0);
+        if (d == nullptr || d->empty())
+            return 0.0;
+        double lo = 1e9, hi = -1e9;
+        for (double v : *d)
+        {
+            lo = ImMin(lo, v);
+            hi = ImMax(hi, v);
+        }
+        return hi - lo;
+    };
+
+    const double vpp_before = osc2_vpp();
+    ctx->LogInfo("SG2/OSC2 before reset: Vpp = %.2f V", vpp_before);
+    IM_CHECK_GT(vpp_before, 0.3); // the widget-driven signal must be live
+
+    // Host-side USB reset (the Esc shortcut path). pollDevice reconnects and
+    // onDeviceConnected must re-push the generator settings by itself — no
+    // UI interaction below this line until the post-reconnect capture.
+    librador_reset_usb();
+    for (int i = 0; i < 40; i++)
+    {
+        if (librador_is_connected() && librador_iso_thread_is_active())
+            break;
+        ctx->SleepNoSkip(0.25f, 0.25f);
+    }
+    IM_CHECK(librador_is_connected() && librador_iso_thread_is_active());
+    ctx->SleepNoSkip(1.5f, 0.1f); // fresh samples of the (resent) waveform
+
+    const double vpp_after = osc2_vpp();
+    ctx->LogInfo("SG2/OSC2 after reconnect: Vpp = %.2f V", vpp_after);
+    IM_CHECK_GT(vpp_after, 0.3); // fails when the reconnect turned SG2 off
+
+    // Leave the board quiet
+    ctx->ItemClick(toggle_id);
+    ctx->Yield(2);
+}
+
 static void RegisterHwTests(ImGuiTestEngine* e)
 {
     ImGuiTest* t = IM_REGISTER_TEST(e, "hw", "loopback_sg1_osc1");
@@ -940,6 +1031,8 @@ static void RegisterHwTests(ImGuiTestEngine* e)
     t->TestFunc = [](ImGuiTestContext* ctx) { HwLoopback(ctx, 2); };
     t = IM_REGISTER_TEST(e, "hw", "pause_inspect_buffer");
     t->TestFunc = [](ImGuiTestContext* ctx) { HwPauseInspect(ctx); };
+    t = IM_REGISTER_TEST(e, "hw", "reconnect_resends_sg2");
+    t->TestFunc = [](ImGuiTestContext* ctx) { HwReconnectResendsSg2(ctx); };
 }
 
 // ---- Engine lifecycle ---------------------------------------------------------
