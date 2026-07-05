@@ -1,5 +1,6 @@
 #include "uartstyledecoder.h"
 #include <cassert>
+#include <cstring>
 
 uartStyleDecoder::uartStyleDecoder(o1buffer *parent) :
     m_serialBuffer{SERIAL_BUFFER_LENGTH},

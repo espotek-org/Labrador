@@ -1,5 +1,8 @@
 #include "i2cdecoder.h"
 
+#include <cstring>
+#include <stdexcept>
+
 using namespace i2c;
 
 i2cDecoder::i2cDecoder(o1buffer* sda_in, o1buffer* scl_in) : 

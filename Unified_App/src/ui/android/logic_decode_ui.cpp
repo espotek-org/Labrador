@@ -6,6 +6,8 @@
 #include "logic_decode_ui.h"
 #include "inputs_ui.h"
 
+#include <cstring>
+
 float logicDecodeUI::draw_grabber(float grabber_height, const char * label, float* backlog, int ch, bool parity_check)
 {
     ImGui::PushID(ch);

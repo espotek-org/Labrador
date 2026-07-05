@@ -7,6 +7,10 @@
 *.pdb
 *.properties~
 *.properties
+# ...but the Unified_App Android build needs its gradle config in the repo
+# (local.properties / keystore.properties stay ignored via the rules above)
+!Unified_App/android/gradle.properties
+!Unified_App/android/gradle/wrapper/gradle-wrapper.properties
 Desktop_Interface/android-build
 Desktop_Interface/moc
 Desktop_Interface/qrc
