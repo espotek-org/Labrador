@@ -55,6 +55,8 @@ pinout.png
 *.srec
 *.eep
 !Desktop_Interface/resources/firmware/*.hex
+!Unified_App/firmware/*.hex
+!Unified_App/android/app/src/main/assets/firmware/*.hex
 
 libdfuprog/Makefile*
 
