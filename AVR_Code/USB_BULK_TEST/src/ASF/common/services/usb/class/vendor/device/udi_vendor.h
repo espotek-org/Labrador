@@ -165,32 +165,32 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 		.ep_iso_in.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN,\
-		.ep_iso_in.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in.bmAttributes            = 0x05,\
 		.ep_iso_in.bInterval               = 1,\
 		.ep_iso_in2.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in2.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in2.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN + 1,\
-		.ep_iso_in2.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in2.bmAttributes            = 0x05,\
 		.ep_iso_in2.bInterval               = 1,\
 		.ep_iso_in3.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in3.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in3.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN + 2,\
-		.ep_iso_in3.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in3.bmAttributes            = 0x05,\
 		.ep_iso_in3.bInterval               = 1,\
 		.ep_iso_in4.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in4.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in4.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN + 3,\
-		.ep_iso_in4.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in4.bmAttributes            = 0x05,\
 		.ep_iso_in4.bInterval               = 1,\
 		.ep_iso_in5.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in5.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in5.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN + 4,\
-		.ep_iso_in5.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in5.bmAttributes            = 0x05,\
 		.ep_iso_in5.bInterval               = 1,\
 		.ep_iso_in6.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in6.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in6.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN + 5,\
-		.ep_iso_in6.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in6.bmAttributes            = 0x05,\
 		.ep_iso_in6.bInterval               = 1,
 	
 		//.ep_iso_out.bLength                = sizeof(usb_ep_desc_t),\
@@ -228,7 +228,7 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 		.ep_iso_in.bLength                 = sizeof(usb_ep_desc_t),\
 		.ep_iso_in.bDescriptorType         = USB_DT_ENDPOINT,\
 		.ep_iso_in.bEndpointAddress        = UDI_VENDOR_EP_ISO_IN,\
-		.ep_iso_in.bmAttributes            = USB_EP_TYPE_ISOCHRONOUS,\
+		.ep_iso_in.bmAttributes            = 0x05,\
 		.ep_iso_in.bInterval               = 1,
 		
 		# define UDI_VENDOR_EPS_ISO_DESC_FS \
@@ -243,7 +243,7 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 
 //! Interface descriptor structure for vendor Class interface
 typedef struct {
-	//usb_iface_desc_t iface0;
+	usb_iface_desc_t iface0;
 	usb_iface_desc_t iface1;
 #if UDI_VENDOR_EPS_SIZE_INT_FS
 	usb_ep_desc_t ep_interrupt_in;
@@ -284,7 +284,7 @@ typedef struct {
 
 //! Content of vendor interface descriptor for all speeds
 #define UDI_VENDOR_DESC      \
-	/*.iface0.bLength            = sizeof(usb_iface_desc_t),\
+	.iface0.bLength            = sizeof(usb_iface_desc_t),\
 	.iface0.bDescriptorType    = USB_DT_INTERFACE,\
 	.iface0.bInterfaceNumber   = UDI_VENDOR_IFACE_NUMBER,\
 	.iface0.bAlternateSetting  = 0,\
@@ -293,10 +293,10 @@ typedef struct {
 	.iface0.bInterfaceSubClass = VENDOR_SUBCLASS,\
 	.iface0.bInterfaceProtocol = VENDOR_PROTOCOL,\
 	.iface0.iInterface         = UDI_VENDOR_STRING_ID,\
-	*/.iface1.bLength            = sizeof(usb_iface_desc_t),\
+	.iface1.bLength            = sizeof(usb_iface_desc_t),\
 	.iface1.bDescriptorType    = USB_DT_INTERFACE,\
 	.iface1.bInterfaceNumber   = UDI_VENDOR_IFACE_NUMBER,\
-	.iface1.bAlternateSetting  = 0,\
+	.iface1.bAlternateSetting  = 1,\
 	.iface1.bNumEndpoints      = UDI_VENDOR_EP_NB,\
 	.iface1.bInterfaceClass    = VENDOR_CLASS,\
 	.iface1.bInterfaceSubClass = VENDOR_SUBCLASS,\

@@ -222,6 +222,13 @@ int usbCallHandler::setup_usb_iso(){
     int error;
     LIBRADOR_LOG(LOG_DEBUG, "usbCallHandler::setup_usb_iso()\n");
 
+    error = libusb_set_interface_alt_setting(handle, 0, 1);
+    if(error){
+        LIBRADOR_LOG(LOG_ERROR, "libusb_set_interface_alt_setting(1) failed: %s\n", libusb_error_name(error));
+        return error;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "Alt setting 1 selected (ISO endpoints active)\n");
+
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);

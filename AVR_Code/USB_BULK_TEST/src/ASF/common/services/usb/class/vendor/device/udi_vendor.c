@@ -102,9 +102,7 @@ static uint8_t udi_vendor_alternate_setting = 0;
 bool udi_vendor_enable(void)
 {
 	udi_vendor_alternate_setting = udc_get_interface_desc()->bAlternateSetting;
-	if (0 == udi_vendor_alternate_setting) {
-		// Call application callback
-		// to notify that interface is enabled
+	if (1 == udi_vendor_alternate_setting) {
 		if (!UDI_VENDOR_ENABLE_EXT()) {
 			return false;
 		}
