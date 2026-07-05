@@ -88,6 +88,9 @@ unixUsbDriver::~unixUsbDriver(void){
     }
 
     if(handle != NULL){
+#ifdef PLATFORM_MAC
+        libusb_release_interface(handle, AIO_BULK_IFACE);
+#endif
         libusb_release_interface(handle, 0);
         qDebug() << "Interface released";
         libusb_close(handle);
@@ -137,6 +140,19 @@ unsigned char unixUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
         handle = NULL;
         return 1;
     } else qDebug() << "Interface claimed!";
+
+#ifdef PLATFORM_MAC
+    //The AIO firmware carries the bulk transport on its own interface;
+    //claim it now, select alternate setting 1 (streaming) in usbIsoInit.
+    error = libusb_claim_interface(handle, AIO_BULK_IFACE);
+    if(error){
+        qDebug() << "libusb_claim_interface(bulk) FAILED";
+        qDebug() << "ERROR" << error << libusb_error_name(error);
+        //Not fatal here: an old (pre-AIO) firmware has only one interface.
+        //The firmware version check will trigger a reflash, after which we
+        //reconnect from scratch.
+    } else qDebug() << "Bulk interface claimed!";
+#endif
 
     return 0;
 }
@@ -188,6 +204,18 @@ static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 int unixUsbDriver::usbIsoInit(void){
     int error;
 
+#ifdef PLATFORM_MAC
+    //Select the bulk streaming alternate setting; the firmware starts
+    //queueing padded frames from its SOF handler once alt 1 is active.
+    error = libusb_set_interface_alt_setting(handle, AIO_BULK_IFACE, 1);
+    if(error){
+        qDebug() << "libusb_set_interface_alt_setting(bulk, 1) FAILED";
+        qDebug() << "ERROR" << libusb_error_name(error);
+        return -1;
+    }
+    qDebug() << "Bulk streaming alternate setting selected";
+#endif
+
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
@@ -197,8 +225,17 @@ int unixUsbDriver::usbIsoInit(void){
             transferUserData[k][n].owner = this;
             transferUserData[k][n].endpoint = k;
             transferUserData[k][n].context = n;
+#ifdef PLATFORM_MAC
+            //Bulk: one transfer carries ISO_PACKETS_PER_CTX padded frames.
+            //Every packet in the stream is a full 64 bytes (the firmware
+            //pads all transfers to 64-byte multiples), so these URBs only
+            //complete when completely full and framing stays aligned to
+            //the transfer boundary.
+            libusb_fill_bulk_transfer(isoCtx[k][n], handle, AIO_BULK_EP, dataBuffer[k][n], AIO_BULK_FRAME_STRIDE*ISO_PACKETS_PER_CTX, isoCallback, (void*)&transferUserData[k][n], 4000);
+#else
             libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, (void*)&transferUserData[k][n], 4000);
             libusb_set_iso_packet_lengths(isoCtx[k][n], ISO_PACKET_SIZE);
+#endif
         }
     }
 
@@ -285,6 +322,58 @@ void unixUsbDriver::isoTimerTick(void){
     //qDebug() << "Processing Ctx" << earliest;
 
 
+#ifdef PLATFORM_MAC
+    //Bulk transport: the transfer holds ISO_PACKETS_PER_CTX padded frames
+    //(64-byte header block + 768-byte payload block each).  Validate every
+    //frame's checksum and deliver only the 750-byte payloads, in the exact
+    //layout the legacy iso path produced.  A frame that fails its checksum
+    //was overwritten by the ADC/DMA loop mid-transmission; substitute the
+    //last good frame rather than plot torn samples.
+    Q_UNUSED(packetPointer);
+    {
+        int usable = isoCtx[0][earliest]->actual_length;
+        unsigned char *raw = dataBuffer[0][earliest];
+        for(int i=0; i<ISO_PACKETS_PER_CTX; i++){
+            unsigned char *frame = raw + (i * AIO_BULK_FRAME_STRIDE);
+            unsigned char *dest = &(outBuffers[currentWriteBuffer][packetLength]);
+            bool frameGood = false;
+            if(((i + 1) * AIO_BULK_FRAME_STRIDE) <= usable
+                && frame[0] == 0xEB && frame[1] == 0x57
+                && (frame[4] | (frame[5] << 8)) == ISO_PACKET_SIZE){
+                unsigned char csum = 0;
+                for(int b=0; b<ISO_PACKET_SIZE; b++){
+                    csum ^= frame[AIO_BULK_HDR_XFER + b];
+                }
+                frameGood = (csum == frame[6]);
+            } else if(((i + 1) * AIO_BULK_FRAME_STRIDE) <= usable){
+                //Header magic missing: stream misalignment (should not
+                //happen - padded bulk never short-transfers).  Count it so
+                //it is visible in the logs.
+                bulkFramesResync++;
+            }
+            if(frameGood){
+                memcpy(dest, frame + AIO_BULK_HDR_XFER, ISO_PACKET_SIZE);
+                memcpy(lastGoodFrame, frame + AIO_BULK_HDR_XFER, ISO_PACKET_SIZE);
+                lastGoodFrameValid = true;
+                bulkFramesOk++;
+            } else {
+                bulkFramesBad++;
+                if(lastGoodFrameValid){
+                    memcpy(dest, lastGoodFrame, ISO_PACKET_SIZE);
+                } else {
+                    memcpy(dest, frame + AIO_BULK_HDR_XFER, ISO_PACKET_SIZE);
+                }
+            }
+            packetLength += ISO_PACKET_SIZE;
+        }
+        if((bulkFramesBad || bulkFramesResync) && (((bulkFramesOk + bulkFramesBad) % 4096) < ISO_PACKETS_PER_CTX)){
+            qDebug("bulk frame stats: ok=%llu bad=%llu resync=%llu",
+                   (unsigned long long)bulkFramesOk,
+                   (unsigned long long)bulkFramesBad,
+                   (unsigned long long)bulkFramesResync);
+        }
+    }
+#else
     //Swap the buffers so that we override the oldest one.
     for (unsigned char k = 0; k< NUM_ISO_ENDPOINTS; k++){
         unsigned char* temp = midBuffer_prev[k];
@@ -318,6 +407,7 @@ void unixUsbDriver::isoTimerTick(void){
             packetLength += ISO_PACKET_SIZE;
         }
     }
+#endif
 
     //qDebug() << "Data copy complete!";
 
@@ -552,6 +642,9 @@ int unixUsbDriver::flashFirmware(void){
         QApplication::processEvents();
     } while (exit_code);
 
+#ifdef PLATFORM_MAC
+    libusb_release_interface(handle, AIO_BULK_IFACE);
+#endif
     libusb_release_interface(handle, 0);
     qDebug() << "Interface released";
     libusb_close(handle);
