@@ -98,6 +98,8 @@ static volatile unsigned char bulk_hdr[8];
 COMPILER_WORD_ALIGNED
 static volatile unsigned char iso_meta_buf[8];
 static volatile unsigned char *bulk_payload_ptr;
+static volatile unsigned short bulk_seg1_len;
+static volatile unsigned short bulk_seg2_len;
 static volatile unsigned short aio_seq = 0;
 static volatile unsigned char bulk_busy = 0;
 static volatile unsigned char meta_busy = 0;
@@ -257,11 +259,41 @@ void main_resume_action(void)
 static void main_aio_bulk_kick(void)
 {
 	//Queue the next bulk frame if the previous one has fully drained.
-	//usb_state has just been toggled for this frame, so isoBuf[usb_state *
-	//PACKET_SIZE] is the half the DMA loop is NOT writing this millisecond.
+	unsigned short i;
+	unsigned char csum;
 	aio_seq++;
 	if (bulk_busy) {
 		return;
+	}
+	if (global_mode >= 5) {
+		//Modes 6/7 run the DMA as a free-running circular buffer that is
+		//not phase-locked to the USB frame, so the fixed halves tear
+		//(measured ~50% checksum failures).  Bulk has no fixed framing:
+		//send a rolling window of the PACKET_SIZE bytes the DMA just
+		//finished writing, which is stable for the next full frame.
+		unsigned short written = BUFFER_SIZE - DMA.CH0.TRFCNT;
+		unsigned short start;
+		if (written > BUFFER_SIZE) written = 0; //TRFCNT mid-reload
+		start = (written >= PACKET_SIZE) ? (written - PACKET_SIZE)
+		                                 : (written + PACKET_SIZE);
+		bulk_payload_ptr = &isoBuf[start];
+		bulk_seg1_len = BUFFER_SIZE - start;
+		if (bulk_seg1_len >= PACKET_SIZE) {
+			bulk_seg1_len = PACKET_SIZE;
+			bulk_seg2_len = 0;
+		} else {
+			bulk_seg2_len = PACKET_SIZE - bulk_seg1_len;
+		}
+		csum = 0;
+		for (i = 0; i < bulk_seg1_len; i++) csum ^= bulk_payload_ptr[i];
+		for (i = 0; i < bulk_seg2_len; i++) csum ^= isoBuf[i];
+	} else {
+		//Modes 0-4 ping-pong the halves in lockstep with the SOF, so the
+		//half the DMA is not writing this millisecond is stable.
+		bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
+		bulk_seg1_len = PACKET_SIZE;
+		bulk_seg2_len = 0;
+		csum = aio_frame_csum(usb_state);
 	}
 	bulk_hdr[0] = AIO_HDR_MAGIC0;
 	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
@@ -269,9 +301,8 @@ static void main_aio_bulk_kick(void)
 	bulk_hdr[3] = (aio_seq >> 8) & 0xff;
 	bulk_hdr[4] = PACKET_SIZE & 0xff;
 	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
-	bulk_hdr[6] = aio_frame_csum(usb_state);
+	bulk_hdr[6] = csum;
 	bulk_hdr[7] = global_mode;
-	bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
 	bulk_busy = 1;
 	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, sizeof(bulk_hdr), bulk_hdr_callback)) {
 		bulk_busy = 0;
@@ -322,7 +353,7 @@ void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep
 		bulk_busy = 0;
 		return;
 	}
-	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_payload_ptr, PACKET_SIZE, bulk_payload_callback)) {
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_payload_ptr, bulk_seg1_len, bulk_payload_callback)) {
 		bulk_busy = 0;
 	}
 }
@@ -330,6 +361,19 @@ void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep
 void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
 {
 	aio_dbg[5]++;
+	if (status != UDD_EP_TRANSFER_OK) {
+		bulk_busy = 0;
+		return;
+	}
+	if (bulk_seg2_len) {
+		//Rolling window wrapped the end of isoBuf: send the tail segment.
+		unsigned short len = bulk_seg2_len;
+		bulk_seg2_len = 0;
+		if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)&isoBuf[0], len, bulk_payload_callback)) {
+			bulk_busy = 0;
+		}
+		return;
+	}
 	bulk_busy = 0;
 }
 
@@ -497,18 +541,23 @@ static void main_aio_arm_endpoints(void)
 	switch(active_transport){
 		case TRANSPORT_ISO6:
 			for(i = 0; i < 6; i++){
+				udd_ep_abort(0x81 + i); //clear any stale job
 				if(!udd_ep_run(0x81 + i, false, (uint8_t *)&isoBuf[i * 125], 125, iso_callback)){
 					aio_dbg[1] |= (1 << i);
 				}
 			}
+			udd_ep_abort(UDI_AIO_EP_ISO6_META);
 			break;
 		case TRANSPORT_ISO1:
+			udd_ep_abort(UDI_AIO_EP_ISO1_IN);
 			if(!udd_ep_run(UDI_AIO_EP_ISO1_IN, false, (uint8_t *)&isoBuf[0], PACKET_SIZE, iso_callback)){
 				aio_dbg[1] |= 0x01;
 			}
+			udd_ep_abort(UDI_AIO_EP_ISO1_META);
 			break;
 		case TRANSPORT_BULK:
 			//Frames are queued from the SOF handler once the pipe is idle.
+			udd_ep_abort(UDI_AIO_EP_BULK_IN);
 			bulk_busy = 0;
 			break;
 	}
@@ -570,6 +619,12 @@ bool main_setup_in_received(void)
 void iso_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep){
 	#if defined(AIO_INTERFACE)
 		aio_dbg[2]++;
+		if (status != UDD_EP_TRANSFER_OK) {
+			//Aborted (endpoint freed on an alt-setting change): do NOT
+			//re-arm, or the job is left busy forever and the next
+			//SET_INTERFACE cannot start the stream.
+			return;
+		}
 		if(active_transport == TRANSPORT_ISO6){
 			unsigned short offset = (ep - 0x81) * 125;
 			if (global_mode < 5){

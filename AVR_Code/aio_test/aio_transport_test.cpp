@@ -126,6 +126,19 @@ static void test_bulk(int seconds, Stats &st) {
         }
         raw_bytes += got;
         stream.insert(stream.end(), buf.begin(), buf.begin() + got);
+        // Interleave variant polls like the app's wedge check does.
+        {
+            static int poll_ctr = 0;
+            static int poll_fails = 0;
+            if (++poll_ctr % 20 == 0) {
+                uint8_t v = 0;
+                int pr = libusb_control_transfer(g_h, 0xC0, 0xa9, 0, 0, &v, 1, 1000);
+                if (pr != 1 && ++poll_fails <= 5)
+                    printf("[!] 0xa9 poll failed: %d (%s)\n", pr, pr < 0 ? libusb_error_name(pr) : "short");
+                if (poll_ctr % 400 == 0)
+                    printf("[i] 0xa9 polls: %d, failures: %d\n", poll_ctr / 20, poll_fails);
+            }
+        }
 
         // Parse frames: [EB 57 seqL seqH lenL lenH csum mode] + payload(len)
         while (true) {
@@ -472,12 +485,74 @@ static void test_signal(void) {
     libusb_release_interface(g_h, 2);
 }
 
+// Reproduce the app's threading pattern: async bulk transfers serviced by a
+// dedicated event thread, control transfers issued from this thread.
+#include <thread>
+#include <atomic>
+static std::atomic<bool> g_ev_stop{false};
+static std::atomic<uint64_t> g_bulk_bytes{0};
+static void ev_thread_fn() {
+    while (!g_ev_stop) {
+        timeval tv{0, 100000};
+        libusb_handle_events_timeout(nullptr, &tv);
+    }
+}
+static void bulk_async_cb(libusb_transfer *t) {
+    if (t->status == LIBUSB_TRANSFER_COMPLETED || t->status == LIBUSB_TRANSFER_TIMED_OUT) {
+        g_bulk_bytes += t->actual_length;
+        if (!g_ev_stop) { if (libusb_submit_transfer(t)) {} }
+    }
+}
+static void test_bulk_async_threaded(int seconds) {
+    printf("\n=== BULK async + event thread + concurrent control (app pattern) ===\n");
+    if (libusb_claim_interface(g_h, 2)) { fprintf(stderr, "claim(2) failed\n"); return; }
+    if (libusb_set_interface_alt_setting(g_h, 2, 1)) {
+        fprintf(stderr, "set_alt failed\n");
+        libusb_release_interface(g_h, 2);
+        return;
+    }
+    static unsigned char bufs[4][16384];
+    libusb_transfer *xf[4];
+    for (int i = 0; i < 4; i++) {
+        xf[i] = libusb_alloc_transfer(0);
+        libusb_fill_bulk_transfer(xf[i], g_h, 0x88, bufs[i], sizeof bufs[i], bulk_async_cb, nullptr, 250);
+        libusb_submit_transfer(xf[i]);
+    }
+    g_ev_stop = false;
+    std::thread ev(ev_thread_fn);
+    int fails = 0, polls = 0, retr_ok = 0;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+    while (std::chrono::steady_clock::now() < deadline) {
+        uint8_t v = 0;
+        int pr = libusb_control_transfer(g_h, 0xC0, 0xa9, 0, 0, &v, 1, 1000);
+        polls++;
+        if (pr != 1) {
+            fails++;
+            if (fails <= 5) printf("[!] poll %d failed: %s\n", polls, pr < 0 ? libusb_error_name(pr) : "short");
+            // immediate retry - EP0 stall self-clears on next SETUP
+            pr = libusb_control_transfer(g_h, 0xC0, 0xa9, 0, 0, &v, 1, 1000);
+            if (pr == 1) retr_ok++;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    g_ev_stop = true;
+    for (int i = 0; i < 4; i++) libusb_cancel_transfer(xf[i]);
+    ev.join();
+    for (int i = 0; i < 4; i++) libusb_free_transfer(xf[i]);
+    printf("[i] polls=%d failures=%d retry-successes=%d, bulk bytes=%llu (%.0f KB/s)\n",
+           polls, fails, retr_ok, (unsigned long long)g_bulk_bytes.load(),
+           g_bulk_bytes.load() / 1024.0 / seconds);
+    libusb_set_interface_alt_setting(g_h, 2, 0);
+    libusb_release_interface(g_h, 2);
+}
+
 // ---------------------------------------------------------------- main ----
 
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IONBF, 0);
     std::string which = argc > 1 ? argv[1] : "all";
     int seconds = argc > 2 ? atoi(argv[2]) : 4;
+    int mode = argc > 3 ? atoi(argv[3]) : 0;
 
     if (libusb_init(nullptr)) { fprintf(stderr, "libusb_init failed\n"); return 1; }
     g_h = libusb_open_device_with_vid_pid(nullptr, VID, PID);
@@ -495,14 +570,15 @@ int main(int argc, char **argv) {
 
     // Put the scope into mode 0 (single channel, CH1 ADC free-running) so the
     // ADC/DMA loop is actively writing isoBuf while we stream.
-    if (!set_mode(0, 1)) return 1;
-    printf("[+] Scope mode 0 set (ADC/DMA loop running)\n");
+    if (!set_mode(mode, 1)) return 1;
+    printf("[+] Scope mode %d set (ADC/DMA loop running)\n", mode);
 
     Stats sb, s1, s6;
     if (which == "bulk" || which == "all") test_bulk(seconds, sb);
     if (which == "iso1" || which == "all") test_iso1(seconds, s1);
     if (which == "iso6" || which == "all") test_iso6(seconds, s6);
     if (which == "sig"  || which == "all") test_signal();
+    if (which == "appthread") test_bulk_async_threaded(seconds);
 
     libusb_close(g_h);
     libusb_exit(nullptr);

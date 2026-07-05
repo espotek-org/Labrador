@@ -36,7 +36,11 @@ void tiny_dma_setup(void){
 	//Turn on DMA
 	PR.PRGEN &=0b111111110; //Turn on DMA clk
 	#if defined(AIO_INTERFACE)
-		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_RR0123_gc;
+		//Fixed priority, ADC channels first: with round-robin the signal
+		//generator's DAC channels (CH2/CH3) delay the ADC re-arm cadence
+		//enough to slip the double-buffer phase (measured: bulk checksum
+		//pass rate fell from ~99.9% to ~67% with the fgen running).
+		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_CH0123_gc;
 	#elif !defined(SINGLE_ENDPOINT_INTERFACE)
 		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_CH0123_gc;
 	#else
@@ -50,8 +54,7 @@ void tiny_dma_setup(void){
 void tiny_dma_apply_transport(void){
 	//Match the DMA priority scheme to the transport and rebuild the current
 	//acquisition mode so block lengths and interrupts fit the new regime.
-	DMA.CTRL = DMA_ENABLE_bm | ((active_transport == TRANSPORT_ISO6) ?
-			DMA_PRIMODE_CH0123_gc : DMA_PRIMODE_RR0123_gc);
+	DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_CH0123_gc;
 	if(global_mode < 8){
 		tiny_dma_delayed_set(global_mode);
 	}
