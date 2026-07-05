@@ -20,6 +20,9 @@ void eeprom_safe_write(){
 	CLK.PSCTRL = CLK_PSADIV4_bm; //Slow down the clock to prevent EEPROM misses
 	nvm_eeprom_load_page_to_buffer(eeprom_buffer_write);
 	nvm_eeprom_atomic_write_page(EEPROM_CURRENT_PAGE);
+	nvm_wait_until_ready(); //The write must be committed before the caller
+	                        //resets or jumps to the bootloader, otherwise the
+	                        //bootloader-request flag survives an extra launch.
 	CLK.PSCTRL = previous_clk_settings;
 	return;
 }

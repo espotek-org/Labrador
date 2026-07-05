@@ -148,11 +148,26 @@ void jump_to_bootloader(){
 
 int main(void){	
 	eeprom_safe_read();
-	if(eeprom_buffer_read[0]){
+	//Enter the bootloader only on the exact flag value written by vendor
+	//request 0xa7.  A DFU chip erase leaves EEPROM at 0xff, which the old
+	//truthiness check treated as "bootloader requested" - that is why every
+	//firmware update used to need two launches (the first boot jumped
+	//straight back into the bootloader while scrubbing the byte).
+	if(1 == eeprom_buffer_read[0]){
+			unsigned char clear_tries;
 			memcpy(eeprom_buffer_write, eeprom_buffer_read, EEPROM_PAGE_SIZE);
 			eeprom_buffer_write[0] = 0;
-			eeprom_safe_write();
-			//eeprom_safe_read();
+			//Verify the flag really cleared before entering the bootloader;
+			//jumping with the write uncommitted leaves the flag set, so the
+			//next app boot bounces straight back into the bootloader (the
+			//old "have to launch twice" bug).
+			for(clear_tries = 0; clear_tries < 3; clear_tries++){
+				eeprom_safe_write();
+				eeprom_safe_read();
+				if(0 == eeprom_buffer_read[0]){
+					break;
+				}
+			}
 			jump_to_bootloader();
 	}
 	
