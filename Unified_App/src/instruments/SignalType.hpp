@@ -180,6 +180,18 @@ public:
 		ImPlot::EndPlot();
 	}
 
+	// Width of the property-table label column. Sized from the widest label at
+	// the current font scale — a hardcoded 80 px clipped "Vpeak-peak" (and the
+	// Square "Duty Cycle") once the text size was raised (font_scale 1.45).
+	static float propertyLabelWidth()
+	{
+		float w = 0.0f;
+		for (const char* lbl : { "Vpeak-peak", "Frequency", "Vbase", "Phase",
+			     "Duty Cycle" })
+			w = std::max(w, ImGui::CalcTextSize(lbl).x);
+		return w + ImGui::GetStyle().ItemSpacing.x;
+	}
+
 	/// <summary>
 	/// Render Control Widgets
 	/// </summary>
@@ -188,10 +200,12 @@ public:
 	{
 		bool changed = false;
 
-		const float width = ImGui::GetContentRegionAvail().x * 0.9;
-		const float labWidth = 80.0f;
+		// Use the full child width: labels + value + unit are tight at large
+		// font scales, so don't discard 10% of the column to a margin.
+		const float width = ImGui::GetContentRegionAvail().x;
+		const float labWidth = propertyLabelWidth();
 		const float unitWidth = 50.0f;
-		const float inpWidth = width - labWidth - unitWidth;
+		const float inpWidth = std::max(width - labWidth - unitWidth, 40.0f);
 
 		if (ImGui::BeginTable((label + "_prop_table").c_str(), 2))
 		{
@@ -539,10 +553,12 @@ public:
 	{
 		bool changed = false;
 
-		const float width = ImGui::GetContentRegionAvail().x * 0.9;
-		const float labWidth = 80.0f;
+		// Use the full child width: labels + value + unit are tight at large
+		// font scales, so don't discard 10% of the column to a margin.
+		const float width = ImGui::GetContentRegionAvail().x;
+		const float labWidth = propertyLabelWidth();
 		const float unitWidth = 50.0f;
-		const float inpWidth = width - labWidth - unitWidth;
+		const float inpWidth = std::max(width - labWidth - unitWidth, 40.0f);
 
 		if (ImGui::BeginTable((label + "_prop_table").c_str(), 2))
 		{
