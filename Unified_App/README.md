@@ -84,8 +84,34 @@ cmake --build build/macos-qa
 
 QA builds embed the [Dear ImGui Test Engine](https://github.com/ocornut/imgui_test_engine)
 (interactive test windows appear when run without `--qa`). The suite lives in
-`src/qa/QaSuite.cpp`; the full QA workflow (including the screenshot-matrix
-review) is documented in `.claude/skills/labrador-qa/SKILL.md`.
+`src/qa/QaSuite.cpp`.
+
+### Automated QA with Claude
+
+The repo ships a Claude Code skill (`.claude/skills/labrador-qa/SKILL.md`)
+that automates the whole QA workflow. From a Claude Code session in this
+repo, either invoke it directly or just ask:
+
+```
+/labrador-qa                      # or:
+"QA the unified app"              # report-only: run everything, report defects
+"QA the unified app and fix what you find"   # find-and-fix + re-verification
+```
+
+It runs three passes:
+
+1. **Headless UI tests** — builds the QA build and runs the `--qa` suite.
+2. **Screenshot matrix** — renders every theme / side-panel page / text size
+   via `--smoke` + `LABRADOR_FRAME_DUMP` and visually reviews the frames for
+   cut-off text, overlap, contrast and layout breakage.
+3. **Hardware loopback** — with a board plugged in and **SG1 wired to OSC1,
+   SG2 wired to OSC2**, verifies generated-vs-captured amplitude and
+   frequency end-to-end (skipped when no board is present).
+
+In report mode nothing is modified; in fix mode defects are fixed at root
+cause and re-verified (both build configs, failing tests re-run, screenshots
+re-captured) before a full regression pass. See the skill file for the test
+engine's path/label conventions when adding new tests.
 
 ## Source layout
 
