@@ -2,13 +2,80 @@
 
 #include "ui/InstrumentFrontend.h"
 
-class App;
-
-// Desktop form factor — the faithful port of the Monash LabraScope arrangement
-// (iterated with several dozen students; the tested reference). All the widget
-// machinery lives in InstrumentFrontend; this class supplies only the layout.
+// Ground-up desktop layout (2026 redesign, replacing the Monash stacked
+// column). Menu-bar-first design:
+//
+//   ┌────────────────────────────────────────────────────────────┐
+//   │ File  Device  Scope  Tools  View  Help                     │  menu bar
+//   ├────────────────────────────────────────────────────────────┤
+//   │ [Run] [Auto Fit] | Inputs mode | Gain | …          [Panel] │  toolbar
+//   ├──────────────────────────────────┬──────────────────┬──────┤
+//   │                                  │                  │ rail │
+//   │            plot                  │    side panel    │  of  │
+//   │                                  │  (one page at a  │ page │
+//   │                                  │      time)       │ tabs │
+//   ├──────────────────────────────────┴──────────────────┴──────┤
+//   │ ● Connected · FW 7.2      mode · rate · gain · REC         │  status bar
+//   └────────────────────────────────────────────────────────────┘
+//
+// The control widgets survive as state holders + section renderers; the
+// permanent chrome (run/stop, gain, input mode, exports, calibration, views)
+// moved into the menu bar / toolbar, Qt-desktop style.
 class DesktopFrontend : public InstrumentFrontend
 {
+  public:
+    void loadSettings(Settings& s) override;
+    void saveSettings(Settings& s) override;
+
   protected:
     void renderLayout(App& app) override;
+
+  private:
+    // Side panel pages, in rail order.
+    enum Panel : int
+    {
+        PanelScope = 0,
+        PanelSignals,
+        PanelMeter,
+        PanelLogic,
+        PanelRecord,
+        PanelAnalysis,
+        PanelCount
+    };
+    static const char* panelName(int p);
+    static const float* panelAccent(int p);
+
+    void handleDesktopShortcuts();
+    void renderDesktopMenuBar(App& app);
+    void renderToolbar(App& app, float height);
+    void renderRail(float height);
+    void renderSidePanel(App& app, float height);
+    void renderStatusBar(App& app);
+    void renderCalibrationWindow();
+    void renderAboutWindow();
+
+    // Panel bodies
+    void renderScopePanel();
+    void renderSignalsPanel();
+    void renderMeterPanel();
+    void renderLogicPanel();
+    void renderRecordPanel(App& app);
+    void renderAnalysisPanel();
+
+    // Open the side panel on a given page (menus/tools shortcuts).
+    void showPanel(int p)
+    {
+        m_panel = p;
+        m_sidebar_visible = true;
+    }
+
+    // File > Export helper: one MenuItem that saves x/y as CSV when clicked.
+    void exportCsvMenuItem(const char* item_label, const std::vector<double>& x,
+        const std::vector<double>& y, const char* x_header, const char* y_header);
+
+    int m_panel = PanelScope;
+    bool m_sidebar_visible = true;
+    float m_sidebar_width = 440.0f;
+    bool m_show_calibration = false;
+    bool m_show_about = false;
 };

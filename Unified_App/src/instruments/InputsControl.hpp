@@ -30,6 +30,28 @@ public:
 	Mode mode() const { return selected_mode; }
 	bool modeChangedThisFrame() const { return mode_changed; }
 
+	// Mode list + programmatic selection, for layouts that render their own
+	// mode selector (desktop toolbar / Device menu) instead of this widget.
+	static constexpr int ModeCount = 7;
+	static const char* modeLabel(int idx) { return mode_labels[idx]; }
+	int selectedIndex() const { return selected_idx; }
+	void selectIndex(int idx)
+	{
+		selected_idx = idx;
+		selected_mode = mode_values[idx];
+	}
+	void setMode(Mode m)
+	{
+		for (int i = 0; i < ModeCount; i++)
+		{
+			if (mode_values[i] == m)
+			{
+				selectIndex(i);
+				return;
+			}
+		}
+	}
+
 	bool channelIsScope(int ch) const
 	{
 		switch (selected_mode)

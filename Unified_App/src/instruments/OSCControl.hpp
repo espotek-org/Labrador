@@ -151,10 +151,37 @@ public:
     }
     
 
-    /// Render UI elements for oscilloscope control (plot/display/trigger/export + math mode)
+    /// Render UI elements for oscilloscope control (plot/display/trigger/export + math mode).
+    /// Composes the section renderers below \u2014 the desktop frontend uses those
+    /// same sections individually to build its Scope panel.
     void renderControl() override
     {
-        // --- Top buttons ---
+        renderRunButtons();
+
+        ImGui::SeparatorText("Display");
+        renderDisplaySection(true);
+
+        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::SeparatorText("General");
+        renderTriggerSection(true);
+
+        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::SeparatorText("Channels");
+        renderProbeSection();
+
+        renderExportSection();
+
+        ImGui::SeparatorText("Math");
+        renderMathSection();
+    }
+
+    // ===== Panel sections =====
+    // Each draws one self-contained block (no SeparatorText heading of its
+    // own, so layouts can supply their own headings/grouping).
+
+    /// Run/Stop + auto-fit buttons (the classic top row)
+    void renderRunButtons()
+    {
         if (ImGui::BeginTable("Buttons", 3))
         {
             float button_width = 100.f;
@@ -166,13 +193,17 @@ public:
             AutofitX = WhiteOutlineButton(u8"Auto Fit  \u2194##Horizontal", ImVec2(button_width, 30));
             ImGui::EndTable();
         }
+    }
 
+    /// Channel show/hide, cursors and signal-properties toggles. When
+    /// include_views is set, also the XY / eye-diagram view toggles (the
+    /// desktop layout keeps those in its Scope menu instead).
+    void renderDisplaySection(bool include_views)
+    {
         const float width = ImGui::GetContentRegionAvail().x * 0.95f;
         float labWidth = 120.0f;
         float controlWidth = (width - 2 * labWidth) / 2;
 
-        // --- Display toggles ---
-        ImGui::SeparatorText("Display");
         if (ImGui::BeginTable("ChannelsTable", 4))
         {
             ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, labWidth);
@@ -195,39 +226,46 @@ public:
             ImGui::TableNextColumn(); ImGui::Text("Signal Properties");
             ImGui::TableNextColumn(); ToggleSwitch((label + "sig_prop_toggle").c_str(), &SignalPropertiesToggle, GenColour);
 
-            // XY mode: plot OSC1 (x) vs OSC2 (y) instead of the time series.
-            // XY and Eye Diagram are mutually exclusive main-plot views;
-            // enabling one switches the other off (Qt's view actions uncheck
-            // one another in on_actionEye_Diagram_triggered / setXYmode).
-            ImGui::TableNextColumn(); ImGui::Text("XY Mode");
-            ImGui::TableNextColumn();
-            if (ToggleSwitch((label + "XY_toggle").c_str(), &XYMode, GenColour) && XYMode)
-                EyeDiagram = false;
-
-            // Eye diagram: overlaid trigger-aligned sweeps of OSC1
-            ImGui::TableNextColumn(); ImGui::Text("Eye Diagram");
-            ImGui::TableNextColumn();
-            if (ToggleSwitch((label + "Eye_toggle").c_str(), &EyeDiagram, GenColour) && EyeDiagram)
-                XYMode = false;
-
-            if (EyeDiagram)
+            if (include_views)
             {
-                ImGui::TableNextColumn(); ImGui::Text("Eye Traces");
-                ImGui::TableNextColumn(); ImGui::SetNextItemWidth(controlWidth);
-                if (ImGui::InputInt("##EyeTraces", &EyeTraces, 1, 8))
-                    EyeTraces = std::clamp(EyeTraces, EyeTracesMin, EyeTracesMax);
+                // XY mode: plot OSC1 (x) vs OSC2 (y) instead of the time series.
+                // XY and Eye Diagram are mutually exclusive main-plot views;
+                // enabling one switches the other off (Qt's view actions uncheck
+                // one another in on_actionEye_Diagram_triggered / setXYmode).
+                ImGui::TableNextColumn(); ImGui::Text("XY Mode");
+                ImGui::TableNextColumn();
+                if (ToggleSwitch((label + "XY_toggle").c_str(), &XYMode, GenColour) && XYMode)
+                    EyeDiagram = false;
+
+                // Eye diagram: overlaid trigger-aligned sweeps of OSC1
+                ImGui::TableNextColumn(); ImGui::Text("Eye Diagram");
+                ImGui::TableNextColumn();
+                if (ToggleSwitch((label + "Eye_toggle").c_str(), &EyeDiagram, GenColour) && EyeDiagram)
+                    XYMode = false;
+
+                if (EyeDiagram)
+                {
+                    ImGui::TableNextColumn(); ImGui::Text("Eye Traces");
+                    ImGui::TableNextColumn(); ImGui::SetNextItemWidth(controlWidth);
+                    if (ImGui::InputInt("##EyeTraces", &EyeTraces, 1, 8))
+                        EyeTraces = std::clamp(EyeTraces, EyeTracesMin, EyeTracesMax);
+                }
             }
 
             ImGui::EndTable();
         }
+    }
 
-        // --- General / Trigger ---
-        labWidth = 100.0f;
+    /// Trigger enable/type/level/auto-level rows. When include_gain is set,
+    /// also the hardware gain combo + auto-gain toggle (the desktop layout
+    /// keeps gain in its toolbar and Scope menu instead).
+    void renderTriggerSection(bool include_gain)
+    {
+        const float width = ImGui::GetContentRegionAvail().x * 0.95f;
+        float labWidth = 100.0f;
         float labWidth2 = 70.0f;
-        controlWidth = (width - labWidth - labWidth2) / 2;
+        float controlWidth = (width - labWidth - labWidth2) / 2;
 
-        ImGui::Dummy(ImVec2(0, 10.0f));
-        ImGui::SeparatorText("General");
         if (ImGui::BeginTable("GeneralTable", 4))
         {
             ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, labWidth);
@@ -260,17 +298,20 @@ public:
             ImGui::TableNextColumn(); ImGui::Text("Auto Level");
             ImGui::TableNextColumn(); ToggleSwitch("##Auto1", &AutoTriggerLevel, GenColour);
 
-            // Hardware gain (ADC frontend). Picking a value manually turns
-            // Auto off, mirroring the Qt gain-menu behaviour.
-            ImGui::TableNextColumn(); ImGui::Text("HW Gain");
-            ImGui::TableNextColumn(); ImGui::SetNextItemWidth(controlWidth);
-            if (ImGui::Combo("##HWGain OSC", &GainComboCurrentItem,
-                    GainComboList, IM_ARRAYSIZE(GainComboList)))
-                AutoGain = false;
+            if (include_gain)
+            {
+                // Hardware gain (ADC frontend). Picking a value manually turns
+                // Auto off, mirroring the Qt gain-menu behaviour.
+                ImGui::TableNextColumn(); ImGui::Text("HW Gain");
+                ImGui::TableNextColumn(); ImGui::SetNextItemWidth(controlWidth);
+                if (ImGui::Combo("##HWGain OSC", &GainComboCurrentItem,
+                        GainComboList, IM_ARRAYSIZE(GainComboList)))
+                    AutoGain = false;
 
-            ImGui::TableNextColumn(); ImGui::Text("Auto Gain");
-            ImGui::TableNextColumn();
-            ToggleSwitch((label + "Auto_gain_toggle").c_str(), &AutoGain, GenColour);
+                ImGui::TableNextColumn(); ImGui::Text("Auto Gain");
+                ImGui::TableNextColumn();
+                ToggleSwitch((label + "Auto_gain_toggle").c_str(), &AutoGain, GenColour);
+            }
 
             // Optional hysteresis UI
             if (HysteresisDisplayOptionEnabled)
@@ -285,11 +326,17 @@ public:
 
             ImGui::EndTable();
         }
+    }
 
-        // --- Per-channel probe attenuation + display offset ---
-        // (Qt: attenuationComboBox_CH1/2 + offsetSpinBox_CH1/2)
-        ImGui::Dummy(ImVec2(0, 10.0f));
-        ImGui::SeparatorText("Channels");
+    /// Per-channel probe attenuation + display offset
+    /// (Qt: attenuationComboBox_CH1/2 + offsetSpinBox_CH1/2)
+    void renderProbeSection()
+    {
+        const float width = ImGui::GetContentRegionAvail().x * 0.95f;
+        float labWidth = 100.0f;
+        float labWidth2 = 70.0f;
+        float controlWidth = (width - labWidth - labWidth2) / 2;
+
         if (ImGui::BeginTable("ChannelSettingsTable", 4))
         {
             ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, labWidth);
@@ -317,7 +364,11 @@ public:
 
             ImGui::EndTable();
         }
+    }
 
+    /// CSV/clipboard export rows for OSC1 / OSC2 / Math
+    void renderExportSection()
+    {
         // Get OSC1 data
         std::vector<double> t1 = OSC1Data->GetTime();
         std::vector<double> v1 = OSC1Data->GetData();
@@ -350,12 +401,11 @@ public:
             "Time", "Voltage",
             ExportFileExtension,
             ExportPathComboWidth);
+    }
 
-
-        // --- Math Mode  ---
-        ImGui::SeparatorText("Math");
-        // ImGui::Text("Display");
-        // ImGui::SameLine();
+    /// Math-channel toggle + highlighted expression input
+    void renderMathSection()
+    {
 		ImGui::Text(" OFF");
 		ImGui::SameLine();
         ToggleSwitch((label + "Math1_toggle").c_str(), &MathControls1.On, ImU32(MathColour));
@@ -404,10 +454,10 @@ private:
     const std::string label;
 	
 
-    // Trigger type list
+    // Trigger type list (short labels so the combo fits a ~400px panel)
     const char* TriggerTypeComboList[4] = {
-        "OSC1 Rising Edge", "OSC1 Falling Edge",
-        "OSC2 Rising Edge", "OSC2 Falling Edge"
+        "OSC1 Rising", "OSC1 Falling",
+        "OSC2 Rising", "OSC2 Falling"
     };
 
     // Hardware gain list (labels match GainValues, index for index)

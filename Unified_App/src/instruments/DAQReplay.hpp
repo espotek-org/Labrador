@@ -52,23 +52,31 @@ public:
 	    : ControlWidget(label, size, accentColour)
 	{}
 
+	/// <summary>Open the load-file dialog (async native dialog; callback runs
+	/// on the main thread during a later frame via PumpFileDialogResults).
+	/// Public so the desktop File menu can trigger it directly.</summary>
+	void openFilePrompt()
+	{
+		if (dialog_open)
+			return;
+		dialog_open = true;
+		ShowOpenFileDialog("txt", [this](const char* path) {
+			dialog_open = false;
+			if (!path)
+				return; // user cancelled
+			loadFile(path);
+		});
+	}
+
 	/// <summary>Render UI: open button, trim controls, and the replay plot.</summary>
 	void renderControl() override
 	{
 		ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-		// --- Open file (async native dialog; callback runs on the main thread
-		// during a later frame via PumpFileDialogResults) ---
 		ImGui::BeginDisabled(dialog_open);
 		if (ImGui::Button("Open DAQ file...##daqreplay"))
 		{
-			dialog_open = true;
-			ShowOpenFileDialog("txt", [this](const char* path) {
-				dialog_open = false;
-				if (!path)
-					return; // user cancelled
-				loadFile(path);
-			});
+			openFilePrompt();
 		}
 		ImGui::EndDisabled();
 

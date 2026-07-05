@@ -66,6 +66,9 @@ public:
 
 	bool ToolsOn = false;
 	int CurrentTab = 0;
+	// Programmatic tab switch (desktop Tools menu): set to 0 (spectrum) or
+	// 1 (network); consumed on the next render.
+	int RequestedTab = -1;
 	ImColor OSC1Colour = colourConvert(constants::OSC1_ACCENT);
 	ImColor OSC2Colour = colourConvert(constants::OSC2_ACCENT);
 	const float* GenColour = constants::GEN_ACCENT;
@@ -103,7 +106,8 @@ public:
 
 		if (ImGui::BeginTabBar("MyTabBar"))
 		{
-			if (ImGui::BeginTabItem("Spectrum Analyser"))
+			if (ImGui::BeginTabItem("Spectrum Analyser", nullptr,
+			        RequestedTab == 0 ? ImGuiTabItemFlags_SetSelected : 0))
 			{
 				CurrentTab = 0;
 				// --- Top buttons ---
@@ -236,7 +240,8 @@ public:
 				}
 				ImGui::EndTabItem();
 			}
-			if (ImGui::BeginTabItem("Network Analyser"))
+			if (ImGui::BeginTabItem("Network Analyser", nullptr,
+			        RequestedTab == 1 ? ImGuiTabItemFlags_SetSelected : 0))
 			{
 				CurrentTab = 1;
 				if (ImGui::BeginTable("NetworkButtons", 2))
@@ -356,6 +361,7 @@ public:
 			}
 		}
 		ImGui::EndTabBar();
+		RequestedTab = -1;
 	}
 
 	bool controlLab() override

@@ -479,6 +479,7 @@ void App::Update()
             { "F", "Auto-fit both axes" },
             { "1 / 2", "Toggle cursor 1 / 2" },
             { "C / V", "Show / hide channel 1 / 2" },
+            { "B", "Show / hide the side panel (desktop)" },
             { "Esc", "Reconnect device (reset USB)" },
             { "F1", "This help" },
         };

@@ -60,6 +60,9 @@ class App : public AppBase
     // Device > Reflash firmware — reuses the firmware-mismatch modal flow.
     void requestFirmwareReflash() { m_firmware_mismatch = true; }
 
+    // File > Quit (RequestQuit is protected on AppBase).
+    void requestQuit() { RequestQuit(); }
+
     // Frame counter + control-resend cadence (for widget servicing throttling).
     int frames() const { return m_frames; }
     int labRefreshRate() const { return m_lab_refresh_rate; }

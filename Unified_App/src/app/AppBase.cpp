@@ -7,6 +7,7 @@
 #include "platform/file_dialog.h"
 #include "platform/android_ui.h"
 
+#include <cstdio>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -188,6 +189,26 @@ AppBase::~AppBase()
     SDL_Quit();
 }
 
+// Debug frame dump (LABRADOR_FRAME_DUMP=<path.ppm> with --smoke): writes the
+// final frame's framebuffer as binary PPM, for eyeballing layouts headlessly.
+static void dumpFramebufferPpm(const char* path, int w, int h)
+{
+    std::vector<unsigned char> rgba((size_t)w * h * 4);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    FILE* f = fopen(path, "wb");
+    if (!f)
+    {
+        fprintf(stderr, "frame dump: cannot open %s\n", path);
+        return;
+    }
+    fprintf(f, "P6\n%d %d\n255\n", w, h);
+    for (int y = h - 1; y >= 0; y--) // GL rows are bottom-up
+        for (int x = 0; x < w; x++)
+            fwrite(&rgba[((size_t)y * w + x) * 4], 1, 3, f);
+    fclose(f);
+}
+
 void AppBase::Run()
 {
     StartUp();
@@ -249,6 +270,9 @@ void AppBase::Run()
             m_clear_color.z * m_clear_color.w, m_clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (m_smoke_frames > 0 && m_done)
+            if (const char* dump = SDL_getenv("LABRADOR_FRAME_DUMP"))
+                dumpFramebufferPpm(dump, display_w, display_h);
         SDL_GL_SwapWindow(m_window);
     }
 
