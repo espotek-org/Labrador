@@ -68,10 +68,68 @@ unified_debug uds;
 
 const unsigned short firmver = FIRMWARE_VERSION_ID;
 
-#ifdef SINGLE_ENDPOINT_INTERFACE
+#ifdef AIO_INTERFACE
+	const unsigned char variant = 0x03;
+#elif defined(SINGLE_ENDPOINT_INTERFACE)
 	const unsigned char variant = 0x02;
 #else
 	const unsigned char variant = 0x01;
+#endif
+
+#ifdef AIO_INTERFACE
+volatile unsigned char active_transport = TRANSPORT_NONE;
+
+//Frame validation, shared by all transports.  aio_seq advances every SOF
+//while a transport streams, so frames the device had to skip appear as
+//sequence gaps at the host.  The checksum is XOR over the payload the host
+//receives that frame; if the ADC/DMA loop overwrites a buffer while it is
+//still on the wire, the host sees a mismatch and can discard the frame.
+//
+//Bulk carries the header in-stream ahead of each payload (magic 0xEB 0x57).
+//The iso interfaces carry it on a dedicated 8-byte iso meta endpoint (magic
+//0xEB 0x58) with lag-1 semantics: the meta packet sent in frame N describes
+//the payload of frame N-1, because N-1's payload is the last one whose bytes
+//were stable for a full frame when the checksum was computed.
+#define AIO_HDR_MAGIC0       0xEB
+#define AIO_HDR_MAGIC1_BULK  0x57
+#define AIO_HDR_MAGIC1_META  0x58
+COMPILER_WORD_ALIGNED
+static volatile unsigned char bulk_hdr[8];
+COMPILER_WORD_ALIGNED
+static volatile unsigned char iso_meta_buf[8];
+static volatile unsigned char *bulk_payload_ptr;
+static volatile unsigned short aio_seq = 0;
+static volatile unsigned char bulk_busy = 0;
+static volatile unsigned char meta_busy = 0;
+static volatile unsigned short meta_prev_seq;
+static volatile unsigned char meta_prev_csum;
+static volatile unsigned char meta_prev_mode;
+static volatile unsigned char meta_prev_valid = 0;
+
+static unsigned char aio_frame_csum(void)
+{
+	//XOR of the payload bytes the host receives this frame, in all
+	//transport/mode combinations:
+	// - iso6 in modes <5 sends two half-buffers (one per analog channel)
+	// - everything else sends one contiguous PACKET_SIZE half
+	unsigned short i;
+	unsigned char c = 0;
+	if((active_transport == TRANSPORT_ISO6) && (global_mode < 5)){
+		volatile unsigned char *a = &isoBuf[usb_state * HALFPACKET_SIZE];
+		volatile unsigned char *b = &isoBuf[PACKET_SIZE + usb_state * HALFPACKET_SIZE];
+		for(i = 0; i < HALFPACKET_SIZE; i++){
+			c ^= a[i];
+			c ^= b[i];
+		}
+	}
+	else{
+		volatile unsigned char *p = &isoBuf[usb_state * PACKET_SIZE];
+		for(i = 0; i < PACKET_SIZE; i++){
+			c ^= p[i];
+		}
+	}
+	return c;
+}
 #endif
 
 volatile unsigned char eeprom_buffer_write[EEPROM_PAGE_SIZE];
@@ -175,6 +233,78 @@ void main_resume_action(void)
 	return;
 }
 
+#ifdef AIO_INTERFACE
+static void main_aio_bulk_kick(void)
+{
+	//Queue the next bulk frame if the previous one has fully drained.
+	//usb_state has just been toggled for this frame, so isoBuf[usb_state *
+	//PACKET_SIZE] is the half the DMA loop is NOT writing this millisecond.
+	aio_seq++;
+	if (bulk_busy) {
+		return;
+	}
+	bulk_hdr[0] = AIO_HDR_MAGIC0;
+	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
+	bulk_hdr[2] = aio_seq & 0xff;
+	bulk_hdr[3] = (aio_seq >> 8) & 0xff;
+	bulk_hdr[4] = PACKET_SIZE & 0xff;
+	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
+	bulk_hdr[6] = aio_frame_csum();
+	bulk_hdr[7] = global_mode;
+	bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
+	bulk_busy = 1;
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, sizeof(bulk_hdr), bulk_hdr_callback)) {
+		bulk_busy = 0;
+	}
+}
+
+static void main_aio_meta_kick(udd_ep_id_t meta_ep)
+{
+	//Send the header describing the PREVIOUS frame (lag-1), then compute
+	//and latch this frame's header for delivery at the next SOF.
+	aio_seq++;
+	if (meta_prev_valid && !meta_busy) {
+		iso_meta_buf[0] = AIO_HDR_MAGIC0;
+		iso_meta_buf[1] = AIO_HDR_MAGIC1_META;
+		iso_meta_buf[2] = meta_prev_seq & 0xff;
+		iso_meta_buf[3] = (meta_prev_seq >> 8) & 0xff;
+		iso_meta_buf[4] = PACKET_SIZE & 0xff;
+		iso_meta_buf[5] = (PACKET_SIZE >> 8) & 0xff;
+		iso_meta_buf[6] = meta_prev_csum;
+		iso_meta_buf[7] = meta_prev_mode;
+		meta_busy = 1;
+		if (!udd_ep_run(meta_ep, false, (uint8_t *)iso_meta_buf, sizeof(iso_meta_buf), meta_callback)) {
+			meta_busy = 0;
+		}
+	}
+	meta_prev_seq = aio_seq;
+	meta_prev_csum = aio_frame_csum();
+	meta_prev_mode = global_mode;
+	meta_prev_valid = 1;
+}
+
+void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
+{
+	if (status != UDD_EP_TRANSFER_OK) {
+		bulk_busy = 0;
+		return;
+	}
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_payload_ptr, PACKET_SIZE, bulk_payload_callback)) {
+		bulk_busy = 0;
+	}
+}
+
+void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
+{
+	bulk_busy = 0;
+}
+
+void meta_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
+{
+	meta_busy = 0;
+}
+#endif
+
 void main_sof_action(void)
 {
 	#ifdef SINGLE_ENDPOINT_INTERFACE
@@ -243,7 +373,32 @@ void main_sof_action(void)
 		currentTrfcnt = DMA.CH0.TRFCNT;
 		debugOnNextEnd = 0;
 	}
-	#ifndef SINGLE_ENDPOINT_INTERFACE
+	#if defined(AIO_INTERFACE)
+		if(active_transport == TRANSPORT_ISO6){
+			if(global_mode < 5){
+				usb_state = (DMA.CH0.TRFCNT < 375) ? 1 : 0;
+			}
+			else{
+				usb_state = (DMA.CH0.TRFCNT < 750) ? 1 : 0;
+			}
+		}
+		else{
+			usb_state = !usb_state;
+		}
+		if(main_b_vendor_enable){
+			switch(active_transport){
+				case TRANSPORT_BULK:
+					main_aio_bulk_kick();
+					break;
+				case TRANSPORT_ISO6:
+					main_aio_meta_kick(UDI_AIO_EP_ISO6_META);
+					break;
+				case TRANSPORT_ISO1:
+					main_aio_meta_kick(UDI_AIO_EP_ISO1_META);
+					break;
+			}
+		}
+	#elif !defined(SINGLE_ENDPOINT_INTERFACE)
 		if(global_mode < 5){
 			usb_state = (DMA.CH0.TRFCNT < 375) ? 1 : 0;
 		}
@@ -253,12 +408,17 @@ void main_sof_action(void)
 	#else
 		usb_state = !usb_state;
 	#endif
-		
+
 	return;
 }
 
 bool main_vendor_enable(void)
 {
+#ifdef AIO_INTERFACE
+	//Classic entry point (vendor request 0xaa): re-arm whatever transport
+	//the host has selected via SET_INTERFACE.
+	return main_aio_rearm();
+#else
 	main_b_vendor_enable = true;
 	firstFrame = 1;
 	udd_ep_run(0x81, false, (uint8_t *)&isoBuf[0], 125, iso_callback);
@@ -270,12 +430,81 @@ bool main_vendor_enable(void)
 	udd_ep_run(0x86, false, (uint8_t *)&isoBuf[625], 125, iso_callback);
 	#endif
 	return true;
+#endif
 }
 
 void main_vendor_disable(void)
 {
 	main_b_vendor_enable = false;
 }
+
+#ifdef AIO_INTERFACE
+static void main_aio_arm_endpoints(void)
+{
+	aio_seq = 0;
+	meta_prev_valid = 0;
+	meta_busy = 0;
+	switch(active_transport){
+		case TRANSPORT_ISO6:
+			udd_ep_run(0x81, false, (uint8_t *)&isoBuf[0], 125, iso_callback);
+			udd_ep_run(0x82, false, (uint8_t *)&isoBuf[125], 125, iso_callback);
+			udd_ep_run(0x83, false, (uint8_t *)&isoBuf[250], 125, iso_callback);
+			udd_ep_run(0x84, false, (uint8_t *)&isoBuf[375], 125, iso_callback);
+			udd_ep_run(0x85, false, (uint8_t *)&isoBuf[500], 125, iso_callback);
+			udd_ep_run(0x86, false, (uint8_t *)&isoBuf[625], 125, iso_callback);
+			break;
+		case TRANSPORT_ISO1:
+			udd_ep_run(UDI_AIO_EP_ISO1_IN, false, (uint8_t *)&isoBuf[0], PACKET_SIZE, iso_callback);
+			break;
+		case TRANSPORT_BULK:
+			//Frames are queued from the SOF handler once the pipe is idle.
+			bulk_busy = 0;
+			break;
+	}
+}
+
+bool main_aio_iface_enable(uint8_t iface)
+{
+	switch(iface){
+		case UDI_AIO_IFACE_ISO6: active_transport = TRANSPORT_ISO6; break;
+		case UDI_AIO_IFACE_ISO1: active_transport = TRANSPORT_ISO1; break;
+		case UDI_AIO_IFACE_BULK: active_transport = TRANSPORT_BULK; break;
+		default: return false;
+	}
+	//The DMA regime (repeat vs. single-shot, block length, priority) depends
+	//on the transport, so rebuild the current acquisition mode under it.
+	tiny_dma_apply_transport();
+	main_b_vendor_enable = true;
+	firstFrame = 1;
+	main_aio_arm_endpoints();
+	return true;
+}
+
+void main_aio_iface_disable(uint8_t iface)
+{
+	//Ignore stale disables from an interface that is not the active one
+	//(the host may bounce alternate settings while switching transports).
+	switch(iface){
+		case UDI_AIO_IFACE_ISO6: if(active_transport != TRANSPORT_ISO6) return; break;
+		case UDI_AIO_IFACE_ISO1: if(active_transport != TRANSPORT_ISO1) return; break;
+		case UDI_AIO_IFACE_BULK: if(active_transport != TRANSPORT_BULK) return; break;
+		default: return;
+	}
+	active_transport = TRANSPORT_NONE;
+	main_b_vendor_enable = false;
+	bulk_busy = 0;
+}
+
+bool main_aio_rearm(void)
+{
+	if(active_transport == TRANSPORT_NONE){
+		return false;
+	}
+	firstFrame = 1;
+	main_aio_arm_endpoints();
+	return true;
+}
+#endif
 
 bool main_setup_out_received(void)
 {
@@ -288,7 +517,22 @@ bool main_setup_in_received(void)
 }
 
 void iso_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep){
-	#ifndef SINGLE_ENDPOINT_INTERFACE
+	#if defined(AIO_INTERFACE)
+		if(active_transport == TRANSPORT_ISO6){
+			unsigned short offset = (ep - 0x81) * 125;
+			if (global_mode < 5){
+				if(ep > 0x83) offset += 375; //Shift from range [375, 750]  to [750, 1125]  Don't do this in modes 6 and 7 because they use 750 byte long sub-buffers.
+				udd_ep_run(ep, false, (uint8_t *)&isoBuf[usb_state * HALFPACKET_SIZE + offset], 125, iso_callback);
+			}
+			else{
+				udd_ep_run(ep, false, (uint8_t *)&isoBuf[usb_state * PACKET_SIZE + offset], 125, iso_callback);
+			}
+		}
+		else if(active_transport == TRANSPORT_ISO1){
+			udd_ep_run(UDI_AIO_EP_ISO1_IN, false, (uint8_t *)&isoBuf[usb_state * PACKET_SIZE], PACKET_SIZE, iso_callback);
+		}
+		return;
+	#elif !defined(SINGLE_ENDPOINT_INTERFACE)
 		unsigned short offset = (ep - 0x81) * 125;
 		if (global_mode < 5){
 			if(ep > 0x83) offset += 375; //Shift from range [375, 750]  to [750, 1125]  Don't do this in modes 6 and 7 because they use 750 byte long sub-buffers.

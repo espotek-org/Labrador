@@ -10,6 +10,18 @@
 #define GLOBALS_H_
 
 //#define SINGLE_ENDPOINT_INTERFACE
+//#define AIO_INTERFACE
+
+#ifdef AIO_INTERFACE
+	#ifdef SINGLE_ENDPOINT_INTERFACE
+		#error "AIO_INTERFACE and SINGLE_ENDPOINT_INTERFACE are mutually exclusive"
+	#endif
+	//Transport selected by the host via SET_INTERFACE (alt setting 1 on one of the three interfaces)
+	#define TRANSPORT_NONE 0
+	#define TRANSPORT_ISO6 1
+	#define TRANSPORT_ISO1 2
+	#define TRANSPORT_BULK 3
+#endif
 
 //#define VERO
 #define OVERCLOCK 48
@@ -63,6 +75,10 @@ extern volatile unsigned short dma_ch1_ran;
 
 extern volatile unsigned char futureMode;
 extern volatile unsigned char modeChanged;
+
+#ifdef AIO_INTERFACE
+extern volatile unsigned char active_transport;
+#endif
 
 COMPILER_WORD_ALIGNED
 extern const unsigned short firmver;

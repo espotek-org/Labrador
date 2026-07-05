@@ -89,6 +89,13 @@ extern "C" {
  */
 //! Global structure which contains standard UDI interface for UDC
 extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
+
+#ifdef AIO_INTERFACE
+//! One UDI per AIO interface (iso6 / iso1 / bulk)
+extern UDC_DESC_STORAGE udi_api_t udi_api_aio_iso6;
+extern UDC_DESC_STORAGE udi_api_t udi_api_aio_iso1;
+extern UDC_DESC_STORAGE udi_api_t udi_api_aio_bulk;
+#endif
 //@}
 
 /**
@@ -157,6 +164,88 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 # define UDI_VENDOR_EPS_BULK_DESC_FS
 # define UDI_VENDOR_EPS_BULK_DESC_HS
 #endif
+
+#ifdef AIO_INTERFACE
+
+//! AIO descriptor set: three interfaces, each with a zero-endpoint default
+//! alternate setting (required for iso by USB 2.0 §5.6.3) and the streaming
+//! endpoints on alternate setting 1.
+typedef struct {
+	usb_iface_desc_t iso6_alt0;
+	usb_iface_desc_t iso6_alt1;
+	usb_ep_desc_t ep_iso_in;
+	usb_ep_desc_t ep_iso_in2;
+	usb_ep_desc_t ep_iso_in3;
+	usb_ep_desc_t ep_iso_in4;
+	usb_ep_desc_t ep_iso_in5;
+	usb_ep_desc_t ep_iso_in6;
+	usb_ep_desc_t ep_iso6_meta;
+	usb_iface_desc_t iso1_alt0;
+	usb_iface_desc_t iso1_alt1;
+	usb_ep_desc_t ep_iso1_in;
+	usb_ep_desc_t ep_iso1_meta;
+	usb_iface_desc_t bulk_alt0;
+	usb_iface_desc_t bulk_alt1;
+	usb_ep_desc_t ep_bulk_in;
+} udi_aio_desc_t;
+
+#define UDI_AIO_IFACE_FIELDS(field, num, alt, neps) \
+	.field.bLength            = sizeof(usb_iface_desc_t),\
+	.field.bDescriptorType    = USB_DT_INTERFACE,\
+	.field.bInterfaceNumber   = num,\
+	.field.bAlternateSetting  = alt,\
+	.field.bNumEndpoints      = neps,\
+	.field.bInterfaceClass    = VENDOR_CLASS,\
+	.field.bInterfaceSubClass = VENDOR_SUBCLASS,\
+	.field.bInterfaceProtocol = VENDOR_PROTOCOL,\
+	.field.iInterface         = UDI_VENDOR_STRING_ID,
+
+#define UDI_AIO_ISO_EP_FIELDS(field, addr) \
+	.field.bLength            = sizeof(usb_ep_desc_t),\
+	.field.bDescriptorType    = USB_DT_ENDPOINT,\
+	.field.bEndpointAddress   = addr,\
+	.field.bmAttributes       = 0x05,\
+	.field.wMaxPacketSize     = LE16(UDI_VENDOR_EPS_SIZE_ISO_FS),\
+	.field.bInterval          = 1,
+
+#define UDI_AIO_META_EP_FIELDS(field, addr) \
+	.field.bLength            = sizeof(usb_ep_desc_t),\
+	.field.bDescriptorType    = USB_DT_ENDPOINT,\
+	.field.bEndpointAddress   = addr,\
+	.field.bmAttributes       = 0x05,\
+	.field.wMaxPacketSize     = LE16(UDI_AIO_EPS_SIZE_META_FS),\
+	.field.bInterval          = 1,
+
+#define UDI_AIO_DESC_FS {\
+	UDI_AIO_IFACE_FIELDS(iso6_alt0, UDI_AIO_IFACE_ISO6, 0, 0) \
+	UDI_AIO_IFACE_FIELDS(iso6_alt1, UDI_AIO_IFACE_ISO6, 1, 7) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in,  UDI_VENDOR_EP_ISO_IN) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in2, UDI_VENDOR_EP_ISO_IN + 1) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in3, UDI_VENDOR_EP_ISO_IN + 2) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in4, UDI_VENDOR_EP_ISO_IN + 3) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in5, UDI_VENDOR_EP_ISO_IN + 4) \
+	UDI_AIO_ISO_EP_FIELDS(ep_iso_in6, UDI_VENDOR_EP_ISO_IN + 5) \
+	UDI_AIO_META_EP_FIELDS(ep_iso6_meta, UDI_AIO_EP_ISO6_META) \
+	UDI_AIO_IFACE_FIELDS(iso1_alt0, UDI_AIO_IFACE_ISO1, 0, 0) \
+	UDI_AIO_IFACE_FIELDS(iso1_alt1, UDI_AIO_IFACE_ISO1, 1, 2) \
+	.ep_iso1_in.bLength          = sizeof(usb_ep_desc_t),\
+	.ep_iso1_in.bDescriptorType  = USB_DT_ENDPOINT,\
+	.ep_iso1_in.bEndpointAddress = UDI_AIO_EP_ISO1_IN,\
+	.ep_iso1_in.bmAttributes     = 0x05,\
+	.ep_iso1_in.wMaxPacketSize   = LE16(UDI_AIO_EPS_SIZE_ISO1_FS),\
+	.ep_iso1_in.bInterval        = 1,\
+	UDI_AIO_META_EP_FIELDS(ep_iso1_meta, UDI_AIO_EP_ISO1_META) \
+	UDI_AIO_IFACE_FIELDS(bulk_alt0, UDI_AIO_IFACE_BULK, 0, 0) \
+	UDI_AIO_IFACE_FIELDS(bulk_alt1, UDI_AIO_IFACE_BULK, 1, 1) \
+	.ep_bulk_in.bLength          = sizeof(usb_ep_desc_t),\
+	.ep_bulk_in.bDescriptorType  = USB_DT_ENDPOINT,\
+	.ep_bulk_in.bEndpointAddress = UDI_AIO_EP_BULK_IN,\
+	.ep_bulk_in.bmAttributes     = USB_EP_TYPE_BULK,\
+	.ep_bulk_in.wMaxPacketSize   = LE16(UDI_AIO_EPS_SIZE_BULK_FS),\
+	.ep_bulk_in.bInterval        = 0,\
+   }
+
+#endif // AIO_INTERFACE
 
 #ifndef SINGLE_ENDPOINT_INTERFACE
 

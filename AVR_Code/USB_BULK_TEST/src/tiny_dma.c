@@ -12,7 +12,17 @@
 #include "globals.h"
 #include "util/delay.h"
 
-#ifndef SINGLE_ENDPOINT_INTERFACE
+#if defined(AIO_INTERFACE)
+	//The DMA regime follows the transport the host selected at runtime:
+	//iso6 streams from continuously-repeating full-packet blocks (classic
+	//variant 01); iso1 and bulk use single-shot half-packet blocks re-armed
+	//from the DMA interrupt (classic variant 02).
+	#define DMA_STANDARD_INTERRUPT ((active_transport == TRANSPORT_ISO6) ? 0x00 : 0x03)
+	#define DMA_STANDARD_CTRLA ((active_transport == TRANSPORT_ISO6) ? \
+		(DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm) : \
+		(DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm))
+	#define DMA_STANDARD_TRANSFER_LENGTH ((active_transport == TRANSPORT_ISO6) ? PACKET_SIZE : HALFPACKET_SIZE)
+#elif !defined(SINGLE_ENDPOINT_INTERFACE)
 	#define DMA_STANDARD_INTERRUPT (0x00)
 	#define DMA_STANDARD_CTRLA (DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm)
 	#define DMA_STANDARD_TRANSFER_LENGTH (PACKET_SIZE)
@@ -25,14 +35,28 @@
 void tiny_dma_setup(void){
 	//Turn on DMA
 	PR.PRGEN &=0b111111110; //Turn on DMA clk
-	#ifndef SINGLE_ENDPOINT_INTERFACE
+	#if defined(AIO_INTERFACE)
+		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_RR0123_gc;
+	#elif !defined(SINGLE_ENDPOINT_INTERFACE)
 		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_CH0123_gc;
-	#else 
+	#else
 		DMA.CTRL = DMA_ENABLE_bm | DMA_PRIMODE_RR0123_gc;
 		#warning "Round Robin on DMA"
 	#endif
-	
+
 }
+
+#ifdef AIO_INTERFACE
+void tiny_dma_apply_transport(void){
+	//Match the DMA priority scheme to the transport and rebuild the current
+	//acquisition mode so block lengths and interrupts fit the new regime.
+	DMA.CTRL = DMA_ENABLE_bm | ((active_transport == TRANSPORT_ISO6) ?
+			DMA_PRIMODE_CH0123_gc : DMA_PRIMODE_RR0123_gc);
+	if(global_mode < 8){
+		tiny_dma_delayed_set(global_mode);
+	}
+}
+#endif
 void tiny_dma_flush(void){
 	DMA.CH0.CTRLA = 0x00;
 	DMA.CH0.CTRLA = DMA_CH_RESET_bm;
@@ -711,14 +735,19 @@ ISR(DMA_CH0_vect){
 	//dma_ch0_ran++;
 	//uds.dma_ch0_cntL = dma_ch0_ran & 0xff;
 	//uds.dma_ch0_cntH = (dma_ch0_ran >> 8) & 0xff;
-	
-	#ifdef SINGLE_ENDPOINT_INTERFACE
-	DMA.CH0.CTRLA = 0x00;	
+
+	#if defined(AIO_INTERFACE) || defined(SINGLE_ENDPOINT_INTERFACE)
+	#ifdef AIO_INTERFACE
+	//Only the single-shot regimes (iso1/bulk) re-arm from this interrupt;
+	//iso6 runs the channel in repeat mode with the interrupt disabled.
+	if(active_transport == TRANSPORT_ISO6) return;
+	#endif
+	DMA.CH0.CTRLA = 0x00;
 	DMA.CH0.CTRLA = DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm; //Do not repeat!
 	DMA.CH0.TRFCNT = HALFPACKET_SIZE;
-			
+
 	short ptr = usb_state ? 0 : PACKET_SIZE;
-			
+
 	DMA.CH0.DESTADDR0 = (( (uint16_t) &isoBuf[ptr]) >> 0) & 0xFF;  //Dest address is isoBuf
 	DMA.CH0.DESTADDR1 = (( (uint16_t) &isoBuf[ptr]) >> 8) & 0xFF;
 
@@ -732,13 +761,16 @@ ISR(DMA_CH1_vect){
 	//uds.dma_ch1_cntL = dma_ch1_ran & 0xff;
 	//uds.dma_ch1_cntH = (dma_ch1_ran >> 8) & 0xff;
 
-#ifdef SINGLE_ENDPOINT_INTERFACE
+	#if defined(AIO_INTERFACE) || defined(SINGLE_ENDPOINT_INTERFACE)
+	#ifdef AIO_INTERFACE
+	if(active_transport == TRANSPORT_ISO6) return;
+	#endif
 	DMA.CH1.CTRLA = 0x00;
 	DMA.CH1.CTRLA = DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm; //Do not repeat!
 	DMA.CH1.TRFCNT = HALFPACKET_SIZE;
-	
+
 	short ptr = usb_state ? HALFPACKET_SIZE : PACKET_SIZE + HALFPACKET_SIZE;
-	
+
 	DMA.CH1.DESTADDR0 = (( (uint16_t) &isoBuf[ptr]) >> 0) & 0xFF;  //Dest address is isoBuf
 	DMA.CH1.DESTADDR1 = (( (uint16_t) &isoBuf[ptr]) >> 8) & 0xFF;
 
