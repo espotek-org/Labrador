@@ -1,11 +1,10 @@
 # Unified_App CI: build the app on every desktop platform (plus a GLES2 build
-# standing in for the Raspberry Pi, and the Android APK), and run the smoke
-# test where a GL context is available headlessly (Linux under Xvfb).
+# standing in for the Raspberry Pi, and the Android APK), run the smoke
+# test where a GL context is available headlessly (Linux under Xvfb), and
+# upload runnable artifacts for every platform.
 #
-# Deliberately NO artifact uploads for now: the repo is public and workflow
-# artifacts on public repos are downloadable by anyone — maintainers build the
-# branch locally to test. Uncomment the upload steps when we're ready to
-# distribute builds.
+# Unix artifacts are tar.gz (inside the artifact zip) so the executable bit
+# survives; unpack with `tar xzf` and run ./labrador next to its assets/ dir.
 name: unified-app
 
 on:
@@ -33,8 +32,12 @@ jobs:
       - name: Build
         run: cmake --build --preset macos
       # macOS runners have no window server session for SDL, so build-only.
-      # - uses: actions/upload-artifact@v4   # disabled: no public uploads yet
-      #   with: { name: labrador-macos, path: Unified_App/build/macos/labrador }
+      - name: Package
+        run: tar -czf labrador-macos-arm64.tar.gz -C build/macos labrador assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labrador-macos-arm64
+          path: Unified_App/labrador-macos-arm64.tar.gz
 
   linux:
     runs-on: ubuntu-latest
@@ -61,6 +64,12 @@ jobs:
             env LIBGL_ALWAYS_SOFTWARE=1 LABRADOR_LAYOUT=desktop ./labrador --smoke
           xvfb-run -a -s "-screen 0 1600x1000x24" \
             env LIBGL_ALWAYS_SOFTWARE=1 LABRADOR_LAYOUT=compact ./labrador --smoke
+      - name: Package
+        run: tar -czf labrador-linux-x64.tar.gz -C build/linux labrador assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labrador-linux-x64
+          path: Unified_App/labrador-linux-x64.tar.gz
 
   # GLES2 build approximates the Raspberry Pi target (Pi 3 floor) on arm64.
   linux-arm-gles2:
@@ -81,6 +90,12 @@ jobs:
         run: cmake --preset pi
       - name: Build
         run: cmake --build --preset pi
+      - name: Package
+        run: tar -czf labrador-pi-arm64-gles2.tar.gz -C build/pi labrador assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labrador-pi-arm64-gles2
+          path: Unified_App/labrador-pi-arm64-gles2.tar.gz
 
   windows:
     runs-on: windows-latest
@@ -106,6 +121,18 @@ jobs:
         run: cmake --preset windows
       - name: Build
         run: cmake --build --preset windows
+      # Bundle the MinGW runtime DLLs (libusb, libstdc++, winpthread, ...) so
+      # the zip runs on a machine without MSYS2.
+      - name: Package
+        run: |
+          mkdir -p dist/labrador
+          cp build/windows/labrador.exe dist/labrador/
+          cp -r build/windows/assets dist/labrador/
+          ldd build/windows/labrador.exe | awk '/mingw64/ {print $3}' | xargs -r cp -t dist/labrador/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labrador-windows-x64
+          path: Unified_App/dist/labrador
 
   android:
     runs-on: ubuntu-latest
@@ -121,3 +148,7 @@ jobs:
       - name: Build APK
         working-directory: Unified_App/android
         run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labrador-android-apk
+          path: Unified_App/android/app/build/outputs/apk/debug/*.apk

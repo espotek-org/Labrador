@@ -38,6 +38,8 @@ Desktop_Interface/release
 *.a
 *.so
 *.so.*
+# ...but the Android build links against these prebuilt libusb binaries
+!Unified_App/deps/libusb-android/android/*/libusb1.0.so
 *.deb
 *.tar.gz
 .qmake.stash

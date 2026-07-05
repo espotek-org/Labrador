@@ -1,7 +1,7 @@
 #include "usbcallhandler.h"
 //#include <stdio.h>
 
-#include <dlfcn.h>
+#include <math.h>
 #include "logging_internal.h"
 #include "uartstyledecoder.h"
 #include <mutex>

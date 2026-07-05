@@ -1,5 +1,6 @@
 #include "o1buffer.h"
 #include "logging_internal.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
