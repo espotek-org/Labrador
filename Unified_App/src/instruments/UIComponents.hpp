@@ -3,12 +3,32 @@
 #define _UI_H_
 
 #include "imgui.h"
+#include "imgui_internal.h" // LastItemData status flags (QA oracles)
 #include "util.h"
 #include <iostream>
 #include "AcquireState.hpp"
 #include "NetworkAnalyser.hpp"
 #include <chrono>
 #include "platform/file_dialog.h"
+
+/// <summary>
+/// Report a custom widget's on/off state so tooling (the UI test engine)
+/// sees it like a checkbox. Must re-fire the item-info hook: widgets capture
+/// their status flags internally, before the caller can mutate LastItemData.
+/// </summary>
+void inline QaMarkItemChecked(bool checked)
+{
+#ifdef IMGUI_ENABLE_TEST_ENGINE // the Checked status flag only exists there
+	if (!checked)
+		return;
+	ImGuiContext& g = *ImGui::GetCurrentContext();
+	g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_Checked;
+	IMGUI_TEST_ENGINE_ITEM_INFO(
+	    g.LastItemData.ID, "", g.LastItemData.StatusFlags);
+#else
+	(void)checked;
+#endif
+}
 
 /// <summary>
 /// Adapted from https://github.com/ocornut/imgui/issues/1537#issuecomment-355562097
@@ -32,6 +52,7 @@ bool inline ToggleSwitch(const char* id, bool* state, ImU32 accentColour)
 		    *state = !*state;
 		    switched = true;
 		}
+		QaMarkItemChecked(*state);
 
 		// CRT themes: OFF is a dark outlined well (unlit phosphor), the knob
 		// glows in the text colour; classic themes keep the gray/white look.

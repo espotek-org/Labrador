@@ -52,6 +52,20 @@ elseif(LABRADOR_GLES2)
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES2)
 endif()
 
+# --- Dear ImGui Test Engine (QA builds: cmake -DLABRADOR_QA=ON) ---
+# In-process UI test framework + the app's --qa headless runner (src/qa/).
+# Off by default. deps/imgui_test_engine/LICENSE.txt: free for open source.
+option(LABRADOR_QA "Build with Dear ImGui Test Engine and the --qa test runner" OFF)
+if(LABRADOR_QA)
+    file(GLOB IMGUI_TE_SOURCES CONFIGURE_DEPENDS deps/imgui_test_engine/*.cpp)
+    target_sources(imgui PRIVATE ${IMGUI_TE_SOURCES})
+    target_include_directories(imgui PUBLIC deps/imgui_test_engine)
+    target_compile_definitions(imgui PUBLIC
+        IMGUI_ENABLE_TEST_ENGINE                         # imgui.cpp item hooks
+        IMGUI_TEST_ENGINE_ENABLE_COROUTINE_STDTHREAD_IMPL=1
+        LABRADOR_QA)
+endif()
+
 # --- librador (canonical merged copy) + libdfuprog (firmware flashing) ---
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libdfuprog
                  ${CMAKE_CURRENT_BINARY_DIR}/libdfuprog EXCLUDE_FROM_ALL)

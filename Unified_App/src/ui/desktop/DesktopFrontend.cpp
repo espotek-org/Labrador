@@ -42,6 +42,7 @@ static void ToolToggle(const char* label, bool* v, const ImVec2& size = ImVec2(0
             ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
     if (ImGui::Button(label, size))
         *v = !*v;
+    QaMarkItemChecked(*v);
     if (on)
         ImGui::PopStyleColor();
 }
@@ -664,15 +665,16 @@ void DesktopFrontend::renderToolbar(App& app, float height)
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, running ? L(0.70f) : L(0.30f));
         ImGui::PushStyleColor(ImGuiCol_Text, running ? th.bg : th.dim);
         run_clicked = ImGui::Button(
-            running ? "RUNNING##runstop" : "STOPPED##runstop", ImVec2(run_w, btn_h));
+            running ? "RUNNING###runstop" : "STOPPED###runstop", ImVec2(run_w, btn_h));
         ImGui::PopStyleColor(4);
     }
     else
     {
-        run_clicked = SolidButton(running ? "Running##runstop" : "Stopped##runstop",
+        run_clicked = SolidButton(running ? "Running###runstop" : "Stopped###runstop",
             running ? ImVec4(0.07f, 0.53f, 0.0f, 1.0f) : ImVec4(0.56f, 0.0f, 0.0f, 1.0f),
             ImVec2(run_w, btn_h));
     }
+    QaMarkItemChecked(running);
     if (run_clicked)
         OSCWidget.Paused = !OSCWidget.Paused;
     if (ImGui::IsItemHovered())
@@ -772,6 +774,7 @@ void DesktopFrontend::renderRail(float height)
     ImGui::PopStyleVar();
 
     const float btn_h = ImGui::GetFontSize() * 2.4f;
+    ImGui::PushID("rail"); // qualifies the page names for the QA item paths
     for (int p = 0; p < PanelCount; p++)
     {
         const bool selected = m_sidebar_visible && (m_panel == p);
@@ -808,6 +811,7 @@ void DesktopFrontend::renderRail(float height)
                 ImVec2(mx.x - r - 4.0f, mn.y + r + 4.0f), r, IM_COL32(230, 40, 40, 255));
         }
     }
+    ImGui::PopID();
 
     ImGui::EndChild();
 }

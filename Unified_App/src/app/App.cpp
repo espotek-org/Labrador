@@ -130,6 +130,8 @@ void App::pushSettings()
 
 App::LayoutMode App::resolvedLayout() const
 {
+    if (qaRun())
+        return LayoutMode::Desktop; // the QA suite drives the desktop layout
     if (m_layout_mode != LayoutMode::Auto)
         return m_layout_mode;
 #ifdef __ANDROID__
@@ -436,18 +438,30 @@ void App::Update()
         ImGui::EndPopup();
     }
 
-    bool uninit_now = CheckIfInUninitialisedMode();
+    // The uninitialised-wedge check looks for a perfectly flat capture, but
+    // for the first moments after connecting the sample buffer legitimately
+    // holds its uniform pre-fill — don't arm the check until the stream has
+    // had time to fill with real samples.
+    if (connected && m_connected_since < 0.0)
+        m_connected_since = ImGui::GetTime();
+    else if (!connected)
+        m_connected_since = -1.0;
+    const bool uninit_check_armed
+        = connected && (ImGui::GetTime() - m_connected_since) > 2.0;
+
+    bool uninit_now = uninit_check_armed && CheckIfInUninitialisedMode();
+    const double dt = ImGui::GetIO().DeltaTime;
     if (uninit_now)
     {
-        uninit_enter_count++;
-        uninit_exit_count = 0;
+        uninit_enter_s += dt;
+        uninit_exit_s = 0.0;
     }
     else
     {
-        uninit_exit_count++;
-        uninit_enter_count = 0;
+        uninit_exit_s += dt;
+        uninit_enter_s = 0.0;
     }
-    if (!uninitialised_mode && uninit_enter_count >= UNINIT_ENTER_THRESHOLD)
+    if (!uninitialised_mode && uninit_enter_s >= UNINIT_ENTER_THRESHOLD_S)
     {
         // NOTE: an automatic USB-port-reset auto-heal was tried here and
         // crashed (resetting with live iso transfers is fragile on macOS);
@@ -455,7 +469,7 @@ void App::Update()
         uninitialised_mode = true;
         ImGui::OpenPopup("Warning!##UninitialisedModePopup");
     }
-    if (uninitialised_mode && uninit_exit_count >= UNINIT_EXIT_THRESHOLD)
+    if (uninitialised_mode && uninit_exit_s >= UNINIT_EXIT_THRESHOLD_S)
     {
         uninitialised_mode = false;
     }

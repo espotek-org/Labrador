@@ -7,6 +7,9 @@
 #include "platform/paths.h"
 #include "platform/file_dialog.h"
 #include "platform/android_ui.h"
+#ifdef LABRADOR_QA
+#include "qa/QaSuite.h"
+#endif
 
 #include <cstdio>
 #include <cstring>
@@ -237,7 +240,11 @@ void AppBase::Run()
 {
     StartUp();
 
-    if (m_smoke_frames > 0)
+#ifdef LABRADOR_QA
+    QaSetup(m_qa_run ? m_qa_filter.c_str() : nullptr);
+#endif
+
+    if (m_smoke_frames > 0 || m_qa_run)
         SDL_GL_SetSwapInterval(0);  // don't block on vsync for an invisible CI window
 
     int frames_rendered = 0;
@@ -299,6 +306,9 @@ void AppBase::Run()
 
         PumpFileDialogResults();
         Update();
+#ifdef LABRADOR_QA
+        QaDrawUI();
+#endif
 
         ImGui::Render();
         int display_w, display_h;
@@ -312,7 +322,20 @@ void AppBase::Run()
             if (const char* dump = SDL_getenv("LABRADOR_FRAME_DUMP"))
                 dumpFramebufferPpm(dump, display_w, display_h);
         SDL_GL_SwapWindow(m_window);
+
+#ifdef LABRADOR_QA
+        QaPostSwap();
+        if (m_qa_run && QaFinished())
+        {
+            m_exit_code = QaReportAndExitCode();
+            m_done = true;
+        }
+#endif
     }
+
+#ifdef LABRADOR_QA
+    QaShutdown();
+#endif
 
     ShutDown();
 }

@@ -23,6 +23,13 @@ class AppBase
     // Render this many frames then exit (0 = run until quit). For smoke tests/CI.
     void SetSmokeFrames(int frames) { m_smoke_frames = frames; }
 
+    // QA builds (-DLABRADOR_QA=ON): run the test suite headlessly and exit.
+    // filter is a Test Engine filter string ("all", "gui", "hw", ...).
+    void SetQaRun(const char* filter) { m_qa_run = true; m_qa_filter = filter; }
+    bool qaRun() const { return m_qa_run; }
+    // Process exit code (non-zero when a headless QA run failed).
+    int exitCode() const { return m_exit_code; }
+
     // Usable content rect (excludes Android system bars) and UI scale — for
     // frontends that lay out the whole client area.
     float contentX() const { return m_content_x; }
@@ -63,8 +70,13 @@ class AppBase
     float m_content_w = 0.0f;
     float m_content_h = 0.0f;
 
+  protected:
+    int m_exit_code = 0;
+
   private:
     void loadFonts();
     bool m_done = false;
     int m_smoke_frames = 0;
+    bool m_qa_run = false;
+    std::string m_qa_filter;
 };

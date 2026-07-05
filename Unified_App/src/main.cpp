@@ -19,8 +19,19 @@ int main(int argc, char** argv)
 #endif
     App app;
     for (int i = 1; i < argc; i++)
-        if (std::string(argv[i]) == "--smoke")
+    {
+        const std::string arg(argv[i]);
+        if (arg == "--smoke")
             app.SetSmokeFrames(60);
+#ifdef LABRADOR_QA
+        // Headless UI test run (QA builds): --qa runs everything, or
+        // --qa=<filter> for a Test Engine filter like "gui" or "hw".
+        else if (arg == "--qa")
+            app.SetQaRun("all");
+        else if (arg.rfind("--qa=", 0) == 0)
+            app.SetQaRun(arg.c_str() + 5);
+#endif
+    }
     app.Run();
-    return 0;
+    return app.exitCode();
 }

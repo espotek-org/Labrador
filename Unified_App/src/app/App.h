@@ -104,10 +104,13 @@ class App : public AppBase
     DebugConsole m_debug_console;
     bool safety_mode = false;
     bool uninitialised_mode = false;
-    int uninit_enter_count = 0;
-    int uninit_exit_count = 0;
-    const int UNINIT_ENTER_THRESHOLD = 10; // frames to enter
-    const int UNINIT_EXIT_THRESHOLD = 60;  // frames to exit
+    double m_connected_since = -1.0; // ImGui time of the connected transition
+    // Time-based debounce (was frame-based, which tripped on millisecond
+    // transients at high frame rates — 240 Hz monitors, the --qa runner).
+    double uninit_enter_s = 0.0;
+    double uninit_exit_s = 0.0;
+    const double UNINIT_ENTER_THRESHOLD_S = 0.17; // sustained time to enter
+    const double UNINIT_EXIT_THRESHOLD_S = 1.0;   // sustained time to exit
 
     // Desktop device polling (Android connects via USB attach intents)
     double m_last_poll_time = 0.0;
