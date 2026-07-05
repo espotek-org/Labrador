@@ -146,6 +146,17 @@ public:
     // PSU calibration offset in volts (Qt genericusbdriver psu_offset /
     // QSettings CalibratePsu).  Applied on the next set_psu_voltage call.
     int set_psu_calibration_offset(double offset);
+    // On-device calibration storage (EEPROM page via vendor requests
+    // 0xac/0xad; firmware >= 0x000A).  Layout: magic CA 1B, version 1,
+    // five LE floats {vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2,
+    // psu_offset}, xor checksum.  NOTE: a DFU chip erase wipes EEPROM, so
+    // the host should re-save after flashing firmware.
+    // load returns 0 on success, 1 if the device has no valid calibration
+    // stored, <0 on transfer errors.
+    int save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset);
+    int load_calibration_from_device(double *vref_ch1, double *gain_scale_ch1,
+        double *vref_ch2, double *gain_scale_ch2, double *psu_offset);
     double get_scope_gain();
     int set_digital_state(uint8_t digState);
     int reset_device(bool goToBootloader);

@@ -234,6 +234,14 @@ void InstrumentFrontend::saveSettings(Settings& s)
 
 void InstrumentFrontend::UpdateHardwareState(App& app)
 {
+    // Device-stored calibration (EEPROM) wins over local settings: it
+    // travels with the hardware.  Fetch it once per connection.
+    static bool was_connected = false;
+    bool now_connected = app.isConnected() && !app.isFlashing();
+    if (now_connected && !was_connected)
+        CalibrationWidget.loadFromDevice();
+    was_connected = now_connected;
+
     if (app.isFlashing())
         return; // the flash/recovery worker owns the USB state right now
     if (app.isConnected())

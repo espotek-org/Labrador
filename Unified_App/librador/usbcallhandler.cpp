@@ -1038,6 +1038,52 @@ int usbCallHandler::set_psu_calibration_offset(double offset){
     return 0;
 }
 
+#define CAL_PAGE_SIZE 32
+#define CAL_MAGIC0 0xCA
+#define CAL_MAGIC1 0x1B
+#define CAL_VERSION 1
+
+int usbCallHandler::save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset_v){
+    unsigned char page[CAL_PAGE_SIZE];
+    float vals[5] = {(float)vref_ch1, (float)gain_scale_ch1,
+                     (float)vref_ch2, (float)gain_scale_ch2, (float)psu_offset_v};
+    memset(page, 0xFF, sizeof page);
+    page[0] = CAL_MAGIC0;
+    page[1] = CAL_MAGIC1;
+    page[2] = CAL_VERSION;
+    page[3] = 0;
+    memcpy(&page[4], vals, sizeof vals);
+    unsigned char cs = 0;
+    for(int i = 0; i < 24; i++) cs ^= page[i];
+    page[24] = cs;
+    send_control_transfer_with_error_checks(0x40, 0xac, 0, 0, CAL_PAGE_SIZE, page);
+    return 0;
+}
+
+int usbCallHandler::load_calibration_from_device(double *vref_ch1, double *gain_scale_ch1,
+        double *vref_ch2, double *gain_scale_ch2, double *psu_offset_v){
+    unsigned char page[CAL_PAGE_SIZE];
+    memset(page, 0, sizeof page);
+    send_control_transfer_with_error_checks(0xc0, 0xad, 0, 0, CAL_PAGE_SIZE, page);
+    if(page[0] != CAL_MAGIC0 || page[1] != CAL_MAGIC1 || page[2] != CAL_VERSION){
+        return 1;   // nothing (valid) stored - e.g. fresh EEPROM after a DFU erase
+    }
+    unsigned char cs = 0;
+    for(int i = 0; i < 24; i++) cs ^= page[i];
+    if(cs != page[24]){
+        return 1;
+    }
+    float vals[5];
+    memcpy(vals, &page[4], sizeof vals);
+    if(vref_ch1) *vref_ch1 = vals[0];
+    if(gain_scale_ch1) *gain_scale_ch1 = vals[1];
+    if(vref_ch2) *vref_ch2 = vals[2];
+    if(gain_scale_ch2) *gain_scale_ch2 = vals[3];
+    if(psu_offset_v) *psu_offset_v = vals[4];
+    return 0;
+}
+
 double usbCallHandler::get_scope_gain(){
     return current_scope_gain;
 }

@@ -71,6 +71,20 @@ int librador_reset_frame_stats(){
     return 0;
 }
 
+int librador_save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->save_calibration_to_device(
+        vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2, psu_offset);
+}
+
+int librador_load_calibration_from_device(double* vref_ch1, double* gain_scale_ch1,
+        double* vref_ch2, double* gain_scale_ch2, double* psu_offset){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->load_calibration_from_device(
+        vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2, psu_offset);
+}
+
 int librador_exit(){
     CHECK_API_INITIALISED
     if(!internal_librador_object){

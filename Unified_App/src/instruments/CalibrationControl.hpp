@@ -99,6 +99,33 @@ public:
 		needs_apply |= (librador_set_psu_calibration_offset(psu_offset) != 0);
 	}
 
+	/// <summary>Persist the current calibration into the board's EEPROM
+	/// (librador vendor requests, firmware >= 0x000A).  Called after each
+	/// completed wizard stage; safe no-op when nothing is valid yet.
+	/// Non-fatal on failure - the local Settings copy remains the
+	/// authoritative mirror (a DFU erase wipes the device copy).</summary>
+	void saveToDevice()
+	{
+		if (!scope_valid && !psu_valid)
+			return;
+		librador_save_calibration_to_device(vref_ch[0], gain_scale_ch[0],
+			vref_ch[1], gain_scale_ch[1], psu_offset);
+	}
+
+	/// <summary>Fetch calibration from the board's EEPROM and apply it
+	/// (device copy wins over local settings - it travels with the
+	/// hardware).  Returns true if a valid stored calibration was loaded.
+	/// Call once per connection.</summary>
+	bool loadFromDevice()
+	{
+		double v1, g1, v2, g2, po;
+		if (librador_load_calibration_from_device(&v1, &g1, &v2, &g2, &po) != 0)
+			return false;
+		applyStored(v1, g1, v2, g2);
+		applyStoredPsuOffset(po);
+		return true;
+	}
+
 	/// <summary>True while the wizard is running (see the class comment for
 	/// what the App must suppress during that time).</summary>
 	bool wizardActive() const { return stage != Stage::Idle && stage != Stage::Failed; }
@@ -539,6 +566,7 @@ private:
 
 		scope_valid = true;
 		stage = Stage::ScopeDone;
+		saveToDevice();
 	}
 
 	/// <summary>Qt on_actionCalibrate_2_triggered: workspace to CH1-scope
@@ -655,6 +683,7 @@ private:
 		}
 		psu_valid = true;
 		stage = Stage::PsuDone;
+		saveToDevice();
 	}
 
 	// ------------------------------------------------------------------

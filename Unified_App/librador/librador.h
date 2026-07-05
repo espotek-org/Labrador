@@ -46,6 +46,15 @@ LIBRADORSHARED_EXPORT int librador_get_active_transport();
 LIBRADORSHARED_EXPORT int librador_get_frame_stats(uint64_t* frames_ok,
     uint64_t* frames_bad_checksum, uint64_t* frames_dropped, uint64_t* frames_unvalidated);
 LIBRADORSHARED_EXPORT int librador_reset_frame_stats();
+// On-device calibration storage (EEPROM; firmware >= 0x000A).  Values use
+// the same semantics as librador_set_channel_calibration /
+// librador_set_psu_calibration_offset.  A DFU chip erase wipes EEPROM, so
+// re-save after a firmware flash.  Load returns 0 on success, 1 if the
+// device has no valid stored calibration, <0 on transfer errors.
+LIBRADORSHARED_EXPORT int librador_save_calibration_to_device(double vref_ch1,
+    double gain_scale_ch1, double vref_ch2, double gain_scale_ch2, double psu_offset);
+LIBRADORSHARED_EXPORT int librador_load_calibration_from_device(double* vref_ch1,
+    double* gain_scale_ch1, double* vref_ch2, double* gain_scale_ch2, double* psu_offset);
 LIBRADORSHARED_EXPORT int librador_exit();
 LIBRADORSHARED_EXPORT int librador_reset_usb();
 //Control
