@@ -10,60 +10,388 @@
 #include <SDL3/SDL_iostream.h>
 #include "librador_platform.h"
 
-void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
-    //Thread mutex??
-    //printf("Copy the data...\n");
-    usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
-    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
+// ---------------------------------------------------------------------------
+// Frame ingestion.  All transports normalise to 750-byte frames dispatched
+// into the o1buffers by device mode, with validity accounting fed by the
+// per-frame headers (see the AIO_* notes in usbcallhandler.h).
+// ---------------------------------------------------------------------------
+
+void usbCallHandler::dispatch_frame(unsigned char *frame750){
+    buffer_read_write_mutex.lock();
+    switch(deviceMode){
+    case 0:
+        internal_o1_buffer_375_CHA->addVector((char*) frame750, 375);
+        break;
+    case 1:
+        internal_o1_buffer_375_CHA->addVector((char*) frame750, 375);
+        internal_o1_buffer_375_CHB->addVector((unsigned char*) &frame750[375], 375);
+        break;
+    case 2:
+        internal_o1_buffer_375_CHA->addVector((char*) frame750, 375);
+        internal_o1_buffer_375_CHB->addVector((char*) &frame750[375], 375);
+        break;
+    case 3:
+        internal_o1_buffer_375_CHA->addVector((unsigned char*) frame750, 375);
+        break;
+    case 4:
+        internal_o1_buffer_375_CHA->addVector((unsigned char*) frame750, 375);
+        internal_o1_buffer_375_CHB->addVector((unsigned char*) &frame750[375], 375);
+        break;
+    case 6:
+        internal_o1_buffer_750->addVector((char*) frame750, 750);
+        break;
+    case 7:
+        internal_o1_buffer_375_CHA->addVector((short*) frame750, 375);
+        break;
+    }
+    buffer_read_write_mutex.unlock();
+}
+
+static unsigned char xor_csum_750(const unsigned char *p){
+    unsigned char c = 0;
+    for(int i = 0; i < ISO_PACKET_SIZE; i++) c ^= p[i];
+    return c;
+}
+
+void usbCallHandler::dispatch_lost_frames(uint64_t count){
+    // Sample-and-hold filler for frames that never arrived intact.  Bounded
+    // so a long stall (unplug, debugger pause) cannot flood the buffers.
+    if(count > 250){
+        count = 250;
+    }
+    for(uint64_t i = 0; i < count; i++){
+        dispatch_frame(last_good_frame);
+    }
+}
+
+void usbCallHandler::note_frame_csum(unsigned char csum, bool valid){
+    frame_csum_ring[data_frame_counter % CSUM_RING_SIZE] = csum;
+    frame_csum_valid[data_frame_counter % CSUM_RING_SIZE] = valid;
+    data_frame_counter++;
+}
+
+void usbCallHandler::note_seq(uint16_t seq){
+    if(seq_started){
+        uint16_t expect = (uint16_t)(last_seq + 1);
+        if(seq != expect){
+            frames_dropped += (uint16_t)(seq - expect);
+        }
+    }
+    seq_started = true;
+    last_seq = seq;
+}
+
+void usbCallHandler::reset_frame_state(){
+    seq_started = false;
+    data_frame_counter = 0;
+    meta_frame_counter = 0;
+    bulk_stream.clear();
+    for(int i = 0; i < CSUM_RING_SIZE; i++) frame_csum_valid[i] = false;
+    for(int k = 0; k < MAX_DATA_ENDPOINTS; k++) iso6_queues[k].clear();
+}
+
+void usbCallHandler::reset_frame_stats(){
+    frames_ok = 0;
+    frames_bad_checksum = 0;
+    frames_dropped = 0;
+    frames_unvalidated = 0;
+}
+
+void usbCallHandler::get_frame_stats(uint64_t *ok, uint64_t *bad_checksum, uint64_t *dropped, uint64_t *unvalidated){
+    if(ok) *ok = frames_ok.load();
+    if(bad_checksum) *bad_checksum = frames_bad_checksum.load();
+    if(dropped) *dropped = frames_dropped.load();
+    if(unvalidated) *unvalidated = frames_unvalidated.load();
+}
+
+// iso1 data packet: one packet per frame, 750 bytes when healthy.
+void usbCallHandler::handle_data_iso_packet(unsigned char *data, int length){
+    if(length == ISO_PACKET_SIZE){
+        note_frame_csum(xor_csum_750(data), true);
+        memcpy(last_good_frame, data, ISO_PACKET_SIZE);
+        dispatch_frame(data);
+    } else {
+        // Device skipped this frame (or partial) - hole in the stream.
+        note_frame_csum(0, false);
+        if(length != 0) frames_bad_checksum++;
+        dispatch_lost_frames(1);
+    }
+}
+
+// iso6: queue per-endpoint packets, assemble frames in lockstep once all
+// six endpoints have delivered their slice of the frame.
+void usbCallHandler::handle_iso6_packet(int ep_index, unsigned char *data, int length){
+    iso6_queues[ep_index].emplace_back(data, data + length);
+    // Bound the queues in case one endpoint stalls permanently.
+    if(iso6_queues[ep_index].size() > 4 * ISO_PACKETS_PER_CTX){
+        iso6_queues[ep_index].pop_front();
+    }
+}
+
+void usbCallHandler::drain_iso6_queues(){
+    while(true){
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+            if(iso6_queues[k].empty()) return;
+        }
+        unsigned char frame[ISO_PACKET_SIZE];
+        bool complete = true;
+        int off = 0;
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+            std::vector<unsigned char> &pkt = iso6_queues[k].front();
+            if(pkt.size() != ISO_PACKET_SIZE / AIO_EP_ISO6_COUNT){
+                complete = false;
+            } else if(complete){
+                memcpy(&frame[off], pkt.data(), pkt.size());
+                off += (int)pkt.size();
+            }
+            iso6_queues[k].pop_front();
+        }
+        if(complete){
+            note_frame_csum(xor_csum_750(frame), true);
+            memcpy(last_good_frame, frame, ISO_PACKET_SIZE);
+            dispatch_frame(frame);
+        } else {
+            note_frame_csum(0, false);
+            dispatch_lost_frames(1);
+        }
+    }
+}
+
+// Meta packet (iso transports): EB 58 seqL seqH csum_half0 csum_half1
+// usb_state mode, describing the previous frame (lag-1).  Because the meta
+// and data URB streams can start a frame or two apart, each meta is matched
+// against a small window of recent frame checksums.
+void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
+    meta_frame_counter++;
+    if(length == 0) return;   // device had no meta armed that frame
+    if(length != AIO_META_PACKET_SIZE || data[0] != AIO_HDR_MAGIC0 || data[1] != AIO_HDR_MAGIC1_META){
+        frames_bad_checksum++;  // corrupt meta counts against validity
+        return;
+    }
+    note_seq((uint16_t)(data[2] | (data[3] << 8)));
+    unsigned char c0 = data[4];
+    unsigned char c1 = data[5];
+    // lag-1 nominal: meta in frame N describes data frame N-1
+    bool matched = false;
+    bool any_candidate = false;
+    for(long lag = -3; lag <= 1; lag++){
+        long idx = (long)meta_frame_counter - 1 + lag;
+        if(idx < 0 || idx >= (long)data_frame_counter) continue;
+        if((long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
+        int slot = idx % CSUM_RING_SIZE;
+        if(!frame_csum_valid[slot]) continue;
+        any_candidate = true;
+        if(frame_csum_ring[slot] == c0 || frame_csum_ring[slot] == c1){
+            matched = true;
+            break;
+        }
+    }
+    if(matched) frames_ok++;
+    else if(any_candidate) frames_bad_checksum++;
+    else frames_unvalidated++;
+}
+
+// Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum
+// mode + zero pad] followed by a 768-byte payload block (750 data + 18
+// pad); fixed 832-byte stride.
+void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
+    // Diagnostic: raw stream capture (LABRADOR_DUMP_BULK=<path>, first 1 MB)
+    static FILE *dump_fp = nullptr;
+    static long dump_left = -1;
+    if(dump_left < 0){
+        const char *env = getenv("LABRADOR_DUMP_BULK");
+        if(env){ dump_fp = fopen(env, "wb"); dump_left = 1024L*1024L; }
+        else dump_left = 0;
+    }
+    if(dump_fp && dump_left > 0){
+        long n = (length < dump_left) ? length : dump_left;
+        fwrite(data, 1, n, dump_fp);
+        dump_left -= n;
+        if(dump_left <= 0){ fclose(dump_fp); dump_fp = nullptr; }
+    }
+    bulk_stream.insert(bulk_stream.end(), data, data + length);
+    size_t pos = 0;
+    while(true){
+        while(bulk_stream.size() - pos >= 2 &&
+              !(bulk_stream[pos] == AIO_HDR_MAGIC0 && bulk_stream[pos+1] == AIO_HDR_MAGIC1_BULK)){
+            pos++;
+        }
+        if(bulk_stream.size() - pos < 8) break;
+        uint16_t len = bulk_stream[pos+4] | (bulk_stream[pos+5] << 8);
+        if(len != ISO_PACKET_SIZE){ pos++; continue; }
+        if(bulk_stream.size() - pos < (size_t)(AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER)) break;
+        uint16_t seq = bulk_stream[pos+2] | (bulk_stream[pos+3] << 8);
+        unsigned char csum = bulk_stream[pos+6];
+        unsigned char *payload = bulk_stream.data() + pos + AIO_BULK_HDR_XFER;
+        if(seq_started){
+            uint16_t expect = (uint16_t)(last_seq + 1);
+            if(seq != expect){
+                // Device skipped frames: keep the sample clock honest.
+                dispatch_lost_frames((uint16_t)(seq - expect));
+            }
+        }
+        note_seq(seq);
+        if(xor_csum_750(payload) == csum){
+            frames_ok++;
+            memcpy(last_good_frame, payload, ISO_PACKET_SIZE);
+            dispatch_frame(payload);
+        } else {
+            // Stomped mid-flight by the ADC/DMA loop - substitute a hold of
+            // the last good frame rather than plot torn data or silently
+            // compress the timebase.
+            frames_bad_checksum++;
+            dispatch_lost_frames(1);
+        }
+        pos += AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER;
+    }
+    bulk_stream.erase(bulk_stream.begin(), bulk_stream.begin() + pos);
+}
+
+// ---------------------------------------------------------------------------
+// Ingest thread: takes raw bytes from the libusb event thread and does all
+// parsing / validation / o1buffer dispatch, so the event thread never
+// blocks on buffer_read_write_mutex (blocking there stalls URB
+// resubmission, the wire NAK-starves, and the device blows its 1 ms drain
+// deadline against the 2 ms ADC overwrite horizon).
+// ---------------------------------------------------------------------------
+
+void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned char *data, int length){
+    // TEMP A/B diagnostic: dispatch inline on the event thread (the
+    // pre-ingest-thread behavior) to measure what the ingest thread buys.
+    static int inline_dispatch = -1;
+    if(inline_dispatch < 0){
+        const char *env = getenv("LABRADOR_INLINE_DISPATCH");
+        inline_dispatch = (env && env[0] == '1') ? 1 : 0;
+    }
+    if(inline_dispatch){
+        switch(kind){
+        case 0: handle_bulk_bytes((unsigned char *)data, length); return;
+        case 1: handle_data_iso_packet((unsigned char *)data, length); return;
+        case 2: handle_iso6_packet(ep_index, (unsigned char *)data, length);
+                drain_iso6_queues(); return;
+        case 3: handle_meta_packet((unsigned char *)data, length); return;
+        }
+        return;
+    }
+    IngestItem item;
+    item.kind = kind;
+    item.ep_index = ep_index;
+    item.bytes.assign(data, data + length);
     {
-        usb_driver->buffer_read_write_mutex.lock(); 
-        for(int i=0;i<transfer->num_iso_packets;i++){
-            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
-            //TODO: a switch statement here to handle all the modes.
-            switch(usb_driver->deviceMode){
+        std::lock_guard<std::mutex> lock(ingest_mutex);
+        // Backstop against an unbounded queue if the ingest thread dies.
+        if(ingest_queue.size() > 4096){
+            ingest_queue.pop_front();
+        }
+        ingest_queue.push_back(std::move(item));
+    }
+    ingest_cv.notify_one();
+}
+
+void usbCallHandler::ingest_thread_function(){
+    LIBRADOR_LOG(LOG_DEBUG, "ingest thread spawned\n");
+    while(true){
+        std::deque<IngestItem> batch;
+        {
+            std::unique_lock<std::mutex> lock(ingest_mutex);
+            ingest_cv.wait(lock, [this]{ return ingest_stop || !ingest_queue.empty(); });
+            if(ingest_stop && ingest_queue.empty()){
+                break;
+            }
+            batch.swap(ingest_queue);
+        }
+        for(IngestItem &item : batch){
+            switch(item.kind){
             case 0:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((char*) packetPointer, 375);
+                handle_bulk_bytes(item.bytes.data(), (int)item.bytes.size());
                 break;
             case 1:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((char*) packetPointer, 375);
-                usb_driver->internal_o1_buffer_375_CHB->addVector((unsigned char*) &packetPointer[375], 375);
+                handle_data_iso_packet(item.bytes.data(), (int)item.bytes.size());
                 break;
             case 2:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((char*) packetPointer, 375);
-                usb_driver->internal_o1_buffer_375_CHB->addVector((char*) &packetPointer[375], 375);
+                handle_iso6_packet(item.ep_index, item.bytes.data(), (int)item.bytes.size());
                 break;
             case 3:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((unsigned char*) packetPointer, 375);
-                break;
-            case 4:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((unsigned char*) packetPointer, 375);
-                usb_driver->internal_o1_buffer_375_CHB->addVector((unsigned char*) &packetPointer[375], 375);
-                break;
-            case 6:
-                usb_driver->internal_o1_buffer_750->addVector((char*) packetPointer, 750);
-                break;
-            case 7:
-                usb_driver->internal_o1_buffer_375_CHA->addVector((short*) packetPointer, 375);
+                handle_meta_packet(item.bytes.data(), (int)item.bytes.size());
                 break;
             }
         }
-        usb_driver->buffer_read_write_mutex.unlock();
+        if(active_transport == LABRADOR_TRANSPORT_ISO6){
+            drain_iso6_queues();
+        }
     }
+    LIBRADOR_LOG(LOG_DEBUG, "ingest thread finished\n");
+}
 
-    //printf("Re-arm the endpoint...\n");
-    if(!usb_driver->is_iso_thread_shutdown_requested()){
+// ---------------------------------------------------------------------------
+// libusb async callbacks (event-loop thread)
+// ---------------------------------------------------------------------------
+
+void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
+    if(!is_iso_thread_shutdown_requested()){
         int error = libusb_submit_transfer(transfer);
         if(error){
             LIBRADOR_LOG(LOG_WARNING, "Error re-arming the endpoint!\n");
-            usb_driver->begin_iso_thread_shutdown();
-            usb_driver->decrement_remaining_transfers();
-            LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", usb_driver->iso_thread_shutdown_remaining_transfers);
+            begin_iso_thread_shutdown();
+            decrement_remaining_transfers();
+            LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers);
         }
     } else {
-        usb_driver->decrement_remaining_transfers();
-        LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", usb_driver->iso_thread_shutdown_remaining_transfers);
+        decrement_remaining_transfers();
+        LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers);
     }
-    return;
+}
+
+void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
+    usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
+    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
+    {
+        // Which data endpoint is this?
+        int ep_index = 0;
+        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+            ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
+        }
+        for(int i=0;i<transfer->num_iso_packets;i++){
+            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+            int actual = transfer->iso_packet_desc[i].actual_length;
+            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+                actual = 0;
+            }
+            if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+                usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
+            } else {
+                usb_driver->queue_ingest(1, 0, packetPointer, actual);
+            }
+        }
+    }
+    usb_driver->rearm_or_retire(transfer);
+}
+
+void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer){
+    usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
+    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
+    {
+        for(int i=0;i<transfer->num_iso_packets;i++){
+            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+            int actual = transfer->iso_packet_desc[i].actual_length;
+            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+                actual = 0;
+            }
+            usb_driver->queue_ingest(3, 0, packetPointer, actual);
+        }
+    }
+    usb_driver->rearm_or_retire(transfer);
+}
+
+void LIBUSB_CALL bulkCallback(struct libusb_transfer * transfer){
+    usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
+    if(transfer->status==LIBUSB_TRANSFER_COMPLETED || transfer->status==LIBUSB_TRANSFER_TIMED_OUT)
+    {
+        if(transfer->actual_length > 0){
+            usb_driver->queue_ingest(0, 0, transfer->buffer, transfer->actual_length);
+        }
+    }
+    usb_driver->rearm_or_retire(transfer);
 }
 
 const char* usbCallHandler::daq_unit_labels[] = {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
@@ -100,15 +428,37 @@ bool usbCallHandler::safe_to_exit_thread(){
 
 
 // it makes sense to call this iso_polling_function because we only use libusb's asynchronous API for isochronous transfers
+std::atomic<uint32_t> g_ctrl_req_counts[256];
+
 void usbCallHandler::iso_polling_function(libusb_context *ctx){
     LIBRADOR_LOG(LOG_DEBUG, "iso_polling_function thread spawned\n");
     struct timeval tv;
     tv.tv_sec = 1;
     tv.tv_usec = 0;//ISO_PACKETS_PER_CTX*4000;
+    auto last_stats = std::chrono::steady_clock::now();
     while(!safe_to_exit_thread()){
         //printf("iso_polling_function begin loop\n");
         if(libusb_event_handling_ok(ctx)){
             libusb_handle_events_timeout(ctx, &tv);
+        }
+        auto now = std::chrono::steady_clock::now();
+        if(now - last_stats > std::chrono::seconds(10)){
+            last_stats = now;
+            LIBRADOR_LOG(LOG_DEBUG, "frame stats: ok=%llu bad_csum=%llu dropped=%llu unvalidated=%llu (transport %d)\n",
+                (unsigned long long)frames_ok.load(), (unsigned long long)frames_bad_checksum.load(),
+                (unsigned long long)frames_dropped.load(), (unsigned long long)frames_unvalidated.load(),
+                active_transport);
+            {
+                char req_summary[256];
+                int off = 0;
+                for(int rc = 0; rc < 256; rc++){
+                    uint32_t n = g_ctrl_req_counts[rc].load();
+                    if(n && off < 200){
+                        off += snprintf(&req_summary[off], sizeof(req_summary)-off, "%02x:%u ", rc, n);
+                    }
+                }
+                LIBRADOR_LOG(LOG_DEBUG, "ctrl sends: %s\n", req_summary);
+            }
         }
     }
     iso_thread_active = false;
@@ -119,11 +469,6 @@ usbCallHandler::usbCallHandler(unsigned short VID_in, unsigned short PID_in)
 {
     VID = VID_in;
     PID = PID_in;
-
-    for(int k=0; k<NUM_ISO_ENDPOINTS; k++){
-        pipeID[k] = 0x81+k;
-        LIBRADOR_LOG(LOG_DEBUG, "pipeID %d = %d\n", k, pipeID[k]);
-    }
 
     internal_o1_buffer_375_CHA = new o1buffer(375e3);
     internal_o1_buffer_375_CHB = new o1buffer(375e3);
@@ -148,12 +493,7 @@ usbCallHandler::~usbCallHandler(){
         LIBRADOR_LOG(LOG_DEBUG, "USB polling thread stopped.\n");
         delete iso_polling_thread;
 
-        for (int i=0; i<NUM_FUTURE_CTX; i++){
-            for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
-                libusb_free_transfer(isoCtx[k][i]);
-            }
-        }
-        LIBRADOR_LOG(LOG_DEBUG, "Transfers freed.\n");
+        free_transfers();
     }
 
     if(daq_thread && daq_thread->joinable()){
@@ -161,7 +501,12 @@ usbCallHandler::~usbCallHandler(){
     }
 
     if(handle){
-        libusb_release_interface(handle, 0);
+        if(claimed_iface > 0){
+            libusb_release_interface(handle, claimed_iface);
+        }
+        if(iface0_claimed){
+            libusb_release_interface(handle, 0);
+        }
         LIBRADOR_LOG(LOG_DEBUG, "Interface released\n");
         libusb_close(handle);
         LIBRADOR_LOG(LOG_DEBUG, "Device Closed\n");
@@ -236,6 +581,15 @@ int usbCallHandler::setup_usb_control(int file_descriptor){
 }
 
 int usbCallHandler::claim_and_prepare(){
+#ifdef __APPLE__
+    // Do NOT claim any interface before the firmware check.  Device-level
+    // control transfers work unclaimed on Darwin, and claiming interface 0
+    // on a board still running pre-AIO firmware (iso endpoints in alt
+    // setting 0) kernel-panics macOS Tahoe.  The streaming interface is
+    // claimed in start_streaming() once the firmware is known to be AIO.
+    iface0_claimed = false;
+    return 0;
+#else
     if(libusb_kernel_driver_active(handle, 0)) {
         LIBRADOR_LOG(LOG_DEBUG, "KERNEL DRIVER ACTIVE");
     } else {
@@ -245,7 +599,9 @@ int usbCallHandler::claim_and_prepare(){
         libusb_detach_kernel_driver(handle, 0);
     }
 
-    //Claim the interface
+    //Claim interface 0.  On AIO firmware its default alt setting has no
+    //endpoints, so this is inert; it exists to keep control transfers
+    //working on platforms that expect a claimed interface (WinUSB).
     int error = libusb_claim_interface(handle, 0);
     if(error){
         LIBRADOR_LOG(LOG_WARNING, "libusb_claim_interface FAILED\n");
@@ -253,6 +609,79 @@ int usbCallHandler::claim_and_prepare(){
         handle = nullptr;
         return -3;
     } else LIBRADOR_LOG(LOG_DEBUG, "Interface claimed!\n");
+    iface0_claimed = true;
+    return 0;
+#endif
+}
+
+int usbCallHandler::set_transport(int transport){
+    if(transport < LABRADOR_TRANSPORT_AUTO || transport > LABRADOR_TRANSPORT_BULK){
+        return -1;
+    }
+    requested_transport = transport;
+    return 0;
+}
+
+int usbCallHandler::get_active_transport(){
+    return active_transport;
+}
+
+int usbCallHandler::resolve_transport(){
+    int t = requested_transport;
+    // Developer/test override; same values as LABRADOR_TRANSPORT_*.
+    const char *env = getenv("LABRADOR_TRANSPORT");
+    if(env && env[0] >= '1' && env[0] <= '3' && env[1] == '\0'){
+        t = env[0] - '0';
+        LIBRADOR_LOG(LOG_WARNING, "transport overridden to %d via LABRADOR_TRANSPORT\n", t);
+    }
+    if(t == LABRADOR_TRANSPORT_AUTO){
+#if defined(__APPLE__)
+        t = LABRADOR_TRANSPORT_BULK;
+#elif defined(_WIN64)
+        t = LABRADOR_TRANSPORT_ISO6;
+#elif defined(_WIN32)
+        t = LABRADOR_TRANSPORT_ISO1;
+#else
+        t = LABRADOR_TRANSPORT_ISO1;   // linux (all), android, pi
+#endif
+    }
+#if defined(__APPLE__) && !defined(LIBRADOR_MACOS_ALLOW_ISO)
+    // Opening a full-speed isochronous pipe kernel-panics macOS Tahoe
+    // (IOUSBHostFamily's getEndpointMult dereferences the NULL SuperSpeed
+    // companion descriptor for full-speed iso endpoints).  Bulk only.
+    if(t != LABRADOR_TRANSPORT_BULK){
+        LIBRADOR_LOG(LOG_WARNING, "iso transports are disabled on macOS (Tahoe kernel panic); using bulk\n");
+        t = LABRADOR_TRANSPORT_BULK;
+    }
+#endif
+    active_transport = t;
+    return t;
+}
+
+int usbCallHandler::configure_transport_endpoints(){
+    switch(active_transport){
+    case LABRADOR_TRANSPORT_ISO6:
+        num_data_endpoints = AIO_EP_ISO6_COUNT;
+        data_packet_size = AIO_ISO6_PACKET_SIZE;
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++) pipeID[k] = AIO_EP_ISO6_FIRST + k;
+        meta_pipeID = AIO_EP_ISO6_META;
+        claimed_iface = AIO_IFACE_ISO6;
+        break;
+    case LABRADOR_TRANSPORT_ISO1:
+        num_data_endpoints = 1;
+        data_packet_size = ISO_PACKET_SIZE;
+        pipeID[0] = AIO_EP_ISO1;
+        meta_pipeID = AIO_EP_ISO1_META;
+        claimed_iface = AIO_IFACE_ISO1;
+        break;
+    case LABRADOR_TRANSPORT_BULK:
+        num_data_endpoints = 0;
+        meta_pipeID = 0;
+        claimed_iface = AIO_IFACE_BULK;
+        break;
+    default:
+        return -1;
+    }
     return 0;
 }
 
@@ -262,40 +691,105 @@ int usbCallHandler::setup_usb_iso(){
     if(iso_polling_thread) {
         LIBRADOR_LOG(LOG_DEBUG, "iso polling thead already exists");
         return -1;
-    } else {
-        LIBRADOR_LOG(LOG_DEBUG, "creating iso polling thread");
-
-        alloc_iso_transfers();
-
-        int error = submit_iso_transfers();
-        if(error) {
-            return error;
-            LIBRADOR_LOG(LOG_WARNING, "setup_usb_iso failed\n");
-        }
-        iso_polling_thread = new std::thread(&usbCallHandler::iso_polling_function, this, ctx);
-        iso_thread_active = true;
     }
+    int error = start_streaming();
+    if(error) {
+        LIBRADOR_LOG(LOG_WARNING, "setup_usb_iso failed (%d)\n", error);
+        return error;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "streaming started on transport %d", active_transport);
+    ingest_stop = false;
+    ingest_thread = new std::thread(&usbCallHandler::ingest_thread_function, this);
+    iso_polling_thread = new std::thread(&usbCallHandler::iso_polling_function, this, ctx);
+    iso_thread_active = true;
     return 0;
 }
 
-void usbCallHandler::alloc_iso_transfers(){
-    for(int n=0;n<NUM_FUTURE_CTX;n++){
-        for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
-            isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
-            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 150); // assume the NUM_FUTURE_CTX=4 iso transfers are FIFO, in which case timeout should be > 1 ms (amount of data per packet) * NUM_PACKETS_PER_CTX * NUM_FUTURE_CTX 
-            libusb_set_iso_packet_lengths(isoCtx[k][n], ISO_PACKET_SIZE);
+int usbCallHandler::total_inflight_transfers(){
+    if(active_transport == LABRADOR_TRANSPORT_BULK) return NUM_BULK_CTX;
+    return (num_data_endpoints + 1) * NUM_FUTURE_CTX;
+}
+
+int usbCallHandler::start_streaming(){
+    resolve_transport();
+    configure_transport_endpoints();
+    reset_frame_state();
+    iso_thread_shutdown_requested = false;
+    iso_thread_shutdown_remaining_transfers = total_inflight_transfers();
+
+    // Claim the transport's interface and select its streaming alt setting.
+    // (Interface 0/alt 0 has no endpoints, so the initial claim during
+    // connection is always safe - including on macOS Tahoe.)
+    if(claimed_iface != 0 || !iface0_claimed){
+        if(libusb_kernel_driver_active(handle, claimed_iface) == 1){
+            libusb_detach_kernel_driver(handle, claimed_iface);
         }
+        int error = libusb_claim_interface(handle, claimed_iface);
+        if(error){
+            LIBRADOR_LOG(LOG_WARNING, "claim_interface(%d) FAILED: %s\n", claimed_iface, libusb_error_name(error));
+            return -3;
+        }
+        if(claimed_iface == 0){
+            iface0_claimed = true;
+        }
+    }
+    int error = libusb_set_interface_alt_setting(handle, claimed_iface, 1);
+    if(error){
+        LIBRADOR_LOG(LOG_WARNING, "set_interface_alt_setting(%d,1) FAILED: %s\n", claimed_iface, libusb_error_name(error));
+        return -4;
+    }
+
+    alloc_iso_transfers();
+    return submit_iso_transfers();
+}
+
+void usbCallHandler::alloc_iso_transfers(){
+    alloc_transport = active_transport;
+    if(active_transport == LABRADOR_TRANSPORT_BULK){
+        for(int n=0;n<NUM_BULK_CTX;n++){
+            bulkCtx[n] = libusb_alloc_transfer(0);
+            // Timeout 0: with a deep queue the tail URBs legitimately wait
+            // longer than any finite timeout before data reaches them
+            // (libusb counts from submission).  Teardown cancels explicitly.
+            libusb_fill_bulk_transfer(bulkCtx[n], handle, AIO_EP_BULK, bulkBuffer[n], BULK_CTX_SIZE, bulkCallback, this, 0);
+        }
+        return;
+    }
+    for(int n=0;n<NUM_FUTURE_CTX;n++){
+        for (int k=0;k<num_data_endpoints;k++){
+            isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
+            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], data_packet_size*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 150); // assume the NUM_FUTURE_CTX=4 iso transfers are FIFO, in which case timeout should be > 1 ms (amount of data per packet) * NUM_PACKETS_PER_CTX * NUM_FUTURE_CTX
+            libusb_set_iso_packet_lengths(isoCtx[k][n], data_packet_size);
+        }
+        metaCtx[n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
+        libusb_fill_iso_transfer(metaCtx[n], handle, meta_pipeID, metaBuffer[n], AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, metaIsoCallback, this, 150);
+        libusb_set_iso_packet_lengths(metaCtx[n], AIO_META_PACKET_SIZE);
     }
 }
 
 int usbCallHandler::submit_iso_transfers(){
+    if(active_transport == LABRADOR_TRANSPORT_BULK){
+        for(int n=0;n<NUM_BULK_CTX;n++){
+            int error = libusb_submit_transfer(bulkCtx[n]);
+            if(error){
+                LIBRADOR_LOG(LOG_ERROR, "bulk submit #%d FAILED with error %d %s\n", n, error, libusb_error_name(error));
+                return error;
+            }
+        }
+        return 0;
+    }
     for(int n=0;n<NUM_FUTURE_CTX;n++){
-        for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
+        for (int k=0;k<num_data_endpoints;k++){
             int error = libusb_submit_transfer(isoCtx[k][n]);
             if(error){
                 LIBRADOR_LOG(LOG_ERROR, "libusb_submit_transfer #%d:%d FAILED with error %d %s\n", n, k, error, libusb_error_name(error));
                 return error;
             }
+        }
+        int error = libusb_submit_transfer(metaCtx[n]);
+        if(error){
+            LIBRADOR_LOG(LOG_ERROR, "meta submit #%d FAILED with error %d %s\n", n, error, libusb_error_name(error));
+            return error;
         }
     }
     return 0;
@@ -314,13 +808,28 @@ int usbCallHandler::send_control_transfer(uint8_t RequestType, uint8_t Request, 
     }
     else controlBuffer = LDATA;
 
-    int error = libusb_control_transfer(handle, RequestType, Request, Value, Index, controlBuffer, Length, 4000);
-    if(error<0){
-        LIBRADOR_LOG(LOG_WARNING, "send_control_transfer FAILED with error %s", libusb_error_name(error));
-        connected = false;
-        return error - 100;
+    // Diagnostic: per-request-code send counters, dumped with frame stats.
+    extern std::atomic<uint32_t> g_ctrl_req_counts[256];
+    g_ctrl_req_counts[Request]++;
+    // EP0 can report a transient stall when a control request races the
+    // streaming event thread (observed ~5% of the time on macOS with async
+    // bulk transfers in flight; every occurrence recovers on an immediate
+    // retry - the stall self-clears at the next SETUP).  All Labrador
+    // vendor requests are idempotent, so retrying is safe.
+    int error = 0;
+    for(int attempt = 0; attempt < 3; attempt++){
+        error = libusb_control_transfer(handle, RequestType, Request, Value, Index, controlBuffer, Length, 4000);
+        if(error >= 0){
+            return 0;
+        }
+        if(error != LIBUSB_ERROR_PIPE){
+            break;
+        }
+        LIBRADOR_LOG(LOG_DEBUG, "control req 0x%02x stalled, retry %d\n", Request, attempt + 1);
     }
-    return 0;
+    LIBRADOR_LOG(LOG_WARNING, "send_control_transfer(req 0x%02x, val 0x%04x, idx 0x%04x, len %u) FAILED with error %s", Request, Value, Index, Length, libusb_error_name(error));
+    connected = false;
+    return error - 100;
 }
 
 
@@ -664,11 +1173,58 @@ int usbCallHandler::set_psu_calibration_offset(double offset){
     return 0;
 }
 
+#define CAL_PAGE_SIZE 32
+#define CAL_MAGIC0 0xCA
+#define CAL_MAGIC1 0x1B
+#define CAL_VERSION 1
+
+int usbCallHandler::save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset_v){
+    unsigned char page[CAL_PAGE_SIZE];
+    float vals[5] = {(float)vref_ch1, (float)gain_scale_ch1,
+                     (float)vref_ch2, (float)gain_scale_ch2, (float)psu_offset_v};
+    memset(page, 0xFF, sizeof page);
+    page[0] = CAL_MAGIC0;
+    page[1] = CAL_MAGIC1;
+    page[2] = CAL_VERSION;
+    page[3] = 0;
+    memcpy(&page[4], vals, sizeof vals);
+    unsigned char cs = 0;
+    for(int i = 0; i < 24; i++) cs ^= page[i];
+    page[24] = cs;
+    send_control_transfer_with_error_checks(0x40, 0xac, 0, 0, CAL_PAGE_SIZE, page);
+    return 0;
+}
+
+int usbCallHandler::load_calibration_from_device(double *vref_ch1, double *gain_scale_ch1,
+        double *vref_ch2, double *gain_scale_ch2, double *psu_offset_v){
+    unsigned char page[CAL_PAGE_SIZE];
+    memset(page, 0, sizeof page);
+    send_control_transfer_with_error_checks(0xc0, 0xad, 0, 0, CAL_PAGE_SIZE, page);
+    if(page[0] != CAL_MAGIC0 || page[1] != CAL_MAGIC1 || page[2] != CAL_VERSION){
+        return 1;   // nothing (valid) stored - e.g. fresh EEPROM after a DFU erase
+    }
+    unsigned char cs = 0;
+    for(int i = 0; i < 24; i++) cs ^= page[i];
+    if(cs != page[24]){
+        return 1;
+    }
+    float vals[5];
+    memcpy(vals, &page[4], sizeof vals);
+    if(vref_ch1) *vref_ch1 = vals[0];
+    if(gain_scale_ch1) *gain_scale_ch1 = vals[1];
+    if(vref_ch2) *vref_ch2 = vals[2];
+    if(gain_scale_ch2) *gain_scale_ch2 = vals[3];
+    if(psu_offset_v) *psu_offset_v = vals[4];
+    return 0;
+}
+
 double usbCallHandler::get_scope_gain(){
     return current_scope_gain;
 }
 
 int usbCallHandler::set_gain(double newGain){
+    LIBRADOR_LOG(LOG_DEBUG, "set_gain(%f) -> 0xa5 DMA rebuild\n", newGain);
     //See XMEGA_AU Manual, page 359.  ADC.CTRL.GAIN.
     if(newGain==0.5) gainMask = 0x07;
     else if (newGain == 1) gainMask = 0x00;
@@ -806,14 +1362,29 @@ int usbCallHandler::reset_device(bool goToBootloader){
     return 0;
 }
 
+// Version and variant are immutable for the lifetime of a connection (and
+// the wedge state their 179/176 sentinels probe for is a connect-time
+// condition), so they are fetched over USB once and cached until teardown.
+// Callers poll these every UI frame; without the cache that was 60-120
+// control transfers per second racing the streaming event thread.
 uint16_t usbCallHandler::get_firmware_version(){
+    if(fw_version_cached){
+        return cached_firmver;
+    }
     send_control_transfer_with_error_checks(0xc0, 0xa8, 0, 0, 2, nullptr);
-    return *((uint16_t *) inBuffer);
+    cached_firmver = *((uint16_t *) inBuffer);
+    fw_version_cached = true;
+    return cached_firmver;
 }
 
 uint8_t usbCallHandler::get_firmware_variant(){
+    if(fw_variant_cached){
+        return cached_variant;
+    }
     send_control_transfer_with_error_checks(0xc0, 0xa9, 0, 0, 1, nullptr);
-    return *((uint8_t *) inBuffer);
+    cached_variant = *((uint8_t *) inBuffer);
+    fw_variant_cached = true;
+    return cached_variant;
 }
 
 double usbCallHandler::get_samples_per_second(){
@@ -921,7 +1492,7 @@ int usbCallHandler::flashFirmware(int file_descriptor){
     int error = setup_usb_control(file_descriptor);
 
     char firmware_filename[64];
-    snprintf(firmware_filename, sizeof firmware_filename, "labrafirm_%04x_%02x.hex",
+    snprintf(firmware_filename, sizeof firmware_filename, "labrafirm_%04X_%02x.hex",
         EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT);
 
     if(!librador_get_host_hooks().prepare_firmware_hex){
@@ -1022,6 +1593,14 @@ void usbCallHandler::teardown_connection(){
     // double std::thread::join otherwise).
     std::lock_guard<std::mutex> teardown_lock(teardown_mutex);
     connected = false;
+    fw_version_cached = false;
+    fw_variant_cached = false;
+    if(data_frame_counter || frames_ok || frames_dropped){
+        LIBRADOR_LOG(LOG_DEBUG, "frame stats at teardown: ok=%llu bad_csum=%llu dropped=%llu unvalidated=%llu (transport %d)\n",
+            (unsigned long long)frames_ok.load(), (unsigned long long)frames_bad_checksum.load(),
+            (unsigned long long)frames_dropped.load(), (unsigned long long)frames_unvalidated.load(),
+            active_transport);
+    }
     if(iso_polling_thread) {
         begin_iso_thread_shutdown();
         if(iso_polling_thread->joinable())
@@ -1031,20 +1610,59 @@ void usbCallHandler::teardown_connection(){
         // prepare for possible replug
         iso_thread_shutdown_requested = false;
         iso_polling_thread = nullptr;
-        iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
-        for (int i=0; i<NUM_FUTURE_CTX; i++){
-            for (int k=0; k<NUM_ISO_ENDPOINTS; k++){
-                libusb_free_transfer(isoCtx[k][i]);
-            }
+        free_transfers();
+    }
+    if(ingest_thread){
+        {
+            std::lock_guard<std::mutex> lock(ingest_mutex);
+            ingest_stop = true;
         }
+        ingest_cv.notify_one();
+        if(ingest_thread->joinable())
+            ingest_thread->join();
+        delete ingest_thread;
+        ingest_thread = nullptr;
+        ingest_queue.clear();
     }
     if(handle){
-        libusb_release_interface(handle, 0);
+        if(claimed_iface >= 0){
+            // Deselect the streaming alt setting so the device stops
+            // producing, then release.  Best effort - the device may
+            // already be gone.
+            libusb_set_interface_alt_setting(handle, claimed_iface, 0);
+            if(claimed_iface != 0 || !iface0_claimed){
+                libusb_release_interface(handle, claimed_iface);
+            }
+            claimed_iface = -1;
+        }
+        if(iface0_claimed){
+            libusb_release_interface(handle, 0);
+            iface0_claimed = false;
+        }
         LIBRADOR_LOG(LOG_DEBUG, "Interface released\n");
         libusb_close(handle);
         handle = nullptr;
         LIBRADOR_LOG(LOG_DEBUG, "Device Closed\n");
     }
+}
+
+void usbCallHandler::free_transfers(){
+    if(alloc_transport < 0) return;
+    if(alloc_transport == LABRADOR_TRANSPORT_BULK){
+        for(int n=0; n<NUM_BULK_CTX; n++){
+            libusb_free_transfer(bulkCtx[n]);
+        }
+    } else {
+        int ndata = (alloc_transport == LABRADOR_TRANSPORT_ISO6) ? AIO_EP_ISO6_COUNT : 1;
+        for (int i=0; i<NUM_FUTURE_CTX; i++){
+            for (int k=0; k<ndata; k++){
+                libusb_free_transfer(isoCtx[k][i]);
+            }
+            libusb_free_transfer(metaCtx[i]);
+        }
+    }
+    alloc_transport = -1;
+    LIBRADOR_LOG(LOG_DEBUG, "Transfers freed.\n");
 }
 
 #ifdef PLATFORM_ANDROID
@@ -1058,7 +1676,7 @@ void usbCallHandler::respondToStartupOrUsbStateChange(bool is_plugged_in, int fi
                 init_libusb();
                 int error = setup_usb_control(file_descriptor);
                 set_bootloader_mode_allowed(false);
-                dfu_launch();// launch twice to clear eeprom flag after flashing
+                dfu_launch();// firmware >= 0x000A boots after a single launch (bootloader-flag bug fixed)
 
                 if(librador_get_host_hooks().confirm_firmware_flash)
                     librador_get_host_hooks().confirm_firmware_flash();

@@ -32,9 +32,11 @@ Librador::Librador()
     usb_driver = new usbCallHandler(LABRADOR_VID, LABRADOR_PID);
 }
 
-int librador_init(){
+int librador_init(int transport_type){
     if(internal_librador_object){
-        //Object already initialised
+        //Object already initialised; still honour a transport change ahead
+        //of the next connect.
+        internal_librador_object->usb_driver->set_transport(transport_type);
         return 1;
     }
 
@@ -42,10 +44,45 @@ int librador_init(){
     if(!internal_librador_object){
         //Object initialisation failed
         return -1;
-    } else {
-        //good, fresh initialisation
-        return 0;
     }
+    if(internal_librador_object->usb_driver->set_transport(transport_type) < 0){
+        return -2;
+    }
+    //good, fresh initialisation
+    return 0;
+}
+
+int librador_get_active_transport(){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->get_active_transport();
+}
+
+int librador_get_frame_stats(uint64_t* frames_ok, uint64_t* frames_bad_checksum,
+        uint64_t* frames_dropped, uint64_t* frames_unvalidated){
+    CHECK_API_INITIALISED
+    internal_librador_object->usb_driver->get_frame_stats(frames_ok,
+        frames_bad_checksum, frames_dropped, frames_unvalidated);
+    return 0;
+}
+
+int librador_reset_frame_stats(){
+    CHECK_API_INITIALISED
+    internal_librador_object->usb_driver->reset_frame_stats();
+    return 0;
+}
+
+int librador_save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->save_calibration_to_device(
+        vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2, psu_offset);
+}
+
+int librador_load_calibration_from_device(double* vref_ch1, double* gain_scale_ch1,
+        double* vref_ch2, double* gain_scale_ch2, double* psu_offset){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->load_calibration_from_device(
+        vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2, psu_offset);
 }
 
 int librador_exit(){

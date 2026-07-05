@@ -26,8 +26,8 @@
 namespace constants
 {
 // Desired Firmware Version/Variant
-constexpr uint16_t DESIRED_FW_VERSION = 7;
-constexpr uint8_t DESIRED_FW_VARIANT = 2;
+constexpr uint16_t DESIRED_FW_VERSION = 0x000C;
+constexpr uint8_t DESIRED_FW_VARIANT = 3;
 
 // Theme Colours
 constexpr ImU32 PRIM_LIGHT = IM_COL32(255, 255, 255, 255); // primary light

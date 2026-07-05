@@ -11,14 +11,15 @@ extern "C"
 #include "i2cdecoder.h"
 #include <thread>
 #include <vector>
+#include <deque>
 #include <chrono>
 #include <atomic>
+#include <condition_variable>
 
 #ifdef PLATFORM_ANDROID
 #include <jni.h>
 #endif
 
-#define NUM_ISO_ENDPOINTS (1)
 #define NUM_FUTURE_CTX (4)
 #define ISO_PACKET_SIZE (750)
 #define ISO_PACKETS_PER_CTX (33)
@@ -29,11 +30,54 @@ extern "C"
 #define XMEGA_MAIN_FREQ (48000000)
 #define PSU_ADC_TOP (128)
 
+// AIO (variant 3) firmware transport layout: three interfaces, each with
+// alt setting 0 = no endpoints and alt setting 1 = the streaming endpoints.
+//   iface 0 (iso6): iso IN 0x81..0x86 (128B) + 8-byte iso meta EP 0x89
+//   iface 1 (iso1): iso IN 0x87 (1023B, carries 750B/frame) + meta EP 0x8a
+//   iface 2 (bulk): bulk IN 0x88 (64B packets, 8-byte in-stream headers)
+// Every frame is protected by {magic, seq16, checksum}: in-stream ahead of
+// each bulk payload (EB 57), lag-1 on the iso meta endpoints (EB 58, which
+// carry the checksum of BOTH double-buffer halves - a frame is valid if it
+// matches either, stomped by the ADC/DMA loop if it matches neither).
+#define LABRADOR_TRANSPORT_AUTO 0
+#define LABRADOR_TRANSPORT_ISO6 1
+#define LABRADOR_TRANSPORT_ISO1 2
+#define LABRADOR_TRANSPORT_BULK 3
+
+#define AIO_IFACE_ISO6 0
+#define AIO_IFACE_ISO1 1
+#define AIO_IFACE_BULK 2
+#define AIO_EP_ISO6_FIRST 0x81
+#define AIO_EP_ISO6_COUNT 6
+#define AIO_EP_ISO1 0x87
+#define AIO_EP_BULK 0x88
+#define AIO_EP_ISO6_META 0x89
+#define AIO_EP_ISO1_META 0x8a
+#define AIO_ISO6_PACKET_SIZE 128
+#define AIO_META_PACKET_SIZE 8
+#define AIO_HDR_MAGIC0 0xEB
+#define AIO_HDR_MAGIC1_BULK 0x57
+#define AIO_HDR_MAGIC1_META 0x58
+// Bulk framing: every transfer is padded to a 64-byte multiple so the
+// stream never contains a short packet (a short packet would terminate a
+// queued URB early and collapse the read-ahead runway).  Each frame is a
+// 64-byte header block (8 meaningful bytes, zero pad) followed by a
+// 768-byte payload block (750 data + 18 pad) - a fixed 832-byte stride.
+#define AIO_BULK_HDR_XFER 64
+#define AIO_BULK_PAYLOAD_XFER 768
+#define MAX_DATA_ENDPOINTS 6
+// Bulk URB queue depth: the host controller keeps draining the pipe into
+// pre-queued kernel buffers even while the app's event thread is busy, so
+// this is the stall runway protecting the device's 1 ms drain deadline
+// (ADC overwrites its double buffer every 2 ms).  16 x 16 KB = 256 KB =
+// ~340 ms at full rate.
+#define NUM_BULK_CTX 16
+#define BULK_CTX_SIZE 16384
+
 // Single source of truth for the firmware the app expects on the board.
-// A "v3" variant carrying both interfaces is planned; flip these together
-// with the .hex shipped in the app assets.
-#define EXPECTED_FIRMWARE_VERSION 0x0007
-#define DEFINED_EXPECTED_VARIANT 2
+// Flip these together with the .hex shipped in the app assets.
+#define EXPECTED_FIRMWARE_VERSION 0x000C
+#define DEFINED_EXPECTED_VARIANT 3
 #define LABRADOR_BOOTLOADER_PID 0x2fe4
 // "Gobindar" state (Qt Desktop_Interface GOBINDAR_PID): a misconfigured/
 // misflashed board that enumerates with PID 0xa000 instead of 0xba94.
@@ -115,6 +159,17 @@ public:
     // PSU calibration offset in volts (Qt genericusbdriver psu_offset /
     // QSettings CalibratePsu).  Applied on the next set_psu_voltage call.
     int set_psu_calibration_offset(double offset);
+    // On-device calibration storage (EEPROM page via vendor requests
+    // 0xac/0xad; firmware >= 0x000A).  Layout: magic CA 1B, version 1,
+    // five LE floats {vref_ch1, gain_scale_ch1, vref_ch2, gain_scale_ch2,
+    // psu_offset}, xor checksum.  NOTE: a DFU chip erase wipes EEPROM, so
+    // the host should re-save after flashing firmware.
+    // load returns 0 on success, 1 if the device has no valid calibration
+    // stored, <0 on transfer errors.
+    int save_calibration_to_device(double vref_ch1, double gain_scale_ch1,
+        double vref_ch2, double gain_scale_ch2, double psu_offset);
+    int load_calibration_from_device(double *vref_ch1, double *gain_scale_ch1,
+        double *vref_ch2, double *gain_scale_ch2, double *psu_offset);
     double get_scope_gain();
     int set_digital_state(uint8_t digState);
     int reset_device(bool goToBootloader);
@@ -134,6 +189,17 @@ public:
     bool isoThreadIsActive();
     void teardown_connection();        // stop iso thread, free transfers, close handle
     int init_libusb();
+    // Transport selection.  Must be set before connecting; AUTO resolves to
+    // the platform default (macOS: bulk; win64: iso6; win32/linux/android:
+    // iso1).  On macOS the iso transports are refused unless the build
+    // defines LIBRADOR_MACOS_ALLOW_ISO - opening a full-speed iso pipe
+    // panics the kernel on macOS Tahoe (IOUSBHostFamily getEndpointMult
+    // NULL-dereferences the SuperSpeed companion descriptor).
+    int set_transport(int transport);
+    int get_active_transport();
+    // Frame-validation statistics accumulated from the per-frame headers.
+    void get_frame_stats(uint64_t *ok, uint64_t *bad_checksum, uint64_t *dropped, uint64_t *unvalidated);
+    void reset_frame_stats();
     void respondToStartupOrUsbStateChange(bool is_plugged_in, int file_descriptor, bool bootloader_mode);
     void set_bootloader_mode_allowed(bool allowed);
     void initiateFirmwareFlash();
@@ -179,9 +245,74 @@ private:
     unsigned char inBuffer[256];
 
     //USBIso Vars
-    unsigned char pipeID[NUM_ISO_ENDPOINTS];
-    libusb_transfer *isoCtx[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
-    unsigned char dataBuffer[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
+    // Data endpoints for the active transport (1 for iso1, 6 for iso6),
+    // plus one meta endpoint for the iso transports.  Buffers are sized for
+    // the worst case (750-byte packets).
+    int num_data_endpoints = 1;
+    unsigned char pipeID[MAX_DATA_ENDPOINTS];
+    unsigned char meta_pipeID = 0;
+    int data_packet_size = ISO_PACKET_SIZE;
+    libusb_transfer *isoCtx[MAX_DATA_ENDPOINTS][NUM_FUTURE_CTX];
+    libusb_transfer *metaCtx[NUM_FUTURE_CTX];
+    unsigned char dataBuffer[MAX_DATA_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
+    unsigned char metaBuffer[NUM_FUTURE_CTX][AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX];
+    // Bulk transport: queued bulk reads parsed as a framed byte stream.
+    libusb_transfer *bulkCtx[NUM_BULK_CTX];
+    unsigned char bulkBuffer[NUM_BULK_CTX][BULK_CTX_SIZE];
+    std::vector<unsigned char> bulk_stream;
+    // Transport state
+    int requested_transport = LABRADOR_TRANSPORT_AUTO;
+    int active_transport = LABRADOR_TRANSPORT_AUTO;   // resolved at connect
+    int claimed_iface = -1;
+    bool iface0_claimed = false;
+    int alloc_transport = -1;   // transport the transfer arrays were built for
+    int total_inflight_transfers();
+    // Frame validation state (event-loop thread only, except the atomics)
+    std::atomic<uint64_t> frames_ok{0};
+    std::atomic<uint64_t> frames_bad_checksum{0};
+    std::atomic<uint64_t> frames_dropped{0};
+    std::atomic<uint64_t> frames_unvalidated{0};
+    bool seq_started = false;
+    uint16_t last_seq = 0;
+    // Recent reassembled-frame checksums for meta (lag-1) pairing:
+    // ring indexed by frame counter, holds the XOR of each 750-byte frame.
+    // Must exceed the largest frame backlog between a data URB completion
+    // and the matching meta URB completion: iso URBs batch 33 frames, and
+    // data/meta URBs can complete a full batch apart, so 16 was too small
+    // (every meta missed the ring and counted as unvalidated).
+    static const int CSUM_RING_SIZE = 128;
+    unsigned char frame_csum_ring[CSUM_RING_SIZE];
+    bool frame_csum_valid[CSUM_RING_SIZE];
+    uint64_t data_frame_counter = 0;
+    uint64_t meta_frame_counter = 0;
+    // iso6 reassembly: per-endpoint packet queues consumed in lockstep
+    std::deque<std::vector<unsigned char>> iso6_queues[MAX_DATA_ENDPOINTS];
+
+    // Hand-off between the libusb event thread and the ingest thread.  The
+    // event thread must NEVER block on buffer_read_write_mutex: while it
+    // is blocked it cannot resubmit bulk URBs, the host controller stops
+    // issuing IN tokens, and the device blows the 1 ms drain deadline (the
+    // ADC overwrites its double buffer every 2 ms).  Callbacks push raw
+    // bytes here under a short-lived lock; the ingest thread does all
+    // parsing, validation and o1buffer dispatch.
+    struct IngestItem {
+        uint8_t kind;        // 0=bulk bytes, 1=iso data, 2=iso6 data, 3=meta
+        uint8_t ep_index;    // iso6 endpoint index
+        std::vector<unsigned char> bytes;
+    };
+    std::deque<IngestItem> ingest_queue;
+    std::mutex ingest_mutex;
+    std::condition_variable ingest_cv;
+    std::thread *ingest_thread = nullptr;
+    bool ingest_stop = false;
+    void ingest_thread_function();
+    void queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned char *data, int length);
+
+    // Timebase preservation: lost or torn frames are replaced with a
+    // repeat of the last good frame (sample-and-hold) so the sample clock
+    // in the o1buffers stays honest instead of silently compressing.
+    unsigned char last_good_frame[ISO_PACKET_SIZE] = {0};
+    void dispatch_lost_frames(uint64_t count);
     std::thread *iso_polling_thread = nullptr;
     std::thread *daq_thread = nullptr;
     //Control Vars
@@ -199,6 +330,13 @@ private:
 
     bool starting_after_flash = false;
 
+    // Firmware identity cache: valid from the first successful reads after
+    // connect until teardown_connection.
+    uint16_t cached_firmver = 0;
+    uint8_t cached_variant = 0;
+    bool fw_version_cached = false;
+    bool fw_variant_cached = false;
+
     int flashFirmware(int file_descriptor);
     void closeDevice_cpp();
     int findDevice_cpp();
@@ -207,7 +345,23 @@ private:
     int check_firmware_and_start_iso();// version/variant check, then iso stream or flash request
 
     friend void isoCallback(struct libusb_transfer * transfer);
+    friend void metaIsoCallback(struct libusb_transfer * transfer);
+    friend void bulkCallback(struct libusb_transfer * transfer);
     int deviceMode = 0;
+
+    // Transport plumbing (all called on the event-loop thread unless noted)
+    int resolve_transport();                     // AUTO -> platform default, macOS iso lockout
+    int configure_transport_endpoints();         // fill pipeID/meta/packet sizes
+    int start_streaming();                       // claim iface, alt 1, submit transfers
+    void dispatch_frame(unsigned char *frame750);// deviceMode switch into o1buffers
+    void note_frame_csum(unsigned char csum, bool valid);
+    void handle_data_iso_packet(unsigned char *data, int length);
+    void handle_iso6_packet(int ep_index, unsigned char *data, int length);
+    void drain_iso6_queues();
+    void handle_meta_packet(unsigned char *data, int length);
+    void handle_bulk_bytes(unsigned char *data, int length);
+    void note_seq(uint16_t seq);
+    void reset_frame_state();
 
     o1buffer *internal_o1_buffer_375_CHA;
     o1buffer *internal_o1_buffer_375_CHB;
@@ -216,6 +370,8 @@ private:
     int begin_iso_thread_shutdown();
     bool is_iso_thread_shutdown_requested();
     int decrement_remaining_transfers();
+    void free_transfers();
+    void rearm_or_retire(struct libusb_transfer *transfer);
     void iso_polling_function(libusb_context *ctx);
     bool safe_to_exit_thread();
 

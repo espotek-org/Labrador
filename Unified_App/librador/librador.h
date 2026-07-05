@@ -25,7 +25,36 @@ JNIEXPORT void JNICALL Java_com_EspoTek_Labrador_MainActivity_nativeInitiateFirm
 #endif
 #endif // PLATFORM_ANDROID
 
-LIBRADORSHARED_EXPORT int librador_init();
+// transport_type: one of the LABRADOR_TRANSPORT_* values (usbcallhandler.h).
+// AUTO resolves at connect time to the platform default: macOS bulk, 64-bit
+// Windows iso6, 32-bit Windows / Linux (all) / Android iso1.  On macOS the
+// iso transports are coerced to bulk unless built with
+// LIBRADOR_MACOS_ALLOW_ISO: opening a full-speed iso pipe kernel-panics
+// macOS Tahoe (IOUSBHostFamily NULL-dereference in getEndpointMult).
+LIBRADORSHARED_EXPORT int librador_init(int transport_type = LABRADOR_TRANSPORT_AUTO);
+// The transport actually in use once connected (AUTO resolved).
+LIBRADORSHARED_EXPORT int librador_get_active_transport();
+// Buffer-validity counters accumulated from the per-frame headers:
+//   frames_ok            frames whose checksum matched
+//   frames_bad_checksum  frames stomped by the ADC/DMA loop mid-flight
+//                        (bulk drops these before they reach the scope
+//                        buffers; iso counts them after the fact via the
+//                        lag-1 meta endpoint)
+//   frames_dropped       frames lost in transit (sequence-number gaps)
+//   frames_unvalidated   frames received without a pairable meta record
+// Any pointer may be null.  Returns -1 before librador_init.
+LIBRADORSHARED_EXPORT int librador_get_frame_stats(uint64_t* frames_ok,
+    uint64_t* frames_bad_checksum, uint64_t* frames_dropped, uint64_t* frames_unvalidated);
+LIBRADORSHARED_EXPORT int librador_reset_frame_stats();
+// On-device calibration storage (EEPROM; firmware >= 0x000A).  Values use
+// the same semantics as librador_set_channel_calibration /
+// librador_set_psu_calibration_offset.  A DFU chip erase wipes EEPROM, so
+// re-save after a firmware flash.  Load returns 0 on success, 1 if the
+// device has no valid stored calibration, <0 on transfer errors.
+LIBRADORSHARED_EXPORT int librador_save_calibration_to_device(double vref_ch1,
+    double gain_scale_ch1, double vref_ch2, double gain_scale_ch2, double psu_offset);
+LIBRADORSHARED_EXPORT int librador_load_calibration_from_device(double* vref_ch1,
+    double* gain_scale_ch1, double* vref_ch2, double* gain_scale_ch2, double* psu_offset);
 LIBRADORSHARED_EXPORT int librador_exit();
 LIBRADORSHARED_EXPORT int librador_reset_usb();
 //Control

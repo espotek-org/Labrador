@@ -31,7 +31,7 @@ void App::StartUp()
     // Console must be installed before librador starts logging from threads
     m_debug_console.install();
 
-    if (librador_init() < 0)
+    if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
         throw std::runtime_error("librador_init failed");
 
 #ifndef __ANDROID__
@@ -260,7 +260,7 @@ void App::startFirmwareFlash()
     librador_initiate_firmware_flash();
 #else
     char hex_name[64];
-    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hu_%02hhu.hex",
+    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hX_%02hhu.hex",
         constants::DESIRED_FW_VERSION, constants::DESIRED_FW_VARIANT);
     std::string hex_path = getResourcePath(hex_name);
     m_flashing = true;
@@ -279,7 +279,7 @@ void App::startBootloaderRecovery()
 {
 #ifndef __ANDROID__
     char hex_name[64];
-    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hu_%02hhu.hex",
+    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hX_%02hhu.hex",
         constants::DESIRED_FW_VERSION, constants::DESIRED_FW_VARIANT);
     std::string hex_path = getResourcePath(hex_name);
     m_flashing = true;
@@ -306,7 +306,7 @@ void App::startGobindarRecovery()
 {
 #ifndef __ANDROID__
     char hex_name[64];
-    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hu_%02hhu.hex",
+    snprintf(hex_name, sizeof hex_name, "firmware/labrafirm_%04hX_%02hhu.hex",
         constants::DESIRED_FW_VERSION, constants::DESIRED_FW_VARIANT);
     std::string hex_path = getResourcePath(hex_name);
     m_flashing = true;

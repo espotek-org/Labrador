@@ -236,6 +236,14 @@ void InstrumentFrontend::saveSettings(Settings& s)
 
 void InstrumentFrontend::UpdateHardwareState(App& app)
 {
+    // Device-stored calibration (EEPROM) wins over local settings: it
+    // travels with the hardware.  Fetch it once per connection.
+    static bool was_connected = false;
+    bool now_connected = app.isConnected() && !app.isFlashing();
+    if (now_connected && !was_connected)
+        CalibrationWidget.loadFromDevice();
+    was_connected = now_connected;
+
     if (app.isFlashing())
         return; // the flash/recovery worker owns the USB state right now
     if (app.isConnected())
@@ -316,6 +324,16 @@ void InstrumentFrontend::RenderMenuBar(App& app)
                 uint8_t deviceVariant = librador_get_device_firmware_variant();
                 ImGui::TextColored(constants::GRAY_TEXT, "Firmware: %hu.%hhu",
                     deviceVersion, deviceVariant);
+                static const char* transport_names[] = {"auto", "iso x6", "iso x1", "bulk"};
+                int transport = librador_get_active_transport();
+                uint64_t f_ok = 0, f_bad = 0, f_drop = 0, f_unval = 0;
+                librador_get_frame_stats(&f_ok, &f_bad, &f_drop, &f_unval);
+                ImGui::TextColored(constants::GRAY_TEXT, "Transport: %s",
+                    (transport >= 0 && transport <= 3) ? transport_names[transport] : "?");
+                ImGui::TextColored(constants::GRAY_TEXT,
+                    "Frames ok/bad/lost: %llu / %llu / %llu",
+                    (unsigned long long)f_ok, (unsigned long long)f_bad,
+                    (unsigned long long)f_drop);
             }
             else if (app.isFlashing())
             {
