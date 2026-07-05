@@ -17,6 +17,12 @@ if(NOT MSVC)
     add_compile_options(-fsigned-char)
 endif()
 
+# exprtk's template instantiations overflow the default PE/COFF section limit
+# ("too many sections" from as.exe), so MinGW needs big-obj support
+if(MINGW)
+    add_compile_options(-Wa,-mbig-obj)
+endif()
+
 # --- SDL3 (Brent's fork, adds SDL_PinchFingerEvent) ---
 # Desktop: static. Android: shared, because SDLActivity System.loadLibrary()s it.
 if(ANDROID)
