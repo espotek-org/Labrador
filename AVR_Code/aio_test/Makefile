@@ -6,10 +6,18 @@ ifeq ($(shell uname),Darwin)
 LDFLAGS += -framework IOKit -framework CoreFoundation -framework Security
 endif
 
+all: aio_transport_test aio_peek
+
 aio_transport_test: aio_transport_test.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
-clean:
-	rm -f aio_transport_test
+# Reads the firmware's 0xab debug state (transport, callback counters)
+# via a device-level control transfer - no interface claim, so it can
+# observe a running app's streaming without disturbing it.
+aio_peek: aio_peek.c
+	$(CC) -O2 $(shell pkg-config --cflags libusb-1.0) -o $@ $< $(LDFLAGS)
 
-.PHONY: clean
+clean:
+	rm -f aio_transport_test aio_peek
+
+.PHONY: all clean

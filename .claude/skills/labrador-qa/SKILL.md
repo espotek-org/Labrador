@@ -126,6 +126,47 @@ Crash triage: any run that dies instead of printing `QA: n/m tests passed`
 is a crash — rerun the failing filter with `lldb -o run -- ./labrador
 --qa=<filter>` and capture the backtrace.
 
+## 4. Transport frame-integrity tools (USB/firmware QA)
+
+Three standalone tools validate the AIO firmware transports (0x000C+)
+end-to-end. Use them whenever the scope shows corruption, after firmware
+changes, or when a transport regression is suspected.
+
+```sh
+# Full librador-path check (the numbers that matter for the apps):
+cmake --build build/macos --target librador_bulk_test
+./build/macos/librador_bulk_test
+# Expected on firmware 0x000C: 100.00% pass on every phase, dropped=0,
+# unvalidated=0 (modes 0 and 2, quiet AND with the 354.1 Hz fgen sine).
+
+# Raw-USB harness (per-transport, mode as 3rd arg; needs SG1->OSC1 loop):
+cd AVR_Code/aio_test && make
+./aio_transport_test bulk|iso1|iso6|bulkdiag|bulkdiaggen <secs> [mode]
+
+# Live peek at a RUNNING app's firmware state - no interface claim, so it
+# never disturbs streaming.  transport: 1=iso6 2=iso1 3=bulk:
+./aio_transport_test/../aio_peek   # i.e. AVR_Code/aio_test/aio_peek
+```
+
+Interpretation gotchas (each of these was a real multi-day trap):
+- **Never validate transports on a quiet/DC input.** A constant input
+  XOR-masks device-side buffer collisions from the checksums (identical
+  bytes overwrite identical bytes) — bulk once measured 99% on DC while
+  torn ~40% under a real signal. Always drive the fgen with a sine whose
+  period is incommensurate with the 1 ms USB frame (354.1 Hz is the
+  convention; also the frequency from the original field report).
+- `librador_bulk_test` (async 16-URB queue) is the acceptance number.
+  The sync-loop harness stalls the wire between reads and shows ~97-99%
+  on a healthy bulk transport — that gap is the harness, not the device.
+- iso6 typically shows ~99.7% plus a few % "unvalidated" (meta packets
+  lost; frames themselves fine) — known, tracked separately.
+- `bulkdiaggen` decodes the DMA write-pointer snapshot the firmware puts
+  in bulk header pad bytes 8-16 and maps stale byte ranges in failing
+  frames — the tool that pinpointed the half-parity and DMA-phase bugs.
+- A board that reports the wrong firmware (aio_peek/harness print it)
+  may have been downgraded by a stale app build with auto-flash — check
+  before diagnosing "corruption" (expected: 0x000C variant 03).
+
 ## Reporting
 
 Summarise as: suites run + pass/fail counts, screenshots reviewed (matrix
