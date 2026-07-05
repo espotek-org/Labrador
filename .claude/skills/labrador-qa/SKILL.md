@@ -48,11 +48,28 @@ Gotchas:
 ## 1. Headless UI test suite (interaction QA)
 
 ```sh
-./build/macos-qa/labrador --qa          # everything ("all")
+./build/macos-qa/labrador --qa          # stable regression suite (gui+hw)
 ./build/macos-qa/labrador --qa=gui      # UI-only
 ./build/macos-qa/labrador --qa=hw       # hardware loopback (needs the harness)
 ./build/macos-qa/labrador --qa=dbg      # dump live window names (path debugging)
+./build/macos-qa/labrador --qa=fuzz     # interaction fuzzer (crash hunt; safe
+                                        # unattended, board attached or not)
 ```
+
+The `fuzz` category walks every menu/widget/page (desktop, mobile AND compact
+layouts), mashes shortcuts, abuses plots/zooms, drags values to extremes,
+cycles device modes, resizes the window to degenerate sizes, runs a seeded
+monkey, and spams Esc-resets timed to land inside connection setup
+(`esc_spam` — the repro for reset-during-reconnect races). Three more live in
+`fuzzx` and must be run individually and deliberately, by name:
+`--qa=minimize_restore` (wedges the headless harness — the main loop stops
+while minimized), `--qa=quit_while_connected` (exits the app mid-run),
+`--qa=calibration_wizard` (rewrites the attached board's calibration).
+Crash-hunting rule: a run that dies without printing `QA: n/m tests passed`
+is a crash even if the exit code looks tame — check
+`~/Library/Logs/DiagnosticReports/labrador-*.ips` and rerun under
+`lldb -o run -- ./labrador --qa=<test>`. Fuzz runs rewrite `settings.ini`
+(calibration included) — restore your backup afterwards.
 
 Exit code 0 = all queued tests passed. The registered tests live in
 `src/qa/QaSuite.cpp`. When writing new tests:

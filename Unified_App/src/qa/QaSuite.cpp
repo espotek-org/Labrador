@@ -199,6 +199,583 @@ static void RegisterGuiTests(ImGuiTestEngine* e)
     };
 }
 
+// ---- Interaction fuzz suite ---------------------------------------------------
+// Crash-hunting tests: walk/mash every reachable interaction surface and rely
+// on the crash handler to catch anything that dies. Two categories:
+//   "fuzz"  (--qa=fuzz)  safe to run unattended with a board attached
+//   "fuzzx" (--qa=<name>) run individually and deliberately: they quit the
+//           app, wedge the headless harness, or rewrite board calibration.
+// Neither runs under plain --qa (see QaSetup: "all" maps to gui+hw).
+// Blacklist: quit/reflash (hardware safety), native file dialogs (cannot be
+// driven headlessly), external URLs.
+
+#include "SDL3/SDL.h"
+
+static bool FuzzBlacklisted(const char* label)
+{
+    static const char* bad[] = { "Quit", "Reflash", "CSV", "recording",
+        "Replay", "Reset USB", "espotek", "GitHub", "Export", "Load",
+        "Browse", "Start" };
+    if (label == nullptr)
+        return false;
+    for (const char* b : bad)
+        if (ImStristr(label, nullptr, b, nullptr) != nullptr)
+            return true;
+    return false;
+}
+
+// Click every gathered item under `parent` (skipping blacklisted labels),
+// closing any popup each click opens.
+static void FuzzClickAllUnder(ImGuiTestContext* ctx, ImGuiTestRef parent, int depth)
+{
+    ctx->PopupCloseAll();
+    ImGuiTestItemList items;
+    ctx->GatherItems(&items, parent, depth);
+    ctx->LogInfo("fuzz: gathered %d items", items.GetSize());
+    if (items.GetSize() == 0)
+        for (ImGuiWindow* w : ctx->UiContext->Windows)
+            if (w->WasActive)
+                ctx->LogInfo("fuzz: live window: '%s'", w->Name);
+    for (int i = 0; i < items.GetSize(); i++)
+    {
+        const ImGuiTestItemInfo& item = *items[i];
+        if (FuzzBlacklisted(item.DebugLabel))
+            continue;
+        if (ctx->ItemInfo(item.ID, ImGuiTestOpFlags_NoError).ID == 0)
+            continue; // item vanished (page changed under us)
+        ctx->LogInfo("fuzz: click #%d '%s'", i, item.DebugLabel);
+        ctx->MouseSetViewport(item.Window);
+        ctx->ItemClick(item.ID);
+        ctx->PopupCloseAll();
+        ctx->Yield(2);
+        if (ctx->IsError())
+            ctx->TestOutput->Status = ImGuiTestStatus_Running; // keep walking; only crashes matter here
+    }
+}
+
+static void RegisterFuzzTests(ImGuiTestEngine* e)
+{
+    ImGuiTest* t = nullptr;
+
+    // Click every safe menu item (incl. toggles twice).
+    t = IM_REGISTER_TEST(e, "fuzz", "menu_walk");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        const char* paths[] = {
+            "Device/Calibration...",
+            "Scope/Run", "Scope/Run",
+            "Scope/Auto-fit both axes",
+            "Scope/Hardware Gain/Auto", "Scope/Hardware Gain/Auto",
+            "Scope/XY Mode", "Scope/XY Mode",
+            "Scope/Eye Diagram", "Scope/Eye Diagram",
+            "Scope/Cursor 1", "Scope/Cursor 2",
+            "Scope/Signal Properties",
+            "Tools/Spectrum Analyser", "Tools/Spectrum Analyser",
+            "Tools/Network Analyser", "Tools/Network Analyser",
+            "Tools/Multimeter", "Tools/Multimeter",
+            "Tools/Logic Analyzer", "Tools/Logic Analyzer",
+            "Tools/DAQ Recorder...",
+            "View/Side Panel", "View/Side Panel",
+            "View/CRT Scanlines", "View/CRT Scanlines",
+            "View/Debug/Debug console",
+            "Help/User Guide",
+            "Help/Keyboard Shortcuts",
+            "Help/Pinout Diagram",
+            "Help/Troubleshooting",
+            "Help/About EspoTek Labrador",
+        };
+        for (const char* p : paths)
+        {
+            ctx->LogInfo("fuzz: menu '%s'", p);
+            ctx->MenuClick(p);
+            ctx->Yield(3);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            SetMainRef(ctx);
+        }
+    };
+
+    // Keyboard mash (no Escape: resets USB with a board attached).
+    t = IM_REGISTER_TEST(e, "fuzz", "keyboard_mash");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ParkMouse(ctx);
+        const ImGuiKeyChord keys[] = {
+            ImGuiKey_Space, ImGuiKey_F, ImGuiKey_B, ImGuiKey_1, ImGuiKey_2,
+            ImGuiKey_F1, ImGuiKey_LeftArrow, ImGuiKey_RightArrow,
+            ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Tab,
+            ImGuiKey_Enter, ImGuiKey_Home, ImGuiKey_End, ImGuiKey_PageUp,
+            ImGuiKey_PageDown, ImGuiKey_Delete, ImGuiKey_Backspace,
+            ImGuiKey_A, ImGuiKey_C, ImGuiKey_D, ImGuiKey_G, ImGuiKey_M,
+            ImGuiKey_P, ImGuiKey_R, ImGuiKey_S, ImGuiKey_T, ImGuiKey_X,
+            ImGuiKey_Z, ImGuiKey_0, ImGuiKey_9, ImGuiKey_F2, ImGuiKey_F5,
+            ImGuiKey_F12,
+            ImGuiMod_Ctrl | ImGuiKey_A, ImGuiMod_Ctrl | ImGuiKey_C,
+            ImGuiMod_Ctrl | ImGuiKey_V, ImGuiMod_Ctrl | ImGuiKey_Z,
+            ImGuiMod_Shift | ImGuiKey_LeftArrow,
+        };
+        for (int round = 0; round < 2; round++) // running, then paused
+        {
+            for (ImGuiKeyChord k : keys)
+            {
+                ctx->KeyPress(k);
+                ctx->Yield(2);
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+            ctx->KeyPress(ImGuiKey_Space); // flip run/pause for round 2
+            ctx->Yield(4);
+        }
+        ctx->KeyPress(ImGuiKey_Space);
+        ctx->Yield(2);
+    };
+
+    // Plot abuse: zoom extremes, pans (incl. paused scrollback), context
+    // menu, box-zoom drags, double-click autofit.
+    t = IM_REGISTER_TEST(e, "fuzz", "plot_abuse");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ImGuiWindow* window = ctx->GetWindowByRef("//Main Window");
+        IM_CHECK(window != nullptr);
+        const ImRect r = window->Rect();
+        const ImVec2 c(r.Min.x + r.GetWidth() * 0.4f, r.Min.y + r.GetHeight() * 0.5f);
+        for (int round = 0; round < 2; round++) // running, then paused
+        {
+            ctx->MouseMoveToPos(c);
+            for (int i = 0; i < 15; i++) ctx->MouseWheelY(+5.0f);   // zoom way in
+            for (int i = 0; i < 30; i++) ctx->MouseWheelY(-5.0f);   // zoom way out
+            ctx->MouseDoubleClick(0);
+            ctx->Yield(2);
+            // pans, including far into the past
+            for (int i = 0; i < 6; i++)
+            {
+                ctx->MouseMoveToPos(ImVec2(c.x - 200, c.y));
+                ctx->MouseDown(0);
+                ctx->MouseMoveToPos(ImVec2(c.x + 300, c.y + 40));
+                ctx->MouseUp(0);
+                ctx->Yield(1);
+            }
+            // right-drag box zoom, tiny and huge
+            ctx->MouseMoveToPos(c);
+            ctx->MouseDown(1);
+            ctx->MouseMoveToPos(ImVec2(c.x + 2, c.y + 2));
+            ctx->MouseUp(1);
+            ctx->Yield(2);
+            ctx->MouseDown(1);
+            ctx->MouseMoveToPos(ImVec2(c.x - 400, c.y - 200));
+            ctx->MouseUp(1);
+            ctx->Yield(2);
+            // context menu open/close
+            ctx->MouseClick(1);
+            ctx->Yield(3);
+            ctx->PopupCloseAll();
+            ctx->MouseDoubleClick(0);
+            ctx->Yield(2);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            ctx->KeyPress(ImGuiKey_Space); // pause for round 2
+            ctx->Yield(4);
+        }
+        ctx->KeyPress(ImGuiKey_Space);
+        ctx->Yield(2);
+    };
+
+    // Click every widget on every side-panel page.
+    t = IM_REGISTER_TEST(e, "fuzz", "page_widget_walk");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        EnsureSidePanelVisible(ctx);
+        const char* pages[] = { "Scope", "Signals", "PSU", "Meter", "Logic",
+            "DAQ", "Analysis" };
+        for (const char* page : pages)
+        {
+            SetMainRef(ctx);
+            ctx->MenuClick(ImGuiTestRef(
+                (std::string("View/Side Panel Page/") + page).c_str()));
+            ctx->Yield(3);
+            ImGuiTestItemInfo w = ctx->WindowInfo(
+                (std::string("//Main Window/##sidepanel/") + page).c_str(),
+                ImGuiTestOpFlags_NoError);
+            if (w.Window == nullptr)
+            {
+                ctx->LogInfo("fuzz: page '%s' window not found, skipping", page);
+                continue;
+            }
+            ctx->LogInfo("fuzz: === page '%s' ===", page);
+            FuzzClickAllUnder(ctx, w.Window->ID, 4);
+        }
+        SetMainRef(ctx);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+    };
+
+    // Drag every draggable thing to extremes on the value-heavy pages.
+    t = IM_REGISTER_TEST(e, "fuzz", "drag_extremes");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        EnsureSidePanelVisible(ctx);
+        const char* pages[] = { "Scope", "Signals", "PSU", "Logic" };
+        for (const char* page : pages)
+        {
+            SetMainRef(ctx);
+            ctx->MenuClick(ImGuiTestRef(
+                (std::string("View/Side Panel Page/") + page).c_str()));
+            ctx->Yield(3);
+            ImGuiTestItemInfo w = ctx->WindowInfo(
+                (std::string("//Main Window/##sidepanel/") + page).c_str(),
+                ImGuiTestOpFlags_NoError);
+            if (w.Window == nullptr)
+                continue;
+            ImGuiTestItemList items;
+            ctx->GatherItems(&items, w.Window->ID, 4);
+            ctx->LogInfo("fuzz: === drag page '%s', %d items ===", page,
+                items.GetSize());
+            for (int i = 0; i < items.GetSize(); i++)
+            {
+                const ImGuiTestItemInfo& item = *items[i];
+                if (FuzzBlacklisted(item.DebugLabel))
+                    continue;
+                if (ctx->ItemInfo(item.ID, ImGuiTestOpFlags_NoError).ID == 0)
+                    continue;
+                ctx->LogInfo("fuzz: drag #%d '%s'", i, item.DebugLabel);
+                ctx->ItemDragWithDelta(item.ID, ImVec2(+700, 0));
+                ctx->Yield(1);
+                ctx->ItemDragWithDelta(item.ID, ImVec2(-1400, 0));
+                ctx->Yield(1);
+                ctx->PopupCloseAll();
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+        SetMainRef(ctx);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+    };
+
+    // Every device mode from the toolbar combo, twice around.
+    t = IM_REGISTER_TEST(e, "fuzz", "mode_cycle");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ImGuiTestItemInfo toolbar = ctx->WindowInfo("//Main Window/##toolbar");
+        IM_CHECK(toolbar.Window != nullptr);
+        for (int round = 0; round < 2; round++)
+        {
+            for (int i = 0; i < 7; i++) // InputsControl::ModeCount
+            {
+                ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+                ctx->Yield(2);
+                ImGuiTestItemList items;
+                ctx->GatherItems(&items, "//##Combo_00", 1);
+                if (i < items.GetSize())
+                {
+                    ctx->LogInfo("fuzz: mode -> '%s'", items[i]->DebugLabel);
+                    ctx->ItemClick(items[i]->ID);
+                }
+                else
+                    ctx->PopupCloseAll();
+                ctx->Yield(4);
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+        // back to default two-channel scope mode
+        ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+        ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
+        ctx->Yield(4);
+    };
+
+    // OS window resize: degenerate and huge sizes.
+    t = IM_REGISTER_TEST(e, "fuzz", "window_resize");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        int nwin = 0;
+        SDL_Window** wins = SDL_GetWindows(&nwin);
+        SDL_Window* win = (nwin > 0) ? wins[0] : nullptr;
+        SDL_free(wins);
+        IM_CHECK(win != nullptr);
+        int w0 = 0, h0 = 0;
+        SDL_GetWindowSize(win, &w0, &h0);
+        const int sizes[][2] = { { 320, 200 }, { 50, 50 }, { 1, 1 },
+            { 8000, 8000 }, { 200, 2000 }, { 2000, 100 }, { w0, h0 } };
+        for (auto& s : sizes)
+        {
+            ctx->LogInfo("fuzz: resize %dx%d", s[0], s[1]);
+            // AppKit window ops must happen on the main thread; tests run on
+            // the engine's coroutine thread. Async so the main loop (blocked
+            // on this coroutine right now) can service it on the next frame.
+            struct SizeReq { SDL_Window* w; int x, y; };
+            SizeReq* req = new SizeReq{ win, s[0], s[1] };
+            SDL_RunOnMainThread(
+                [](void* ud) {
+                    SizeReq* r = (SizeReq*)ud;
+                    SDL_SetWindowSize(r->w, r->x, r->y);
+                    delete r;
+                },
+                req, false);
+            ctx->Yield(8);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+    };
+
+    // Seeded monkey: random clicks/keys/wheel over the whole main window.
+    t = IM_REGISTER_TEST(e, "fuzz", "monkey");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        unsigned int rng = 0xC0FFEE42u;
+        auto next = [&rng]() {
+            rng = rng * 1664525u + 1013904223u;
+            return rng >> 8;
+        };
+        const ImGuiKeyChord keys[] = { ImGuiKey_Space, ImGuiKey_F, ImGuiKey_B,
+            ImGuiKey_1, ImGuiKey_2, ImGuiKey_LeftArrow, ImGuiKey_RightArrow,
+            ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Tab, ImGuiKey_Enter };
+        ImGuiTestItemList items;
+        for (int i = 0; i < 400; i++)
+        {
+            if ((i % 25) == 0)
+            {
+                ctx->PopupCloseAll();
+                ctx->GatherItems(&items, "//Main Window", 5);
+                ctx->LogInfo("fuzz: monkey iter %d, %d items", i, items.GetSize());
+            }
+            const unsigned int action = next() % 6;
+            if (action <= 2 && items.GetSize() > 0)
+            {
+                const ImGuiTestItemInfo& item = *items[next() % items.GetSize()];
+                if (FuzzBlacklisted(item.DebugLabel))
+                    continue;
+                if (ctx->ItemInfo(item.ID, ImGuiTestOpFlags_NoError).ID == 0)
+                    continue;
+                ctx->LogInfo("fuzz: monkey click '%s'", item.DebugLabel);
+                ctx->ItemClick(item.ID);
+                ctx->PopupCloseAll();
+            }
+            else if (action == 3)
+            {
+                ctx->PopupCloseAll(); // no Enter into an open menu
+                ctx->KeyPress(keys[next() % IM_ARRAYSIZE(keys)]);
+            }
+            else
+            {
+                ImGuiWindow* window = ctx->GetWindowByRef("//Main Window");
+                if (window == nullptr)
+                    continue;
+                const ImRect r = window->Rect();
+                ctx->MouseMoveToPos(ImVec2(
+                    r.Min.x + (next() % (int)r.GetWidth()),
+                    r.Min.y + (next() % (int)r.GetHeight())));
+                if (action == 4)
+                    ctx->MouseWheelY((float)(int)(next() % 21) - 10.0f);
+                else
+                    ctx->MouseClick(next() % 2);
+                ctx->PopupCloseAll();
+            }
+            ctx->Yield(1);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+        SetMainRef(ctx);
+    };
+
+    // Calibration wizard end-to-end (scope path). REWRITES the attached
+    // board's calibration values in settings.ini — run deliberately.
+    t = IM_REGISTER_TEST(e, "fuzzx", "calibration_wizard");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ctx->MenuClick("Device/Calibration...");
+        ctx->Yield(3);
+        ctx->SetRef("Calibration");
+        if (ctx->ItemExists("Calibrate Oscilloscope##cal_start_scope"))
+        {
+            ctx->ItemClick("Calibrate Oscilloscope##cal_start_scope");
+            ctx->Yield(3);
+            for (int i = 0; i < 60; i++) // step through, bounded
+            {
+                if (ctx->GetWindowByRef("//Calibration") == nullptr)
+                    break;
+                if (ctx->ItemExists("Next##cal_next"))
+                    ctx->ItemClick("Next##cal_next");
+                else if (ctx->ItemExists("Done##cal_scope_done"))
+                {
+                    ctx->ItemClick("Done##cal_scope_done");
+                    break;
+                }
+                else if (ctx->ItemExists("OK##cal_failed_ok"))
+                {
+                    ctx->ItemClick("OK##cal_failed_ok");
+                    break;
+                }
+                ctx->SleepNoSkip(1.0f, 0.5f); // measuring phases take real time
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+        // close the window if it is still up
+        SetMainRef(ctx);
+    };
+
+    // Minimize / restore / fullscreen. CAVEAT: the main loop stops pumping
+    // while minimized, so the queued restore never runs and the headless
+    // harness wedges — run manually, be ready to un-minimize by hand.
+    t = IM_REGISTER_TEST(e, "fuzzx", "minimize_restore");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        int nwin = 0;
+        SDL_Window** wins = SDL_GetWindows(&nwin);
+        SDL_Window* win = (nwin > 0) ? wins[0] : nullptr;
+        SDL_free(wins);
+        IM_CHECK(win != nullptr);
+        enum Op { OpMin, OpRestore, OpMax, OpFsOn, OpFsOff };
+        const Op ops[] = { OpMin, OpRestore, OpMax, OpRestore, OpFsOn,
+            OpFsOff, OpMin, OpRestore };
+        for (Op op : ops)
+        {
+            ctx->LogInfo("fuzz: window op %d", (int)op);
+            struct Req { SDL_Window* w; Op op; };
+            Req* req = new Req{ win, op };
+            SDL_RunOnMainThread(
+                [](void* ud) {
+                    Req* r = (Req*)ud;
+                    switch (r->op)
+                    {
+                    case OpMin:     SDL_MinimizeWindow(r->w); break;
+                    case OpRestore: SDL_RestoreWindow(r->w); break;
+                    case OpMax:     SDL_MaximizeWindow(r->w); break;
+                    case OpFsOn:    SDL_SetWindowFullscreen(r->w, true); break;
+                    case OpFsOff:   SDL_SetWindowFullscreen(r->w, false); break;
+                    }
+                    delete r;
+                },
+                req, false);
+            ctx->Yield(30); // let it render a while in that state
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+    };
+
+    // Reset the USB connection (the Esc shortcut path) while streaming,
+    // repeatedly, and once while paused, waiting out each reconnect.
+    t = IM_REGISTER_TEST(e, "fuzz", "reset_usb");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        for (int round = 0; round < 3; round++)
+        {
+            if (round == 2)
+            {
+                ctx->KeyPress(ImGuiKey_Space); // paused this time
+                ctx->Yield(4);
+            }
+            ctx->LogInfo("fuzz: reset usb, round %d", round);
+            ctx->MenuClick("Device/Reset USB connection");
+            ctx->SleepNoSkip(4.0f, 0.5f); // reconnect + auto-restream
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+        ctx->KeyPress(ImGuiKey_Space); // resume if still paused
+        ctx->Yield(4);
+    };
+
+    // Quit through the app's own File menu while connected and streaming —
+    // exercises the real shutdown path (thread joins, USB teardown). The app
+    // exits mid-test, killing the run: run this one alone.
+    t = IM_REGISTER_TEST(e, "fuzzx", "quit_while_connected");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ctx->SleepNoSkip(3.0f, 0.5f); // make sure streaming is up
+        ctx->MenuClick("File/Quit");
+        ctx->SleepNoSkip(10.0f, 1.0f); // should be dead before this ends
+    };
+
+    // Interactive walk INSIDE the mobile and compact layouts (the
+    // desktop-forced QA suite never exercises them): switch live, click
+    // every safe item in every window, then switch on.
+    t = IM_REGISTER_TEST(e, "fuzz", "layout_walk");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        const char* layouts[] = { "Mobile", "Compact (800x480)", "Desktop" };
+        for (const char* layout : layouts)
+        {
+            // Switch via the View menu if this layout still has one.
+            if (ctx->GetWindowByRef("//Main Window") != nullptr)
+            {
+                ctx->SetRef("Main Window");
+                ctx->MenuClick(ImGuiTestRef(
+                    (std::string("View/Layout/") + layout).c_str()));
+                ctx->Yield(10);
+            }
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            ctx->LogInfo("fuzz: === walking layout %s ===", layout);
+            if (strcmp(layout, "Desktop") == 0)
+                break; // back home; the desktop walk already ran elsewhere
+            ImGuiWindow* main = ctx->GetWindowByRef("//Main Window");
+            if (main == nullptr)
+                continue;
+            ctx->SetRef(main->ID);
+            // Visit every page via its nav-rail label, then click everything
+            // the page shows.
+            const char* rail_pages[] = { "Scope", "Signals", "PSU", "Meter",
+                "Logic", "DAQ", "Analysis" };
+            for (const char* page : rail_pages)
+            {
+                ctx->PopupCloseAll();
+                ctx->MenuClick(ImGuiTestRef(
+                    (std::string("View/Side Panel Page/") + page).c_str()));
+                ctx->Yield(4);
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+                ctx->LogInfo("fuzz: --- %s page '%s' ---", layout, page);
+                FuzzClickAllUnder(ctx, main->ID, 5);
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+    };
+
+    // Live layout switches (desktop -> compact -> mobile -> desktop).
+    t = IM_REGISTER_TEST(e, "fuzz", "layout_switch");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        const char* layouts[] = { "Compact (800x480)", "Mobile", "Desktop" };
+        for (const char* layout : layouts)
+        {
+            ctx->LogInfo("fuzz: layout -> %s", layout);
+            if (ctx->GetWindowByRef("//Main Window") != nullptr)
+            {
+                ctx->SetRef("Main Window");
+                ctx->MenuClick(ImGuiTestRef(
+                    (std::string("View/Layout/") + layout).c_str()));
+            }
+            ctx->Yield(10);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+    };
+
+    // Esc is the reset-USB shortcut, and users spam it. Rapid resets land
+    // while the previous reconnect is still in flight; the reconnect state
+    // machine must survive that. (Repro for a field crash: 5-10 quick Escs.)
+    t = IM_REGISTER_TEST(e, "fuzz", "esc_spam");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        // The Esc handler is gated on librador_is_connected(), so a fixed
+        // cadence mostly no-ops while disconnected. Fire the instant the
+        // connection comes (back) up so the reset lands inside connection
+        // setup, like a user hammering the key.
+        for (int i = 0; i < 12; i++)
+        {
+            for (int w = 0; w < 100 && !librador_is_connected(); w++)
+                ctx->SleepNoSkip(0.1f, 0.1f);
+            ctx->LogInfo("fuzz: Esc press %d (connected=%d)", i,
+                (int)librador_is_connected());
+            ctx->KeyPress(ImGuiKey_Escape);
+            ctx->Yield(2);
+            ctx->KeyPress(ImGuiKey_Escape); // double-tap for good measure
+            ctx->Yield(2);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+        ctx->SleepNoSkip(8.0f, 1.0f); // let the final reconnect settle
+        ctx->Yield(4);
+    };
+}
+
 // ---- Hardware loopback tests -------------------------------------------------
 // Harness: SG1 wired to OSC1, SG2 wired to OSC2, board plugged in. Each test
 // drives a 1 kHz sine on the signal generator and checks amplitude and
@@ -370,6 +947,10 @@ static void RegisterHwTests(ImGuiTestEngine* e)
 void QaSetup(const char* run_filter)
 {
     g_headless = (run_filter != nullptr);
+    // Bare --qa means the stable regression suite; the fuzz categories are
+    // opt-in (--qa=fuzz or individual test names).
+    if (run_filter != nullptr && strcmp(run_filter, "all") == 0)
+        run_filter = "gui,hw";
 
     g_engine = ImGuiTestEngine_CreateContext();
     ImGuiTestEngineIO& io = ImGuiTestEngine_GetIO(g_engine);
@@ -380,6 +961,7 @@ void QaSetup(const char* run_filter)
     io.ConfigLogToTTY = g_headless;
 
     RegisterGuiTests(g_engine);
+    RegisterFuzzTests(g_engine);
     RegisterHwTests(g_engine);
 
     ImGuiTestEngine_Start(g_engine, ImGui::GetCurrentContext());
