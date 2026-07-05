@@ -44,3 +44,7 @@ install(TARGETS libdfuprog
     FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# dfu-programmer predates C23 (its dfu-bool.h defines enum constants named
+# true/false, keywords from C23 on); pin the dialect new GCCs default past.
+set_target_properties(libdfuprog PROPERTIES C_STANDARD 17 C_EXTENSIONS ON)
