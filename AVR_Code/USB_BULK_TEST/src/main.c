@@ -220,6 +220,13 @@ int main(void){
 			asm("nop");
 			asm("nop");
 			if(modeChanged){
+				//Clear the flag BEFORE applying: tiny_dma_set_mode_X busy-waits
+				//up to 1ms in tiny_calibration_synchronise_phase, and a
+				//SET_INTERFACE arriving during that window re-posts a mode set
+				//(the DMA phase depends on the transport).  Clearing after the
+				//switch would swallow that re-post and leave the acquisition
+				//phase built for the wrong transport.
+				modeChanged = 0;
 				switch(futureMode){
 					case 0:
 					tiny_dma_set_mode_0();
@@ -246,7 +253,6 @@ int main(void){
 					tiny_dma_set_mode_7();
 					break;
 				}
-				modeChanged = 0;
 			}
 	}
 }
@@ -294,14 +300,22 @@ static void main_aio_bulk_kick(void)
 		bulk_seg2_len = 0;
 		csum = aio_frame_csum(safe_half);
 	} else {
-		//Modes 0-4 ping-pong the halves in lockstep with the SOF, so the
-		//half the DMA is not writing this millisecond is stable.  The
-		//768-byte transfer carries 18 trailing pad bytes (adjacent buffer
-		//content, ignored by the host).
-		bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
+		//Modes 0-4: the SOF handler toggles usb_state BEFORE this kick
+		//runs, and the DMA re-arm ISR (firing just before SOF at servo
+		//lock) has already pointed the ADC writer at the post-toggle
+		//usb_state half - confirmed by the DMA snapshot in the header:
+		//the writer sits in the usb_state half on ~100% of frames.
+		//Transmit the OTHER half (the one the writer just finished),
+		//matching the pre-toggle arming parity of the iso transports,
+		//which measure 100% clean under load.  Transmitting usb_state's
+		//half means racing the writer through the very bytes being
+		//sent; a quiet DC input masks that from the checksum (new bytes
+		//== old bytes), which is how it survived testing.
+		unsigned char tx_half = usb_state ^ 1;
+		bulk_payload_ptr = &isoBuf[tx_half * PACKET_SIZE];
 		bulk_seg1_len = BULK_PAYLOAD_XFER_LEN;
 		bulk_seg2_len = 0;
-		csum = aio_frame_csum(usb_state);
+		csum = aio_frame_csum(tx_half);
 	}
 	bulk_hdr[0] = AIO_HDR_MAGIC0;
 	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
@@ -311,6 +325,19 @@ static void main_aio_bulk_kick(void)
 	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
 	bulk_hdr[6] = csum;
 	bulk_hdr[7] = global_mode;
+	//Diagnostic snapshot of the acquisition DMA state at kick time, in
+	//otherwise-unused pad bytes.  The host can correlate checksum failures
+	//with where the ADC write pointer actually was relative to the half
+	//being transmitted.
+	bulk_hdr[8] = usb_state;
+	bulk_hdr[9] = DMA.CH0.DESTADDR0;
+	bulk_hdr[10] = DMA.CH0.DESTADDR1;
+	bulk_hdr[11] = DMA.CH0.TRFCNTL;
+	bulk_hdr[12] = DMA.CH0.TRFCNTH;
+	bulk_hdr[13] = DMA.CH1.DESTADDR0;
+	bulk_hdr[14] = DMA.CH1.DESTADDR1;
+	bulk_hdr[15] = DMA.CH1.TRFCNTL;
+	bulk_hdr[16] = DMA.CH1.TRFCNTH;
 	bulk_busy = 1;
 	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, BULK_HDR_XFER_LEN, bulk_hdr_callback)) {
 		bulk_busy = 0;

@@ -22,14 +22,31 @@
 		(DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm) : \
 		(DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm))
 	#define DMA_STANDARD_TRANSFER_LENGTH ((active_transport == TRANSPORT_ISO6) ? PACKET_SIZE : HALFPACKET_SIZE)
+	//Acquisition block phase (modes 0-4).  TC_CALI counts 24000/frame with
+	//SOF at 12000.  The classic start phase (CNT=500 = SOF+521us) puts each
+	//375-sample block boundary - and the DMA re-arm that begins overwriting
+	//the OTHER buffer half - at ~SOF+533us.  An iso transaction has drained
+	//by then, but bulk transactions trickle out across the whole frame, and
+	//the second half-packet region (payload bytes 375..549) is still on the
+	//wire at ~500us: a 29us race, lost on ~20% of frames (measured, mode 2
+	//under signal-gen load).  For bulk, start the DMA at CNT=7200
+	//(=SOF-200us) so the block boundary lands at ~SOF+800us: the writer
+	//enters the transmitted half 130us after its last byte left, and the
+	//re-arm interrupt stays 200us clear of the SOF handler.
+	#define AIO_DMA_START_PHASE   ((active_transport == TRANSPORT_BULK) ? 7200 : 500)
+	#define AIO_DMA_MEDIAN_TRFCNT ((active_transport == TRANSPORT_BULK) ? 300 : 200)
 #elif !defined(SINGLE_ENDPOINT_INTERFACE)
 	#define DMA_STANDARD_INTERRUPT (0x00)
 	#define DMA_STANDARD_CTRLA (DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm | DMA_CH_REPEAT_bm)
 	#define DMA_STANDARD_TRANSFER_LENGTH (PACKET_SIZE)
+	#define AIO_DMA_START_PHASE   500
+	#define AIO_DMA_MEDIAN_TRFCNT 200
 #else
 	#define DMA_STANDARD_INTERRUPT (0x03)
 	#define DMA_STANDARD_CTRLA (DMA_CH_BURSTLEN_1BYTE_gc | DMA_CH_SINGLE_bm)
 	#define DMA_STANDARD_TRANSFER_LENGTH (HALFPACKET_SIZE)
+	#define AIO_DMA_START_PHASE   500
+	#define AIO_DMA_MEDIAN_TRFCNT 200
 #endif
 
 void tiny_dma_setup(void){
@@ -153,8 +170,8 @@ void tiny_dma_set_mode_0(void){
 	DMA.CH0.DESTADDR1 = (( (uint16_t) &isoBuf[0]) >> 8) & 0xFF;
 	DMA.CH0.DESTADDR2 = 0x00;
 		
-	tiny_calibration_synchronise_phase(500, 200);
-	median_TRFCNT = 200;
+	tiny_calibration_synchronise_phase(AIO_DMA_START_PHASE, 200);
+	median_TRFCNT = AIO_DMA_MEDIAN_TRFCNT;
 	median_TRFCNT_delay = 1; //Wait a few frames before actually setting median_TRFCNT, in case a SOF interrupt was queued during tiny_dma_set_mode_xxx.
 	DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
 	
@@ -250,8 +267,8 @@ void tiny_dma_set_mode_1(void){
 	DMA.CH0.DESTADDR1 = (( (uint16_t) &isoBuf[0]) >> 8) & 0xFF;
 	DMA.CH0.DESTADDR2 = 0x00;
 	
-	tiny_calibration_synchronise_phase(500, 200);
-	median_TRFCNT = 200;
+	tiny_calibration_synchronise_phase(AIO_DMA_START_PHASE, 200);
+	median_TRFCNT = AIO_DMA_MEDIAN_TRFCNT;
 	median_TRFCNT_delay = 1; //Wait a few frames before actually setting median_TRFCNT, in case a SOF interrupt was queued during tiny_dma_set_mode_xxx.
 	DMA.CH1.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
 	DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!	
@@ -347,8 +364,8 @@ void tiny_dma_set_mode_2(void){
 				
 	//Must enable last for REPCNT won't work!
 
-	tiny_calibration_synchronise_phase(500, 200);
-	median_TRFCNT = 200;
+	tiny_calibration_synchronise_phase(AIO_DMA_START_PHASE, 200);
+	median_TRFCNT = AIO_DMA_MEDIAN_TRFCNT;
 	median_TRFCNT_delay = 1; //Wait a few frames before actually setting median_TRFCNT, in case a SOF interrupt was queued during tiny_dma_set_mode_xxx.
 	DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
 	DMA.CH1.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
@@ -454,8 +471,8 @@ void tiny_dma_set_mode_3(void){
 	DMA.CH0.DESTADDR1 = (( (uint16_t) &isoBuf[0]) >> 8) & 0xFF;
 	DMA.CH0.DESTADDR2 = 0x00;
 		
-	tiny_calibration_synchronise_phase(500, 200);
-	median_TRFCNT = 200;
+	tiny_calibration_synchronise_phase(AIO_DMA_START_PHASE, 200);
+	median_TRFCNT = AIO_DMA_MEDIAN_TRFCNT;
 	median_TRFCNT_delay = 1; //Wait a few frames before actually setting median_TRFCNT, in case a SOF interrupt was queued during tiny_dma_set_mode_xxx.
 
 	//Must enable last for REPCNT won't work!
@@ -554,8 +571,8 @@ void tiny_dma_set_mode_4(void){
 	DMA.CH1.DESTADDR1 = (( (uint16_t) &isoBuf[PACKET_SIZE]) >> 8) & 0xFF;
 	DMA.CH1.DESTADDR2 = 0x00;
 		
-	tiny_calibration_synchronise_phase(500, 200);
-	median_TRFCNT = 200;
+	tiny_calibration_synchronise_phase(AIO_DMA_START_PHASE, 200);
+	median_TRFCNT = AIO_DMA_MEDIAN_TRFCNT;
 	median_TRFCNT_delay = 1; //Wait a few frames before actually setting median_TRFCNT, in case a SOF interrupt was queued during tiny_dma_set_mode_xxx.
 	DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
 	DMA.CH1.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!

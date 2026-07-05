@@ -22,6 +22,7 @@
 #include <vector>
 #include <chrono>
 #include <deque>
+#include <cmath>
 #include <libusb.h>
 
 #define VID 0x03eb
@@ -178,6 +179,136 @@ static void test_bulk(int seconds, Stats &st) {
     printf("[i] raw bulk bytes: %llu (%.1f KB/s incl. headers)\n",
            (unsigned long long)raw_bytes, raw_bytes / secs / 1024.0);
     st.report("bulk", secs);
+    libusb_set_interface_alt_setting(g_h, 2, 0);
+    libusb_release_interface(g_h, 2);
+}
+
+// ------------------------------------------------------------ bulkdiag ----
+// Diagnostic bulk run: firmware puts a snapshot of the acquisition DMA
+// state (usb_state + CH0/CH1 DESTADDR/TRFCNT at kick time) in header bytes
+// 8..16.  Correlate checksum failures with where the ADC write pointer was
+// relative to the transmitted half, and map which byte ranges of failing
+// frames went out stale (identical to the previous same-half frame).
+static void test_bulkdiag(int seconds, bool fgen) {
+    printf("\n=== BULK diagnostic (fgen %s) ===\n", fgen ? "ON" : "off");
+    if (libusb_claim_interface(g_h, 2)) { fprintf(stderr, "claim(2) failed\n"); return; }
+    if (fgen) {
+        // 20-sample sine at 141.2 us/sample = 354.1 Hz (the frequency from
+        // the user's field report; deliberately incommensurate with the
+        // 1 ms frame so frame-aligned artifacts can't hide).
+        // timerPeriod = 141.2us * 48 MHz - 0.5 = 6777, clock div setting 1.
+        uint8_t wave[20];
+        for (int i = 0; i < 20; i++)
+            wave[i] = (uint8_t)(128 + 100 * sin(2 * 3.14159265 * i / 20));
+        int r = libusb_control_transfer(g_h, 0x40, 0xa1, 6777, 1, wave, sizeof(wave), 1000);
+        printf("[+] fgen 354.1 Hz sine load: %d\n", r);
+    }
+    if (libusb_set_interface_alt_setting(g_h, 2, 1)) {
+        fprintf(stderr, "set_alt(2,1) failed\n");
+        libusb_release_interface(g_h, 2);
+        return;
+    }
+
+    std::deque<uint8_t> stream;
+    std::vector<uint8_t> buf(16384);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+
+    // Per-frame records
+    struct Rec { uint16_t seq; bool pass; uint8_t state; uint16_t ch0_dest, ch0_trf, ch1_dest, ch1_trf; };
+    std::vector<Rec> recs;
+    std::vector<uint8_t> prev_same_half[2];  // last payload per usb_state value
+    int printed_fail_maps = 0;
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        int got = 0;
+        int r = libusb_bulk_transfer(g_h, 0x88, buf.data(), (int)buf.size(), &got, 250);
+        if (r && r != LIBUSB_ERROR_TIMEOUT) break;
+        stream.insert(stream.end(), buf.begin(), buf.begin() + got);
+        while (true) {
+            while (stream.size() >= 2 &&
+                   !(stream[0] == HDR_MAGIC0 && stream[1] == HDR_MAGIC1_BULK))
+                stream.pop_front();
+            if (stream.size() < 8) break;
+            uint16_t len = stream[4] | (stream[5] << 8);
+            if (len != PACKET_SIZE) { stream.pop_front(); continue; }
+            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
+            Rec rec;
+            rec.seq = stream[2] | (stream[3] << 8);
+            uint8_t csum = stream[6];
+            rec.state = stream[8];
+            rec.ch0_dest = stream[9] | (stream[10] << 8);
+            rec.ch0_trf  = stream[11] | (stream[12] << 8);
+            rec.ch1_dest = stream[13] | (stream[14] << 8);
+            rec.ch1_trf  = stream[15] | (stream[16] << 8);
+            std::vector<uint8_t> payload(stream.begin() + BULK_HDR_XFER,
+                                         stream.begin() + BULK_HDR_XFER + PACKET_SIZE);
+            uint8_t actual = 0;
+            for (auto b : payload) actual ^= b;
+            rec.pass = (actual == csum);
+
+            if (!rec.pass && prev_same_half[rec.state & 1].size() == PACKET_SIZE
+                && printed_fail_maps < 15) {
+                // Map segments identical to the previous same-half frame
+                // (stale => writer had not refreshed them by transmit time).
+                auto &old_p = prev_same_half[rec.state & 1];
+                printf("FAIL seq=%5u state=%u ch0_dest=%5u trf=%3u ch1_dest=%5u trf=%3u stale:",
+                       rec.seq, rec.state, rec.ch0_dest, rec.ch0_trf, rec.ch1_dest, rec.ch1_trf);
+                int seg_start = -1;
+                for (int i = 0; i <= PACKET_SIZE; i++) {
+                    bool same = (i < PACKET_SIZE) && payload[i] == old_p[i];
+                    if (same && seg_start < 0) seg_start = i;
+                    if (!same && seg_start >= 0) {
+                        if (i - seg_start >= 12) printf(" [%d..%d]", seg_start, i - 1);
+                        seg_start = -1;
+                    }
+                }
+                printf("\n");
+                printed_fail_maps++;
+            }
+            prev_same_half[rec.state & 1] = payload;
+            recs.push_back(rec);
+            stream.erase(stream.begin(),
+                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
+        }
+    }
+
+    // Aggregate: pass/fail vs writer-half-at-kick (from CH0 dest offset).
+    // CH0 dest addresses cluster at isoBuf+0 / isoBuf+750 (mode 0/2);
+    // infer the isoBuf base as the minimum seen.
+    uint16_t base = 0xffff;
+    for (auto &rc : recs) if (rc.ch0_dest < base) base = rc.ch0_dest;
+    uint64_t n[2][2] = {{0,0},{0,0}};  // [writer_in_tx_half][pass]
+    uint64_t trf_sum[2] = {0,0}; uint64_t trf_n[2] = {0,0};
+    uint64_t pass_total = 0;
+    for (auto &rc : recs) {
+        uint16_t off = rc.ch0_dest - base;           // 0..1499
+        int writer_half = (off >= PACKET_SIZE) ? 1 : 0;
+        int tx_half = rc.state & 1;
+        int collide = (writer_half == tx_half) ? 1 : 0;
+        n[collide][rc.pass ? 1 : 0]++;
+        trf_sum[rc.pass ? 1 : 0] += rc.ch0_trf; trf_n[rc.pass ? 1 : 0]++;
+        if (rc.pass) pass_total++;
+    }
+    printf("frames=%zu pass=%.2f%%  (isoBuf base inferred: %u)\n",
+           recs.size(), recs.empty() ? 0 : 100.0 * pass_total / recs.size(), base);
+    printf("  writer in OTHER half at kick: pass=%llu fail=%llu\n",
+           (unsigned long long)n[0][1], (unsigned long long)n[0][0]);
+    printf("  writer in TX    half at kick: pass=%llu fail=%llu\n",
+           (unsigned long long)n[1][1], (unsigned long long)n[1][0]);
+    printf("  mean CH0.TRFCNT at kick: pass=%.1f fail=%.1f\n",
+           trf_n[1] ? (double)trf_sum[1] / trf_n[1] : 0.0,
+           trf_n[0] ? (double)trf_sum[0] / trf_n[0] : 0.0);
+    // TRFCNT distribution, 25-count bins, pass vs fail
+    uint64_t hist[2][16] = {{0},{0}};
+    for (auto &rc : recs) {
+        int bin = rc.ch0_trf / 25; if (bin > 15) bin = 15;
+        hist[rc.pass ? 1 : 0][bin]++;
+    }
+    printf("  TRFCNT hist (bin=25): ");
+    for (int b = 0; b < 16; b++) printf("%d:%llu/%llu ", b * 25,
+        (unsigned long long)hist[1][b], (unsigned long long)hist[0][b]);
+    printf(" (pass/fail)\n");
+
     libusb_set_interface_alt_setting(g_h, 2, 0);
     libusb_release_interface(g_h, 2);
 }
@@ -587,6 +718,8 @@ int main(int argc, char **argv) {
     if (which == "iso6" || which == "all") test_iso6(seconds, s6);
     if (which == "sig"  || which == "all") test_signal();
     if (which == "appthread") test_bulk_async_threaded(seconds);
+    if (which == "bulkdiag")     test_bulkdiag(seconds, false);
+    if (which == "bulkdiaggen")  test_bulkdiag(seconds, true);
 
     libusb_close(g_h);
     libusb_exit(nullptr);
