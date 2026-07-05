@@ -14,6 +14,7 @@ extern "C"
 #include <deque>
 #include <chrono>
 #include <atomic>
+#include <condition_variable>
 
 #ifdef PLATFORM_ANDROID
 #include <jni.h>
@@ -58,7 +59,12 @@ extern "C"
 #define AIO_HDR_MAGIC1_BULK 0x57
 #define AIO_HDR_MAGIC1_META 0x58
 #define MAX_DATA_ENDPOINTS 6
-#define NUM_BULK_CTX 4
+// Bulk URB queue depth: the host controller keeps draining the pipe into
+// pre-queued kernel buffers even while the app's event thread is busy, so
+// this is the stall runway protecting the device's 1 ms drain deadline
+// (ADC overwrites its double buffer every 2 ms).  16 x 16 KB = 256 KB =
+// ~340 ms at full rate.
+#define NUM_BULK_CTX 16
 #define BULK_CTX_SIZE 16384
 
 // Single source of truth for the firmware the app expects on the board.
@@ -270,6 +276,32 @@ private:
     uint64_t meta_frame_counter = 0;
     // iso6 reassembly: per-endpoint packet queues consumed in lockstep
     std::deque<std::vector<unsigned char>> iso6_queues[MAX_DATA_ENDPOINTS];
+
+    // Hand-off between the libusb event thread and the ingest thread.  The
+    // event thread must NEVER block on buffer_read_write_mutex: while it
+    // is blocked it cannot resubmit bulk URBs, the host controller stops
+    // issuing IN tokens, and the device blows the 1 ms drain deadline (the
+    // ADC overwrites its double buffer every 2 ms).  Callbacks push raw
+    // bytes here under a short-lived lock; the ingest thread does all
+    // parsing, validation and o1buffer dispatch.
+    struct IngestItem {
+        uint8_t kind;        // 0=bulk bytes, 1=iso data, 2=iso6 data, 3=meta
+        uint8_t ep_index;    // iso6 endpoint index
+        std::vector<unsigned char> bytes;
+    };
+    std::deque<IngestItem> ingest_queue;
+    std::mutex ingest_mutex;
+    std::condition_variable ingest_cv;
+    std::thread *ingest_thread = nullptr;
+    bool ingest_stop = false;
+    void ingest_thread_function();
+    void queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned char *data, int length);
+
+    // Timebase preservation: lost or torn frames are replaced with a
+    // repeat of the last good frame (sample-and-hold) so the sample clock
+    // in the o1buffers stays honest instead of silently compressing.
+    unsigned char last_good_frame[ISO_PACKET_SIZE] = {0};
+    void dispatch_lost_frames(uint64_t count);
     std::thread *iso_polling_thread = nullptr;
     std::thread *daq_thread = nullptr;
     //Control Vars

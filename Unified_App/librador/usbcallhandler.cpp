@@ -53,6 +53,17 @@ static unsigned char xor_csum_750(const unsigned char *p){
     return c;
 }
 
+void usbCallHandler::dispatch_lost_frames(uint64_t count){
+    // Sample-and-hold filler for frames that never arrived intact.  Bounded
+    // so a long stall (unplug, debugger pause) cannot flood the buffers.
+    if(count > 250){
+        count = 250;
+    }
+    for(uint64_t i = 0; i < count; i++){
+        dispatch_frame(last_good_frame);
+    }
+}
+
 void usbCallHandler::note_frame_csum(unsigned char csum, bool valid){
     frame_csum_ring[data_frame_counter % CSUM_RING_SIZE] = csum;
     frame_csum_valid[data_frame_counter % CSUM_RING_SIZE] = valid;
@@ -97,11 +108,13 @@ void usbCallHandler::get_frame_stats(uint64_t *ok, uint64_t *bad_checksum, uint6
 void usbCallHandler::handle_data_iso_packet(unsigned char *data, int length){
     if(length == ISO_PACKET_SIZE){
         note_frame_csum(xor_csum_750(data), true);
+        memcpy(last_good_frame, data, ISO_PACKET_SIZE);
         dispatch_frame(data);
     } else {
         // Device skipped this frame (or partial) - hole in the stream.
         note_frame_csum(0, false);
         if(length != 0) frames_bad_checksum++;
+        dispatch_lost_frames(1);
     }
 }
 
@@ -135,9 +148,11 @@ void usbCallHandler::drain_iso6_queues(){
         }
         if(complete){
             note_frame_csum(xor_csum_750(frame), true);
+            memcpy(last_good_frame, frame, ISO_PACKET_SIZE);
             dispatch_frame(frame);
         } else {
             note_frame_csum(0, false);
+            dispatch_lost_frames(1);
         }
     }
 }
@@ -178,6 +193,20 @@ void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
 
 // Bulk stream parser: [EB 57 seqL seqH lenL lenH csum mode] + payload.
 void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
+    // Diagnostic: raw stream capture (LABRADOR_DUMP_BULK=<path>, first 1 MB)
+    static FILE *dump_fp = nullptr;
+    static long dump_left = -1;
+    if(dump_left < 0){
+        const char *env = getenv("LABRADOR_DUMP_BULK");
+        if(env){ dump_fp = fopen(env, "wb"); dump_left = 1024L*1024L; }
+        else dump_left = 0;
+    }
+    if(dump_fp && dump_left > 0){
+        long n = (length < dump_left) ? length : dump_left;
+        fwrite(data, 1, n, dump_fp);
+        dump_left -= n;
+        if(dump_left <= 0){ fclose(dump_fp); dump_fp = nullptr; }
+    }
     bulk_stream.insert(bulk_stream.end(), data, data + length);
     size_t pos = 0;
     while(true){
@@ -192,18 +221,104 @@ void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
         uint16_t seq = bulk_stream[pos+2] | (bulk_stream[pos+3] << 8);
         unsigned char csum = bulk_stream[pos+6];
         unsigned char *payload = bulk_stream.data() + pos + 8;
+        if(seq_started){
+            uint16_t expect = (uint16_t)(last_seq + 1);
+            if(seq != expect){
+                // Device skipped frames: keep the sample clock honest.
+                dispatch_lost_frames((uint16_t)(seq - expect));
+            }
+        }
         note_seq(seq);
         if(xor_csum_750(payload) == csum){
             frames_ok++;
+            memcpy(last_good_frame, payload, ISO_PACKET_SIZE);
             dispatch_frame(payload);
         } else {
-            // Stomped mid-flight by the ADC/DMA loop - drop it rather than
-            // pollute the scope buffers with torn data.
+            // Stomped mid-flight by the ADC/DMA loop - substitute a hold of
+            // the last good frame rather than plot torn data or silently
+            // compress the timebase.
             frames_bad_checksum++;
+            dispatch_lost_frames(1);
         }
         pos += 8 + len;
     }
     bulk_stream.erase(bulk_stream.begin(), bulk_stream.begin() + pos);
+}
+
+// ---------------------------------------------------------------------------
+// Ingest thread: takes raw bytes from the libusb event thread and does all
+// parsing / validation / o1buffer dispatch, so the event thread never
+// blocks on buffer_read_write_mutex (blocking there stalls URB
+// resubmission, the wire NAK-starves, and the device blows its 1 ms drain
+// deadline against the 2 ms ADC overwrite horizon).
+// ---------------------------------------------------------------------------
+
+void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned char *data, int length){
+    // TEMP A/B diagnostic: dispatch inline on the event thread (the
+    // pre-ingest-thread behavior) to measure what the ingest thread buys.
+    static int inline_dispatch = -1;
+    if(inline_dispatch < 0){
+        const char *env = getenv("LABRADOR_INLINE_DISPATCH");
+        inline_dispatch = (env && env[0] == '1') ? 1 : 0;
+    }
+    if(inline_dispatch){
+        switch(kind){
+        case 0: handle_bulk_bytes((unsigned char *)data, length); return;
+        case 1: handle_data_iso_packet((unsigned char *)data, length); return;
+        case 2: handle_iso6_packet(ep_index, (unsigned char *)data, length);
+                drain_iso6_queues(); return;
+        case 3: handle_meta_packet((unsigned char *)data, length); return;
+        }
+        return;
+    }
+    IngestItem item;
+    item.kind = kind;
+    item.ep_index = ep_index;
+    item.bytes.assign(data, data + length);
+    {
+        std::lock_guard<std::mutex> lock(ingest_mutex);
+        // Backstop against an unbounded queue if the ingest thread dies.
+        if(ingest_queue.size() > 4096){
+            ingest_queue.pop_front();
+        }
+        ingest_queue.push_back(std::move(item));
+    }
+    ingest_cv.notify_one();
+}
+
+void usbCallHandler::ingest_thread_function(){
+    LIBRADOR_LOG(LOG_DEBUG, "ingest thread spawned\n");
+    while(true){
+        std::deque<IngestItem> batch;
+        {
+            std::unique_lock<std::mutex> lock(ingest_mutex);
+            ingest_cv.wait(lock, [this]{ return ingest_stop || !ingest_queue.empty(); });
+            if(ingest_stop && ingest_queue.empty()){
+                break;
+            }
+            batch.swap(ingest_queue);
+        }
+        for(IngestItem &item : batch){
+            switch(item.kind){
+            case 0:
+                handle_bulk_bytes(item.bytes.data(), (int)item.bytes.size());
+                break;
+            case 1:
+                handle_data_iso_packet(item.bytes.data(), (int)item.bytes.size());
+                break;
+            case 2:
+                handle_iso6_packet(item.ep_index, item.bytes.data(), (int)item.bytes.size());
+                break;
+            case 3:
+                handle_meta_packet(item.bytes.data(), (int)item.bytes.size());
+                break;
+            }
+        }
+        if(active_transport == LABRADOR_TRANSPORT_ISO6){
+            drain_iso6_queues();
+        }
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "ingest thread finished\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -241,13 +356,10 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
                 actual = 0;
             }
             if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-                usb_driver->handle_iso6_packet(ep_index, packetPointer, actual);
+                usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
             } else {
-                usb_driver->handle_data_iso_packet(packetPointer, actual);
+                usb_driver->queue_ingest(1, 0, packetPointer, actual);
             }
-        }
-        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-            usb_driver->drain_iso6_queues();
         }
     }
     usb_driver->rearm_or_retire(transfer);
@@ -263,7 +375,7 @@ void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer){
             if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
                 actual = 0;
             }
-            usb_driver->handle_meta_packet(packetPointer, actual);
+            usb_driver->queue_ingest(3, 0, packetPointer, actual);
         }
     }
     usb_driver->rearm_or_retire(transfer);
@@ -274,7 +386,7 @@ void LIBUSB_CALL bulkCallback(struct libusb_transfer * transfer){
     if(transfer->status==LIBUSB_TRANSFER_COMPLETED || transfer->status==LIBUSB_TRANSFER_TIMED_OUT)
     {
         if(transfer->actual_length > 0){
-            usb_driver->handle_bulk_bytes(transfer->buffer, transfer->actual_length);
+            usb_driver->queue_ingest(0, 0, transfer->buffer, transfer->actual_length);
         }
     }
     usb_driver->rearm_or_retire(transfer);
@@ -314,6 +426,8 @@ bool usbCallHandler::safe_to_exit_thread(){
 
 
 // it makes sense to call this iso_polling_function because we only use libusb's asynchronous API for isochronous transfers
+std::atomic<uint32_t> g_ctrl_req_counts[256];
+
 void usbCallHandler::iso_polling_function(libusb_context *ctx){
     LIBRADOR_LOG(LOG_DEBUG, "iso_polling_function thread spawned\n");
     struct timeval tv;
@@ -332,6 +446,17 @@ void usbCallHandler::iso_polling_function(libusb_context *ctx){
                 (unsigned long long)frames_ok.load(), (unsigned long long)frames_bad_checksum.load(),
                 (unsigned long long)frames_dropped.load(), (unsigned long long)frames_unvalidated.load(),
                 active_transport);
+            {
+                char req_summary[256];
+                int off = 0;
+                for(int rc = 0; rc < 256; rc++){
+                    uint32_t n = g_ctrl_req_counts[rc].load();
+                    if(n && off < 200){
+                        off += snprintf(&req_summary[off], sizeof(req_summary)-off, "%02x:%u ", rc, n);
+                    }
+                }
+                LIBRADOR_LOG(LOG_DEBUG, "ctrl sends: %s\n", req_summary);
+            }
         }
     }
     iso_thread_active = false;
@@ -571,6 +696,8 @@ int usbCallHandler::setup_usb_iso(){
         return error;
     }
     LIBRADOR_LOG(LOG_DEBUG, "streaming started on transport %d", active_transport);
+    ingest_stop = false;
+    ingest_thread = new std::thread(&usbCallHandler::ingest_thread_function, this);
     iso_polling_thread = new std::thread(&usbCallHandler::iso_polling_function, this, ctx);
     iso_thread_active = true;
     return 0;
@@ -619,7 +746,10 @@ void usbCallHandler::alloc_iso_transfers(){
     if(active_transport == LABRADOR_TRANSPORT_BULK){
         for(int n=0;n<NUM_BULK_CTX;n++){
             bulkCtx[n] = libusb_alloc_transfer(0);
-            libusb_fill_bulk_transfer(bulkCtx[n], handle, AIO_EP_BULK, bulkBuffer[n], BULK_CTX_SIZE, bulkCallback, this, 250);
+            // Timeout 0: with a deep queue the tail URBs legitimately wait
+            // longer than any finite timeout before data reaches them
+            // (libusb counts from submission).  Teardown cancels explicitly.
+            libusb_fill_bulk_transfer(bulkCtx[n], handle, AIO_EP_BULK, bulkBuffer[n], BULK_CTX_SIZE, bulkCallback, this, 0);
         }
         return;
     }
@@ -676,6 +806,9 @@ int usbCallHandler::send_control_transfer(uint8_t RequestType, uint8_t Request, 
     }
     else controlBuffer = LDATA;
 
+    // Diagnostic: per-request-code send counters, dumped with frame stats.
+    extern std::atomic<uint32_t> g_ctrl_req_counts[256];
+    g_ctrl_req_counts[Request]++;
     // EP0 can report a transient stall when a control request races the
     // streaming event thread (observed ~5% of the time on macOS with async
     // bulk transfers in flight; every occurrence recovers on an immediate
@@ -1089,6 +1222,7 @@ double usbCallHandler::get_scope_gain(){
 }
 
 int usbCallHandler::set_gain(double newGain){
+    LIBRADOR_LOG(LOG_DEBUG, "set_gain(%f) -> 0xa5 DMA rebuild\n", newGain);
     //See XMEGA_AU Manual, page 359.  ADC.CTRL.GAIN.
     if(newGain==0.5) gainMask = 0x07;
     else if (newGain == 1) gainMask = 0x00;
@@ -1472,6 +1606,18 @@ void usbCallHandler::teardown_connection(){
         iso_thread_shutdown_requested = false;
         iso_polling_thread = nullptr;
         free_transfers();
+    }
+    if(ingest_thread){
+        {
+            std::lock_guard<std::mutex> lock(ingest_mutex);
+            ingest_stop = true;
+        }
+        ingest_cv.notify_one();
+        if(ingest_thread->joinable())
+            ingest_thread->join();
+        delete ingest_thread;
+        ingest_thread = nullptr;
+        ingest_queue.clear();
     }
     if(handle){
         if(claimed_iface >= 0){
