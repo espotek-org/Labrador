@@ -182,9 +182,13 @@ void InstrumentFrontend::shutDown(App& app)
 void InstrumentFrontend::onDeviceConnected(App& app)
 {
     (void)app;
-    // Same post-connect init the Monash app performed
-    SG1Widget.reset();
-    SG2Widget.reset();
+    // The board just (re)connected and has forgotten its state. Re-push the
+    // signal generators' current UI settings instead of turning them off:
+    // reset() drove the device off, so after a reconnect the generators went
+    // dark and stayed dark until the user touched a control. markDirty() makes
+    // the next controlLab pass resend whatever the widgets currently show.
+    SG1Widget.markDirty();
+    SG2Widget.markDirty();
     // Device mode is owned by the Inputs widget; force a resend of the
     // selected mode and the digital-out states on the next controlLab pass.
     InputsWidget.markDirty();

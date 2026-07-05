@@ -123,8 +123,14 @@ public:
 			switched = true;
 		}
 
-		if (switched)
+		// resend_pending forces a re-push after a USB reconnect: the board
+		// was reset and has forgotten its generator state, but nothing in the
+		// UI changed, so `switched` is false. It is a separate flag because
+		// renderControl() overwrites `switched` every frame (and only runs
+		// while the widget is visible), which would otherwise drop the resend.
+		if (switched || resend_pending)
 		{
+			resend_pending = false;
 			if (!active)
 			{
 				signals[signal_idx]->turnOff(channel);
@@ -140,7 +146,22 @@ public:
 
 	}
 
+	// Turn the generator output off on the hardware. Used on app shutdown, so
+	// it drives the device directly rather than deferring to controlLab (which
+	// won't run again).
 	void reset()
+	{
+		uart_queue.clear();
+		uart_transmitting = false;
+		signals[signal_idx]->turnOff(channel);
+	}
+
+	// Force the next controlLab() to re-push this widget's current state to the
+	// board — used after a USB reconnect, when the device has forgotten its
+	// generator settings. Mirrors InputsControl::markDirty / DigitalOutControl.
+	// Without this the signal generator silently stayed dark after every
+	// reconnect until the user toggled a control.
+	void markDirty()
 	{
 		uart_queue.clear();
 		uart_transmitting = false;
@@ -148,7 +169,7 @@ public:
 		{
 			uart_idle_pending = true; // re-assert the idle-high line on reconnect
 		}
-		signals[0]->turnOff(channel);
+		resend_pending = true;
 	}
 
 	// Where the UART TX section renders: inline under the waveform controls
@@ -356,6 +377,7 @@ private:
 	int channel;
 	bool active;
 	bool switched;
+	bool resend_pending = false; // re-push waveform on the next controlLab (reconnect)
 	int signal_idx = 0;
 	std::vector<GenericSignal*> signals;
 	float* pPSUVoltage;
