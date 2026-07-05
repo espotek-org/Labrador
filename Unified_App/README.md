@@ -29,7 +29,7 @@ make macos            # = cmake --preset macos && cmake --build --preset macos
 ```sh
 sudo apt install build-essential cmake ninja-build pkg-config libusb-1.0-0-dev \
     libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
-    libxfixes-dev libxi-dev libxss-dev libxkbcommon-dev libwayland-dev \
+    libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev \
     libegl1-mesa-dev libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
 make linux
 ./build/linux/labrador
