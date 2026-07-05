@@ -193,6 +193,10 @@ void InstrumentFrontend::onDeviceConnected(App& app)
     // selected mode and the digital-out states on the next controlLab pass.
     InputsWidget.markDirty();
     DigitalOutWidget.markDirty();
+    // Likewise the UART/I2C decode settings, which the device forgets on
+    // reset — without this the decoders kept using whatever config the
+    // freshly-rebooted board defaulted to until the user changed a setting.
+    LogicWidget.markDirty();
     InputsWidget.controlLab();
     // cannot run too often as this causes the usb sampling bug — the device
     // rebooted, so force a single resend of whatever gain the UI has selected
