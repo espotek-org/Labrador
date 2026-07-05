@@ -1,12 +1,34 @@
 ---
 name: labrador-qa
-description: Auto-QA the Unified_App Labrador GUI — build the QA build, run the ImGui Test Engine suite headlessly, screenshot-review every theme/page/text-size for cut-off text and layout breakage, and run hardware loopback tests against a real board (SG1→OSC1, SG2→OSC2). Use when asked to QA, regression-test, or verify the Unified_App UI.
+description: Auto-QA the Unified_App Labrador GUI — build the QA build, run the ImGui Test Engine suite headlessly, screenshot-review every theme/page/text-size for cut-off text and layout breakage, and run hardware loopback tests against a real board (SG1→OSC1, SG2→OSC2). Two modes — report-only, or find-and-fix with re-verification. Use when asked to QA, regression-test, verify, or fix the Unified_App UI.
 ---
 
 # Labrador Unified_App auto-QA
 
 Work from `Unified_App/`. Three complementary passes; run all of them for a
 full QA sweep, or pick the one that matches the request.
+
+## Modes
+
+**Report** (asked to "QA", "audit", "check"): run the passes, report defects
+with evidence, change nothing.
+
+**Fix** (asked to "fix", "QA and fix", or defects are found during other
+work): for each defect, diagnose to root cause, fix, then **re-verify** —
+rebuild BOTH the plain and QA builds, re-run the failing suite/filter until
+green, and re-capture the screenshot that showed the problem. Rules:
+
+- Fix the app, not the oracle: only change a test when the test itself is
+  provably wrong (wrong path, bad timing) — say so explicitly when you do.
+  A hardware test reading noise floor means the harness isn't wired; report,
+  don't loosen thresholds.
+- Fix root causes, not symptoms (a truncated label means a hardcoded width —
+  make it CalcTextSize-driven rather than shortening the text; a modal during
+  a fast run may be frame-rate-dependent logic — make it time-based).
+- After all fixes: run the FULL `--qa` suite + smoke test all three layouts
+  (`LABRADOR_LAYOUT=desktop|compact|mobile ./labrador --smoke`) to catch
+  regressions, and spot-check 2–3 screenshots from the visual matrix.
+- Keep app fixes and test-suite fixes in separate commits when committing.
 
 ## 0. Build the QA build
 
@@ -109,4 +131,6 @@ is a crash — rerun the failing filter with `lldb -o run -- ./labrador
 Summarise as: suites run + pass/fail counts, screenshots reviewed (matrix
 covered), defects found (with screenshot/log evidence and file:line where
 diagnosed), and anything skipped (e.g. hw without a harness). Distinguish
-app bugs from test-suite bugs explicitly.
+app bugs from test-suite bugs explicitly. In fix mode, additionally list
+each defect as fixed (with the verifying re-run/screenshot) or deferred
+(with why), and note any new tests added to lock the fix in.
