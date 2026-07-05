@@ -856,10 +856,13 @@ int usbCallHandler::set_synchronous_pause_state(bool newState){
 int usbCallHandler::setPaused(int channel, bool is_paused)
 {
     if(channel==1){
-        if(deviceMode==6)
-            return internal_o1_buffer_750->setPaused(is_paused);
-        else
-            return internal_o1_buffer_375_CHA->setPaused(is_paused);
+        // CH1 owns two capture buffers (375 kSps and the mode-6 750 kSps).
+        // Drive both in lockstep, like setSettingsForChannel, so a pause set
+        // in one mode can't leave the other buffer stranded frozen after a
+        // device-mode change.
+        int ret_750 = internal_o1_buffer_750->setPaused(is_paused);
+        int ret_375 = internal_o1_buffer_375_CHA->setPaused(is_paused);
+        return ret_750 ? ret_750 : ret_375;
     } else if (channel == 2){
         return internal_o1_buffer_375_CHB->setPaused(is_paused);
     }

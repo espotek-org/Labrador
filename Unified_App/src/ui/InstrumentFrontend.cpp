@@ -64,6 +64,8 @@ static void updateAutoGain(OSCControl& osc, const InputsControl& inputs, const P
 {
     if (!librador_is_connected() || !librador_iso_thread_is_active())
         return;
+    if (osc.Paused)
+        return; // a gain change would re-scale the frozen capture record (Qt: no autoGain while paused)
     if (!plot.VisibleYValid)
         return; // XY/spectrum/network view showing - keep the current gain
     if (s_applied_gain <= 0.0)
@@ -261,6 +263,11 @@ void InstrumentFrontend::UpdateHardwareState(App& app)
         SG1Widget.controlLab();
         SG2Widget.controlLab();
         InputsWidget.controlLab();
+        // Qt parity (mainwindow.cpp deviceMode change handling): switching
+        // the input mode releases the capture pause — the frozen record
+        // belongs to the old mode's channel layout.
+        if (InputsWidget.modeChangedThisFrame())
+            OSCWidget.Paused = false;
         MultimeterWidget.controlLab();
         LogicWidget.controlLab();
         DAQWidget.controlLab();

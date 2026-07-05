@@ -268,12 +268,101 @@ static void HwLoopback(ImGuiTestContext* ctx, int channel)
     librador_update_signal_gen_settings(channel, idle, 16, 10.0, 0.0, 0.0);
 }
 
+// Run/Stop must freeze the capture record device-side (librador snapshot)
+// so the paused view can be inspected in full detail, and reads with a
+// delay must reach seconds-old history — the Qt app's pause behaviour.
+static void HwPauseInspect(ImGuiTestContext* ctx)
+{
+    for (int i = 0; i < 20; i++)
+    {
+        if (librador_is_connected() && librador_iso_thread_is_active())
+            break;
+        ctx->SleepNoSkip(0.25f, 0.25f);
+    }
+    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    {
+        ctx->LogWarning("No Labrador board connected - skipping hardware test");
+        return;
+    }
+
+    SetMainRef(ctx);
+    ImGuiTestItemInfo toolbar = ctx->WindowInfo("//Main Window/##toolbar");
+    IM_CHECK(toolbar.Window != nullptr);
+    ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+    ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
+    ctx->SleepNoSkip(0.5f, 0.1f);
+    if (librador_get_paused(1)) // a previous failed run may have left it paused
+    {
+        ctx->ItemClick("**/###runstop");
+        ctx->Yield(3);
+    }
+    IM_CHECK(!librador_get_paused(1));
+
+    // 1 kHz sine on SG1, then let several seconds of it into the record so
+    // the delayed read below lands inside the sine region
+    unsigned char wave[100];
+    for (int i = 0; i < 100; i++)
+        wave[i] = (unsigned char)(127.5 + 127.5 * sin(2.0 * IM_PI * i / 100.0));
+    IM_CHECK_GE(librador_update_signal_gen_settings(1, wave, 100, 10.0, 2.0, 0.0), 0);
+    ctx->SleepNoSkip(4.0f, 0.1f);
+
+    // Pause through the toolbar; PlotWidget syncs the device-side pause
+    ctx->ItemClick("**/###runstop");
+    ctx->Yield(3);
+    IM_CHECK(librador_get_paused(1));
+
+    std::vector<double>* fetched = librador_get_analog_data(1, 0.05, 5000, 0.0, 0);
+    IM_CHECK(fetched != nullptr);
+    const std::vector<double> frozen = *fetched;
+    IM_CHECK_GT((int)frozen.size(), 1000);
+
+    // Record must not move while paused, even though the input keeps
+    // changing: park the generator, wait, and re-read
+    unsigned char idle[16] = { 0 };
+    librador_update_signal_gen_settings(1, idle, 16, 10.0, 0.0, 0.0);
+    ctx->SleepNoSkip(1.5f, 0.1f);
+    fetched = librador_get_analog_data(1, 0.05, 5000, 0.0, 0);
+    IM_CHECK(fetched != nullptr);
+    IM_CHECK(frozen == *fetched);
+
+    // Scrollback: a read 3 s into the frozen record still shows the sine
+    fetched = librador_get_analog_data(1, 0.05, 5000, 3.0, 0);
+    IM_CHECK(fetched != nullptr);
+    double lo = 1e9, hi = -1e9;
+    for (double v : *fetched)
+    {
+        lo = ImMin(lo, v);
+        hi = ImMax(hi, v);
+    }
+    ctx->LogInfo("paused record at -3 s: Vpp = %.2f V", hi - lo);
+    IM_CHECK_GT(hi - lo, 1.2);
+    IM_CHECK_LT(hi - lo, 3.0);
+
+    // Unpause: capture resumes and now sees the parked (flat) generator
+    ctx->ItemClick("**/###runstop");
+    ctx->Yield(3);
+    IM_CHECK(!librador_get_paused(1));
+    ctx->SleepNoSkip(1.5f, 0.1f);
+    fetched = librador_get_analog_data(1, 0.05, 5000, 0.0, 0);
+    IM_CHECK(fetched != nullptr);
+    lo = 1e9; hi = -1e9;
+    for (double v : *fetched)
+    {
+        lo = ImMin(lo, v);
+        hi = ImMax(hi, v);
+    }
+    ctx->LogInfo("resumed capture: Vpp = %.2f V", hi - lo);
+    IM_CHECK_LT(hi - lo, 0.8);
+}
+
 static void RegisterHwTests(ImGuiTestEngine* e)
 {
     ImGuiTest* t = IM_REGISTER_TEST(e, "hw", "loopback_sg1_osc1");
     t->TestFunc = [](ImGuiTestContext* ctx) { HwLoopback(ctx, 1); };
     t = IM_REGISTER_TEST(e, "hw", "loopback_sg2_osc2");
     t->TestFunc = [](ImGuiTestContext* ctx) { HwLoopback(ctx, 2); };
+    t = IM_REGISTER_TEST(e, "hw", "pause_inspect_buffer");
+    t->TestFunc = [](ImGuiTestContext* ctx) { HwPauseInspect(ctx); };
 }
 
 // ---- Engine lifecycle ---------------------------------------------------------

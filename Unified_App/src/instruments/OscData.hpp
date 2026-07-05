@@ -2,6 +2,7 @@
 #include <vector>
 #include "librador.h"
 #include <algorithm>
+#include <cstddef>
 #include <chrono>
 #include "fftw3.h"
 #include <complex>
@@ -59,35 +60,43 @@ public:
 	}
 	void SetExtendedData() // sets the extended_data vector to be used for plotting, extended meaning including the trigger timeout
 	{
-		if (!paused)
+		// Runs while paused too: librador then serves its frozen snapshot
+		// (o1buffer buffer_paused), so re-fetching per frame is what lets the
+		// user pan/zoom through the captured record in full detail.
+		extended_data_sample_rate_hz = CalculateSampleRate();
+		double sample_rate_hz = extended_data_sample_rate_hz;
+		double ext_time_window = 0;
+		if (time_max < trigger_time_plot)
 		{
-			extended_data_sample_rate_hz = CalculateSampleRate();
-			double sample_rate_hz = extended_data_sample_rate_hz;
-			double ext_time_window = 0;
-			if (time_max < trigger_time_plot)
-			{
-				ext_time_window = trigger_timeout + trigger_time_plot - time_min;
-			}
-			else if (time_min > trigger_time_plot)
-			{
-				ext_time_window = time_max - trigger_time_plot + trigger_timeout;
-			}
-			else
-			{
-				ext_time_window = time_max - time_min + trigger_timeout;
-			}
-			std::vector<double>* extended_data_ptr = librador_get_analog_data_by_rate(channel,
-				ext_time_window, sample_rate_hz, delay_s, filter_mode);
-			if (extended_data_ptr)
-			{
-				extended_data = *extended_data_ptr;
-				std::reverse(extended_data.begin(), extended_data.end());
-				ApplyDisplayTransform(extended_data);
-			}
-			else
-			{
-				extended_data = {};
-			}
+			ext_time_window = trigger_timeout + trigger_time_plot - time_min;
+		}
+		else if (time_min > trigger_time_plot)
+		{
+			ext_time_window = time_max - trigger_time_plot + trigger_timeout;
+		}
+		else
+		{
+			ext_time_window = time_max - time_min + trigger_timeout;
+		}
+		// The o1buffer is circular and ~10 s deep; asking for more would wrap
+		// back into the newest samples (reachable when panning a paused
+		// record far into the past)
+		double sps = librador_get_samples_per_second();
+		if (sps > 0)
+		{
+			ext_time_window = std::min(ext_time_window, NUM_SAMPLES_PER_CHANNEL / sps);
+		}
+		std::vector<double>* extended_data_ptr = librador_get_analog_data_by_rate(channel,
+			ext_time_window, sample_rate_hz, delay_s, filter_mode);
+		if (extended_data_ptr)
+		{
+			extended_data = *extended_data_ptr;
+			std::reverse(extended_data.begin(), extended_data.end());
+			ApplyDisplayTransform(extended_data);
+		}
+		else
+		{
+			extended_data = {};
 		}
 	}
 	std::vector<double> GetData()
@@ -96,49 +105,83 @@ public:
 	}
 	void SetData() // sets the data vector for plotting, this is exactly what is plotted
 	{
-		if (!paused)
+		double sample_rate_hz = extended_data_sample_rate_hz;
+		if (paused && !trigger_on)
 		{
-			double sample_rate_hz = extended_data_sample_rate_hz;
-			if (extended_data.size() == 0)
+			// Free-run pause: scroll back through the frozen capture record
+			// instead of always showing its newest samples (Qt parity:
+			// DisplayControl's delay scrollback while properly paused)
+			SetFrozenRecordData();
+			return;
+		}
+		double time_start = time_min;
+		double step = time_window;
+		if (extended_data.size() == 0 || sample_rate_hz <= 0)
+		{
+			data = {};
+		}
+		else if (trigger_on)
+		{
+			// While paused the view can pan anywhere over the frozen record,
+			// so the slice may run past either end of extended_data: clamp
+			// it and shift the time base by whatever was cut off the front.
+			const std::ptrdiff_t n = (std::ptrdiff_t)extended_data.size();
+			const std::ptrdiff_t want_begin = (std::ptrdiff_t)(
+			    (trigger_time_since_ext_start + time_min - trigger_time_plot) * sample_rate_hz);
+			const std::ptrdiff_t want_end = (std::ptrdiff_t)(
+			    (trigger_time_since_ext_start + time_min - trigger_time_plot + time_window) * sample_rate_hz);
+			const std::ptrdiff_t begin = std::clamp(want_begin, (std::ptrdiff_t)0, n);
+			const std::ptrdiff_t end = std::clamp(want_end, begin, n);
+			data = std::vector<double>(
+				extended_data.begin() + begin, extended_data.begin() + end);
+			time_start = time_min + (begin - want_begin) / sample_rate_hz;
+			step = 1 / sample_rate_hz;
+			// Plot-time of the newest sample in the record; keeps the
+			// free-run scrollback anchored if the trigger is switched off
+			// while paused
+			pause_anchor = trigger_time_plot
+			    + (n / sample_rate_hz - trigger_time_since_ext_start);
+		}
+		else
+		{
+			const std::ptrdiff_t n = (std::ptrdiff_t)extended_data.size();
+			const std::ptrdiff_t want = (std::ptrdiff_t)(time_window * sample_rate_hz);
+			if (want <= n)
 			{
-				data = {};
-			}
-			else if (trigger_on)
-			{
-				data = std::vector<double>(
-					extended_data.begin() + (trigger_time_since_ext_start + time_min - trigger_time_plot) * sample_rate_hz,
-					extended_data.begin() + (trigger_time_since_ext_start + time_min - trigger_time_plot + time_window) * sample_rate_hz);
+				data = std::vector<double>(extended_data.end() - want, extended_data.end());
+				step = time_window / data.size();
 			}
 			else
 			{
-				data = std::vector<double>(
-					extended_data.end() - time_window * sample_rate_hz,
-					extended_data.end()
-				);
+				// View wider than the capture record (which SetExtendedData
+				// clamps to the o1buffer depth): the trace only fills the
+				// right edge of the axis
+				data = extended_data;
+				step = 1 / sample_rate_hz;
+				time_start = time_max - n * step;
 			}
-			this->time_step = time_window / data.size();
-			double time_step = time_window / data.size();
-			time.resize(data.size());
-			auto& local_time_start = time_min;
-			std::generate(time.begin(), time.end(),
-			    [n = 0, &time_step, &local_time_start]() mutable
-			    { return n++ * time_step + local_time_start; });
+			// Free-running: the newest sample sits at the right edge
+			pause_anchor = time_max;
 		}
+		this->time_step = step;
+		time.resize(data.size());
+		std::generate(time.begin(), time.end(),
+		    [n = 0, &step, &time_start]() mutable
+		    { return n++ * step + time_start; });
 	}
-	// SetData overload to set data directly (used for math channel)
+	// SetData overload to set data directly (used for math channel).
+	// Not gated on pause: while paused the math trace is recomputed from the
+	// (frozen, pannable) OSC1/OSC2 views, so it must follow them.
 	void SetData(std::vector<double> data)
 	{
-		if (!paused)
-		{
-			this->data = data;
-			this->time_step = time_window / data.size();
-			double time_step = time_window / data.size();
-			time.resize(data.size());
-			auto& local_time_start = time_min;
-			std::generate(time.begin(), time.end(),
-				[n = 0, &time_step, &local_time_start]() mutable
-				{ return n++ * time_step + local_time_start; });
-		}
+		this->data = data;
+		this->time_step = time_window / data.size();
+		double time_step = time_window / data.size();
+		time.resize(data.size());
+		auto& local_time_start = time_min;
+		std::generate(time.begin(), time.end(),
+			[n = 0, &time_step, &local_time_start]() mutable
+			{ return n++ * time_step + local_time_start; });
 	}
 	std::vector<double> GetTime()
 	{
@@ -183,7 +226,9 @@ public:
 		int trigger_start_index = 0;
 		int trigger_end_index = 0;
 		std::vector<double> temp_data = {};
-		if (!paused)
+		// Runs while paused too — extended_data is then the frozen record, so
+		// the search finds the same crossing every frame and the trace stays
+		// pinned to the marker as the user pans/zooms the paused view.
 		{
 			temp_data = extended_data;
 			if (time_max > trigger_time_plot)
@@ -195,6 +240,10 @@ public:
 				trigger_start_index = (int)temp_data.size() - 1;
 			}
 			trigger_end_index = trigger_start_index - (int)(trigger_timeout * sample_rate_hz) + 2; // keep original +2
+			// Unrestricted panning over a paused record can push the search
+			// window entirely before the record start; keep the crossing
+			// loops (which read index i-1) inside the buffer
+			trigger_end_index = std::max(trigger_end_index, 0);
 
 			if (trigger && time_window > 0 && !extended_data.empty())
 			{
@@ -288,10 +337,7 @@ public:
 
 	void SetTriggerTime(double trigger_time)
 	{
-		if (!paused)
-		{
-			this->trigger_time_since_ext_start = trigger_time;
-		}
+		this->trigger_time_since_ext_start = trigger_time;
 	}
 	void SetTriggerTimeout(double trigger_timeout)
 	{
@@ -1038,6 +1084,11 @@ private:
 	
 	// osc control parameters
 	bool paused = false;
+	// Plot-time of the newest sample in the capture record, maintained by
+	// SetData every frame. While paused it maps the (frozen) record onto the
+	// time axis so panning left of it reads progressively older samples —
+	// the Qt app's "inspect the whole buffer while paused" behaviour.
+	double pause_anchor = 0;
 	// display transform (probe attenuation divisor + additive volt offset),
 	// see SetDisplayTransform
 	double display_attenuation = 1.0;
@@ -1052,6 +1103,44 @@ private:
 		{
 			s = s / display_attenuation + display_offset;
 		}
+	}
+	// Free-run paused view: fetch the [lo, hi] slice of the frozen record
+	// that intersects the current time axis. pause_anchor marks the newest
+	// frozen sample, so the fetch delay grows as the user pans left, and the
+	// sample rate follows the zoom — full detail anywhere in the ~10 s
+	// record (Qt: isoBuffer readBuffer(window, ..., delay) while paused).
+	void SetFrozenRecordData()
+	{
+		double sample_rate_hz = extended_data_sample_rate_hz;
+		double sps = librador_get_samples_per_second();
+		double hi = std::min(time_max, pause_anchor);
+		// The record only reaches this far back; requests beyond it would
+		// wrap around librador's circular buffer
+		double lo = std::max(time_min, pause_anchor - (sps > 0 ? NUM_SAMPLES_PER_CHANNEL / sps : 0));
+		if (sample_rate_hz <= 0 || sps <= 0 || hi <= lo)
+		{
+			data = {};
+			time = {};
+			return;
+		}
+		std::vector<double>* fetched = librador_get_analog_data_by_rate(
+		    channel, hi - lo, sample_rate_hz, pause_anchor - hi, filter_mode);
+		if (fetched)
+		{
+			data = *fetched;
+			std::reverse(data.begin(), data.end());
+			ApplyDisplayTransform(data);
+		}
+		else
+		{
+			data = {};
+		}
+		this->time_step = 1 / sample_rate_hz;
+		double step = this->time_step;
+		time.resize(data.size());
+		std::generate(time.begin(), time.end(),
+		    [n = 0, &step, &lo]() mutable
+		    { return n++ * step + lo; });
 	}
 	double CalculateSampleRate()
 	{

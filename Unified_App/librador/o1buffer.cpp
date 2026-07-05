@@ -424,6 +424,11 @@ int o1buffer::setPaused(bool is_paused, int mostRecentAddressDelta, bool hard){
         memcpy(buffer_paused, buffer, sizeof(int)*NUM_SAMPLES_PER_CHANNEL);
         mostRecentAddressPaused = mostRecentAddress + mostRecentAddressDelta;
         buffer_mutex2.unlock();
+    } else if(!is_paused) {
+        // Historically only setVirtualTransformSettings could unpause (it
+        // assigns the whole settings struct); through this setter a pause
+        // could be engaged but never released.
+        m_virtual_transform_settings.is_paused = false;
     }
     return 0;
 }

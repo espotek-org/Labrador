@@ -1546,7 +1546,17 @@ public:
 		analysis_tools_widget->OSC1Colour = colourConvert(constants::OSC1_ACCENT);
 		analysis_tools_widget->OSC2Colour = colourConvert(constants::OSC2_ACCENT);
 
-		// sets whether the osc is paused or not (if paused, data will not update)
+		// Run/Stop drives the device-side capture pause (Qt isoDriver
+		// pauseEnable parity): pausing makes librador snapshot its ~10 s
+		// o1buffer, so every fetch below reads a frozen record that the user
+		// can pan/zoom through in full detail. Compared against the lab's own
+		// state so it self-heals after reconnects.
+		if (librador_get_paused(1) != osc_control->Paused)
+		{
+			librador_set_paused(1, osc_control->Paused);
+			librador_set_paused(2, osc_control->Paused);
+		}
+		// sets whether the osc is paused or not (paused = inspect the frozen record)
 		OSC1Data->SetPaused(osc_control->Paused);
 		OSC2Data->SetPaused(osc_control->Paused);
 		// per-channel display transforms (probe attenuation + volt offset);
@@ -1869,6 +1879,13 @@ public:
 
 	void AutoSetOscGain()
 	{
+		// The paused record holds raw ADC codes converted at read time with
+		// the current gain — a gain change would re-scale the frozen trace
+		// to the wrong voltages (Qt skips autoGain while properly paused)
+		if (osc_control->Paused)
+		{
+			return;
+		}
 		int frame = ImGui::GetFrameCount();
 		if (frame - last_update_frame < 5)
 		{
