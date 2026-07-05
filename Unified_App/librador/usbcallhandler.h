@@ -287,6 +287,13 @@ private:
 
     bool starting_after_flash = false;
 
+    // Firmware identity cache: valid from the first successful reads after
+    // connect until teardown_connection.
+    uint16_t cached_firmver = 0;
+    uint8_t cached_variant = 0;
+    bool fw_version_cached = false;
+    bool fw_variant_cached = false;
+
     int flashFirmware(int file_descriptor);
     void closeDevice_cpp();
     int findDevice_cpp();

@@ -1226,14 +1226,29 @@ int usbCallHandler::reset_device(bool goToBootloader){
     return 0;
 }
 
+// Version and variant are immutable for the lifetime of a connection (and
+// the wedge state their 179/176 sentinels probe for is a connect-time
+// condition), so they are fetched over USB once and cached until teardown.
+// Callers poll these every UI frame; without the cache that was 60-120
+// control transfers per second racing the streaming event thread.
 uint16_t usbCallHandler::get_firmware_version(){
+    if(fw_version_cached){
+        return cached_firmver;
+    }
     send_control_transfer_with_error_checks(0xc0, 0xa8, 0, 0, 2, nullptr);
-    return *((uint16_t *) inBuffer);
+    cached_firmver = *((uint16_t *) inBuffer);
+    fw_version_cached = true;
+    return cached_firmver;
 }
 
 uint8_t usbCallHandler::get_firmware_variant(){
+    if(fw_variant_cached){
+        return cached_variant;
+    }
     send_control_transfer_with_error_checks(0xc0, 0xa9, 0, 0, 1, nullptr);
-    return *((uint8_t *) inBuffer);
+    cached_variant = *((uint8_t *) inBuffer);
+    fw_variant_cached = true;
+    return cached_variant;
 }
 
 double usbCallHandler::get_samples_per_second(){
@@ -1439,6 +1454,8 @@ void usbCallHandler::teardown_connection(){
     // double std::thread::join otherwise).
     std::lock_guard<std::mutex> teardown_lock(teardown_mutex);
     connected = false;
+    fw_version_cached = false;
+    fw_variant_cached = false;
     if(data_frame_counter || frames_ok || frames_dropped){
         LIBRADOR_LOG(LOG_DEBUG, "frame stats at teardown: ok=%llu bad_csum=%llu dropped=%llu unvalidated=%llu (transport %d)\n",
             (unsigned long long)frames_ok.load(), (unsigned long long)frames_bad_checksum.load(),
