@@ -33,19 +33,21 @@ public:
 		int error = librador_set_power_supply_voltage(voltage);
 		if (error)
 		{
+			// The set failed — almost always because the board isn't
+			// connected (librador returns -420/-421 for API/USB-not-ready,
+			// -1101/-1104 for a failed control transfer). All of these are
+			// transient and expected: the board may be mid-reset (Esc), or
+			// unplugged. Report "not applied" so the per-frame controlLab
+			// pass retries once the link is back — never terminate the app.
+			// (This used to std::exit(error): a USB reset returned -421 and
+			// killed the whole GUI, exit code 91.)
 #ifndef NDEBUG
 			printf("librador_set_power_supply_voltage FAILED with error code "
-				    "%d",
+				    "%d; will retry\n",
 				error);
 #endif
-			// Board not connected (continue to run)
-			if (error == -1101 || error == -1104)
-			{
-				return false;
-			}
-			std::exit(error);
+			return false;
 		}
 		return true;
-		// printf("Successfully set power supply voltage to %.2fV\n", voltage);
 	}
 };
