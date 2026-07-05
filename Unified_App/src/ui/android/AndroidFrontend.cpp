@@ -111,8 +111,9 @@ void AndroidFrontend::do_settings_panel_layout(
     }
 }
 
-void AndroidFrontend::draw_settings_panel(bool landscape, bool screen_keyboard_shown)
+void AndroidFrontend::draw_settings_panel(App& app, bool landscape, bool screen_keyboard_shown)
 {
+    (void)app; // used on desktop builds only (layout escape hatch below)
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     ImGuiStyle& style = ImGui::GetStyle();
@@ -190,6 +191,17 @@ void AndroidFrontend::draw_settings_panel(bool landscape, bool screen_keyboard_s
             }
             ImGui::NewLine();
         }
+
+#ifndef __ANDROID__
+        // Desktop testing escape hatch: the tile UI has no View menu, so the
+        // way back to the desktop layout lives under the control tiles,
+        // sized like a tile so it reads as part of the column.
+        ImGui::Spacing();
+        if (ImGui::Button("Desktop layout", ImVec2(tile_singlet_width_pixels, 0.f)))
+            app.setLayoutMode(App::LayoutMode::Desktop);
+        maybe_clicked_background &= !ImGui::IsItemHovered();
+#endif
+
         ImGui::EndChild();
     }
 }
@@ -368,7 +380,7 @@ void AndroidFrontend::update(App& app)
     }
 
     draw_selector_popup(landscape, orientation_changed);
-    draw_settings_panel(landscape, screen_keyboard_shown);
+    draw_settings_panel(app, landscape, screen_keyboard_shown);
     draw_collapse_button(landscape, dataWindowBottomLeft, dataWindowBottomRight);
 
     ImGui::End();

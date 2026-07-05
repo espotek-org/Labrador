@@ -3,6 +3,9 @@
 #include <SDL3/SDL.h>
 #include "imgui.h"
 
+#include <string>
+#include <vector>
+
 // Owns SDL init, the window, the GL context, ImGui/ImPlot contexts, fonts and
 // the main loop. Derived from the Monash LabraScope AppBase (SDL2) rewritten
 // for SDL3 + ImGui 1.92, following the patterns proven in Brent's Android app.
@@ -28,12 +31,24 @@ class AppBase
     float contentH() const { return m_content_h; }
     float mainScale() const { return m_main_scale; }
 
+    // User text-size factor (View > Text Size), applied to FontScaleMain
+    // each frame. 1.0 = normal.
+    float fontScale() const { return m_font_scale; }
+    void setFontScale(float s) { m_font_scale = s; }
+
+
   protected:
     virtual void StartUp() = 0;
     virtual void Update() = 0;  // one ImGui frame
     virtual void ShutDown() = 0;
 
     void RequestQuit() { m_done = true; }
+
+    // Fonts loaded at init: Rajdhani (classic + "Modern" CRT themes) and
+    // VT323 (the "Retro" CRT themes). Run() picks per frame from the theme.
+    ImFont* m_font_default = nullptr;
+    ImFont* m_font_retro = nullptr;
+    float m_font_scale = 1.0f;
 
     SDL_Window* m_window = nullptr;
     SDL_GLContext m_gl_context = nullptr;

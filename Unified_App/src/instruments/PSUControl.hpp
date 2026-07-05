@@ -11,7 +11,7 @@ public:
 
 	PSUControl(std::string label, ImVec2 size, const float* borderColor)
 	    : ControlWidget(label, size, borderColor)
-	    , voltage(8.0f) // Default voltage
+	    , voltage(4.5f) // Default voltage: the supply's minimum (safe default)
 	{}
 
 	/// <summary>

@@ -9,6 +9,7 @@
 #include "ui/lowres/LowResFrontend.h"
 #include "ui/android/AndroidFrontend.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -50,7 +51,8 @@ void App::StartUp()
         m_gobindar_texture = (intptr_t)gob_tmp_texture;
 
     loadSettings();
-    SetGlobalStyle(m_dark_theme);
+    const ThemeSpec* theme = FindTheme(m_theme);
+    SetGlobalStyle(theme ? *theme : ThemeAt(0));
 
     // Layout override for testing (e.g. LABRADOR_LAYOUT=compact ./labrador --smoke).
     // It wins for this run but is never written back to settings.ini.
@@ -76,7 +78,25 @@ void App::loadSettings()
     else if (layout == "compact") m_layout_mode = LayoutMode::Compact;
     else m_layout_mode = LayoutMode::Auto;
 
-    m_dark_theme = m_settings.getString("theme", "dark") != "light";
+    const char* theme_default = "classic-dark";
+    m_theme = m_settings.getString("theme", theme_default);
+    // Legacy ids: the dark/light-only era, then the pre-split CRT ids.
+    if (m_theme == "dark")
+        m_theme = theme_default;
+    else if (m_theme == "light")
+        m_theme = "classic-light";
+    else if (m_theme == "phosphor")
+        m_theme = "phosphor-retro";
+    else if (m_theme == "amber")
+        m_theme = "amber-retro";
+    else if (m_theme == "vector")
+        m_theme = "vector-retro";
+    if (!FindTheme(m_theme))
+        m_theme = theme_default; // includes retired ids (ice/arcade/dos)
+
+    // Text-size factor; clamp so a hand-edited value can't wreck the layout
+    double font_scale = m_settings.getDouble("font_scale", 1.0);
+    setFontScale((float)std::clamp(font_scale, 0.7, 2.0));
 
     // Widget-specific keys (hw_gain, hw_gain_auto, cal_*) are loaded by the
     // frontend once it is created (InstrumentFrontend::loadSettings), since the
@@ -104,7 +124,8 @@ void App::pushSettings()
         }
         m_settings.set("layout", layout);
     }
-    m_settings.set("theme", m_dark_theme ? "dark" : "light");
+    m_settings.set("theme", m_theme);
+    m_settings.set("font_scale", (double)fontScale());
 }
 
 App::LayoutMode App::resolvedLayout() const
@@ -455,16 +476,16 @@ void App::Update()
     }
 
     // Draw the whole UI for this form factor and service its widgets.
+    // (The mobile tile UI embeds its own "Return to desktop layout" button
+    // under the control tiles on desktop builds — it has no View menu.)
     m_active_frontend->update(*this);
 
-    // Shared post-layout UI
-    if (m_show_demo_windows)
+    // Re-apply the theme every frame (wins over any mid-frame style mutation,
+    // e.g. PreviewStyle).
     {
-        ImGui::ShowDemoWindow();
-        ImPlot::ShowDemoWindow();
+        const ThemeSpec* theme = FindTheme(m_theme);
+        SetGlobalStyle(theme ? *theme : ThemeAt(0));
     }
-    else
-        SetGlobalStyle(m_dark_theme);
 
     if (m_show_debug_console)
         m_debug_console.render(&m_show_debug_console, m_flashing || m_recovering);

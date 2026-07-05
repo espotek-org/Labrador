@@ -137,10 +137,32 @@ public:
     MathControls MathControls1, MathControls2, MathControls3, MathControls4;
 
     // ===== Colours =====
+    // Cached from the theme-written constants:: accent arrays; PlotWidget
+    // reads these every frame for the traces. refreshAccentCache() re-syncs
+    // them (called per frame from PlotWidget::UpdateOscData and the section
+    // renderers, so a theme switch takes effect immediately).
     ImColor OSC1Colour = colourConvert(constants::OSC1_ACCENT);
     ImColor OSC2Colour = colourConvert(constants::OSC2_ACCENT);
     ImColor GenColour = colourConvert(constants::GEN_ACCENT);
     ImColor MathColour = colourConvert(constants::MATH_ACCENT);
+
+    void refreshAccentCache()
+    {
+        OSC1Colour = colourConvert(constants::OSC1_ACCENT);
+        OSC2Colour = colourConvert(constants::OSC2_ACCENT);
+        GenColour = colourConvert(constants::GEN_ACCENT);
+        MathColour = colourConvert(constants::MATH_ACCENT);
+        // The math-expression highlighter caches token colours too
+        for (MiniHLRule& r : rules)
+        {
+            if (r.token == "osc1")
+                r.color = ImU32(OSC1Colour);
+            else if (r.token == "osc2")
+                r.color = ImU32(OSC2Colour);
+            else if (r.token == "t")
+                r.color = ImU32(MathColour);
+        }
+    }
     ImColor Green = ImColor(float(20. / 255), float(143. / 255), 0.f, 1.f);
     ImColor Red = ImColor(float(143. / 255), 0.f, 0.f, 1.f);
 
@@ -200,8 +222,12 @@ public:
     /// desktop layout keeps those in its Scope menu instead).
     void renderDisplaySection(bool include_views)
     {
+        refreshAccentCache(); // accents are theme-written
+
         const float width = ImGui::GetContentRegionAvail().x * 0.95f;
-        float labWidth = 120.0f;
+        // Label columns sized from the font (the CRT themes use a wider
+        // terminal font, so fixed pixel widths truncate).
+        float labWidth = ImGui::CalcTextSize("Signal Properties").x + 12.0f;
         float controlWidth = (width - 2 * labWidth) / 2;
 
         if (ImGui::BeginTable("ChannelsTable", 4))
@@ -261,9 +287,11 @@ public:
     /// keeps gain in its toolbar and Scope menu instead).
     void renderTriggerSection(bool include_gain)
     {
+        refreshAccentCache(); // accents are theme-written
+
         const float width = ImGui::GetContentRegionAvail().x * 0.95f;
-        float labWidth = 100.0f;
-        float labWidth2 = 70.0f;
+        float labWidth = ImGui::CalcTextSize("HW Gain").x + 14.0f;
+        float labWidth2 = ImGui::CalcTextSize("Auto Level").x + 14.0f;
         float controlWidth = (width - labWidth - labWidth2) / 2;
 
         if (ImGui::BeginTable("GeneralTable", 4))
@@ -332,9 +360,11 @@ public:
     /// (Qt: attenuationComboBox_CH1/2 + offsetSpinBox_CH1/2)
     void renderProbeSection()
     {
+        refreshAccentCache(); // accents are theme-written
+
         const float width = ImGui::GetContentRegionAvail().x * 0.95f;
-        float labWidth = 100.0f;
-        float labWidth2 = 70.0f;
+        float labWidth = ImGui::CalcTextSize("CH1 Probe").x + 14.0f;
+        float labWidth2 = ImGui::CalcTextSize("Offset").x + 14.0f;
         float controlWidth = (width - labWidth - labWidth2) / 2;
 
         if (ImGui::BeginTable("ChannelSettingsTable", 4))
@@ -406,6 +436,8 @@ public:
     /// Math-channel toggle + highlighted expression input
     void renderMathSection()
     {
+        refreshAccentCache(); // accents are theme-written
+
 		ImGui::Text(" OFF");
 		ImGui::SameLine();
         ToggleSwitch((label + "Math1_toggle").c_str(), &MathControls1.On, ImU32(MathColour));
@@ -454,10 +486,11 @@ private:
     const std::string label;
 	
 
-    // Trigger type list (short labels so the combo fits a ~400px panel)
+    // Trigger type list (short labels so the combo fits a ~400px panel;
+    // CH1/CH2 matches the probe and inputs-mode naming)
     const char* TriggerTypeComboList[4] = {
-        "OSC1 Rising", "OSC1 Falling",
-        "OSC2 Rising", "OSC2 Falling"
+        "CH1 Rising", "CH1 Falling",
+        "CH2 Rising", "CH2 Falling"
     };
 
     // Hardware gain list (labels match GainValues, index for index)

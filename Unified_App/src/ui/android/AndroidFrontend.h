@@ -71,7 +71,7 @@ class AndroidFrontend : public Frontend
     // tiles[]/inputs_ui). The dpi/pixel_6a_dpi args are dropped — AppBase owns
     // DPI scaling, so the landscape tile width is expressed in font units.
     void do_settings_panel_layout(float* data_width, float* data_height, bool landscape, int y_size);
-    void draw_settings_panel(bool landscape, bool screen_keyboard_shown);
+    void draw_settings_panel(App& app, bool landscape, bool screen_keyboard_shown);
     void draw_selector_popup(bool landscape, bool orientation_changed);
     void draw_collapse_button(bool landscape, ImVec2 dataWindowBottomLeft, ImVec2 dataWindowBottomRight);
     int get_selector_popup_height();

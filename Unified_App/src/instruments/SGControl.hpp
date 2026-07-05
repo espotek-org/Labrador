@@ -95,8 +95,10 @@ public:
 			                  "voltage. Increase the PSU voltage for more range.");
 		}
 
-		// UART TX is a CH1-only feature, as in the Qt app.
-		if (channel == 1)
+		// UART TX is a CH1-only feature, as in the Qt app. The desktop layout
+		// relocates it to the Logic page (ShowUartInline = false) and calls
+		// renderUartControl there itself.
+		if (channel == 1 && ShowUartInline)
 		{
 			renderUartControl();
 		}
@@ -149,11 +151,15 @@ public:
 		signals[0]->turnOff(channel);
 	}
 
-private:
+	// Where the UART TX section renders: inline under the waveform controls
+	// (classic/lowres) or hosted by another page (desktop Logic panel).
+	bool ShowUartInline = true;
+
 	/// <summary>
 	/// Collapsible UART TX section (CH1 only). Port of the Qt app's serial
 	/// encoding path: text is framed as 8N1 logic-level UART (idle high) and
-	/// sent as the CH1 waveform at one sample per bit.
+	/// sent as the CH1 waveform at one sample per bit. Public so the desktop
+	/// Logic page can host it.
 	/// </summary>
 	void renderUartControl()
 	{
@@ -232,6 +238,7 @@ private:
 		}
 	}
 
+private:
 	/// <summary>
 	/// Port of the Qt app's MainWindow::uartEncode bit framing, restricted to
 	/// 8N1 (no parity — Qt's optional parity path has a known bug where it

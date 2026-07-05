@@ -344,17 +344,31 @@ void InstrumentFrontend::RenderMenuBar(App& app)
             ImGui::Separator();
             if (ImGui::BeginMenu("Theme"))
             {
-                if (ImGui::MenuItem("Dark", NULL, app.darkTheme()))
-                    app.setDarkTheme(true);
-                if (ImGui::MenuItem("Light", NULL, !app.darkTheme()))
-                    app.setDarkTheme(false);
+                for (int i = 0; i < ThemeCount(); i++)
+                {
+                    const ThemeSpec& t = ThemeAt(i);
+                    if (ImGui::MenuItem(t.label, NULL, app.themeId() == t.id))
+                        app.setThemeId(t.id);
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Text Size"))
+            {
+                auto sizeItem = [&app](const char* label, float s) {
+                    if (ImGui::MenuItem(
+                            label, NULL, std::fabs(app.fontScale() - s) < 0.01f))
+                        app.setFontScale(s);
+                };
+                sizeItem("Small", 0.85f);
+                sizeItem("Normal", 1.0f);
+                sizeItem("Large", 1.2f);
+                sizeItem("Extra Large", 1.45f);
                 ImGui::EndMenu();
             }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Debug"))
         {
-            ImGui::MenuItem("Demo windows", NULL, &app.showDemoWindows());
             ImGui::MenuItem("Debug console", NULL, &app.showDebugConsole());
             ImGui::EndMenu();
         }

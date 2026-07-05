@@ -31,20 +31,30 @@ constexpr uint8_t DESIRED_FW_VARIANT = 2;
 
 // Theme Colours
 constexpr ImU32 PRIM_LIGHT = IM_COL32(255, 255, 255, 255); // primary light
-constexpr float SG1_ACCENT[3] = { 42. / 255, 39. / 255, 212. / 255 };
-constexpr float SG2_ACCENT[3] = { 203. / 255, 100. / 255, 4. / 255 };
-constexpr float PSU_ACCENT[3] = { 190. / 255, 54. / 255, 54. / 255 };
-constexpr ImVec4 GRAY_TEXT = ImVec4(0.6, 0.6, 0.6, 1);
-constexpr float OSC_ACCENT[3] = { 0.4, 0.4, 0.4 };
-// Channel colours match the Qt app: CH1 = yellow, CH2 = cyan/teal
-// (Qt::yellow / Qt::cyan, mainwindow.cpp:462-463).
-constexpr float OSC1_ACCENT[3] = { 255. / 255, 255. / 255, 0. / 255 };
-constexpr float OSC2_ACCENT[3] = { 0. / 255, 255. / 255, 255. / 255 };
-constexpr float GEN_ACCENT[3] = { 150. / 255, 150. / 255, 150. / 255 };
-constexpr float MATH_ACCENT[3] = { 0, 0.9, 0.78 };
+// Secondary/hint text. Not constexpr: SetGlobalStyle retints it per theme
+// (dim phosphor in the CRT themes, neutral gray in the classic ones).
+extern ImVec4 GRAY_TEXT;
+
+// Per-instrument chrome accents. Not constexpr: widgets hold live pointers
+// to these arrays, and SetGlobalStyle rewrites them per theme — the mono CRT
+// themes collapse them all to the theme line colour, "Arcade" installs a
+// neon palette, the classic themes restore the original Monash colours.
+extern float SG1_ACCENT[3];
+extern float SG2_ACCENT[3];
+extern float PSU_ACCENT[3];
+extern float OSC_ACCENT[3];
+extern float GEN_ACCENT[3];
+extern float SPECTRUM_ANALYSER_ACCENT[3];
+extern float NETWORK_ANALYSER_ACCENT[3];
+
+// Trace/data colours. Also theme-written, but every theme keeps the same hue
+// family (CH1 = yellow-ish, CH2 = cyan-ish, matching the Qt app's
+// Qt::yellow/Qt::cyan) so channels stay identifiable — only the light theme
+// darkens them for contrast on a white plot.
+extern float OSC1_ACCENT[3];
+extern float OSC2_ACCENT[3];
+extern float MATH_ACCENT[3];
 constexpr float PLOT_ACCENT[3] = {0., 0., 0.};
-constexpr float SPECTRUM_ANALYSER_ACCENT[3] = { 210. / 255, 68. / 255, 41. / 255 };
-constexpr float NETWORK_ANALYSER_ACCENT[3] = { 65. / 255, 194. / 255, 55. / 255 };
 
 // Syntax Highlighting Colours
 constexpr ImU32 SymbolColour = IM_COL32(175, 253, 255, 255);
@@ -173,9 +183,62 @@ void init_constants();
 void PreviewStyle();
 void BeginControlWidgetStyle(const float ac[3]);
 void EndControlWidgetStyle();
-// Applies the app-wide theme (called every frame from App::Update). The
-// zero-arg default keeps legacy callers on the original Monash dark look.
-void SetGlobalStyle(bool dark = true);
+
+// ---- Themes -----------------------------------------------------------------
+// A UI theme. The `retro` family ("Phosphor" and its derivations) is the CRT
+// look: near-black background, chrome (segment frames, outlines, headers)
+// drawn in `line`, plots become a phosphor screen (`screen` + `grid`), square
+// corners and 1px-outlined widgets everywhere; the desktop layout adds a
+// vector bezel and scanlines on top. `mono` retro themes additionally replace
+// the per-instrument accent colours with `line` for a single-phosphor look;
+// non-mono retro ("Arcade") keeps the accents for a colour-CRT vibe.
+// Per-instrument accent palette (RGB triplets matching the float[3] accent
+// pointers the widgets hold). SetGlobalStyle copies these over the mutable
+// constants:: accent arrays, so a colourful theme can give the scope, logic
+// analyzer, PSU etc. distinct hues while the mono themes collapse them all
+// to the phosphor line colour.
+struct ThemeAccents
+{
+	float psu[3];    // power supply
+	float sg1[3];    // signal generator 1 (+ digital outputs)
+	float sg2[3];    // signal generator 2 (+ calibration)
+	float gen[3];    // generic toggles: trigger, cursors, XY...
+	float logic[3];  // logic analyzer / spectrum analyser
+	float record[3]; // DAQ / network analyser
+	float scope[3];  // scope chrome (plot settings box, Scope panel)
+	// Trace colours: same hue family in every theme (CH1 yellow-ish, CH2
+	// cyan-ish); the light theme darkens them for contrast on white.
+	float ch1[3];
+	float ch2[3];
+	float math[3];
+};
+
+struct ThemeSpec
+{
+	const char* id;    // settings.ini value
+	const char* label; // menu label
+	bool retro;        // phosphor/CRT family
+	bool mono;         // retro only: chrome accents collapse to `line`
+	bool light;        // classic light palette (non-retro only)
+	bool pixelFont;    // "Retro" variants: VT323 terminal font (else Rajdhani)
+	ImVec4 bg;         // window background
+	ImVec4 text;       // primary text
+	ImVec4 dim;        // secondary text
+	ImVec4 line;       // bright chrome: segment frames, outlines, headers
+	ImVec4 lineDim;    // subdued lines: separators, inner borders
+	ImVec4 fill;       // widget fill (FrameBg)
+	ImVec4 screen;     // plot background (the CRT face)
+	ImVec4 grid;       // plot grid / graticule
+	ThemeAccents accents; // per-instrument chrome palette
+};
+
+int ThemeCount();
+const ThemeSpec& ThemeAt(int idx);
+const ThemeSpec* FindTheme(const std::string& id); // nullptr if unknown
+const ThemeSpec& CurrentTheme(); // last theme applied by SetGlobalStyle
+
+// Applies the app-wide theme (called every frame from App::Update).
+void SetGlobalStyle(const ThemeSpec& theme);
 ImU32 colourConvert(const float c[3], float alpha = 1.0f);
 void replace_all(
     std::string& s, std::string const& toReplace, std::string const& replaceWith);

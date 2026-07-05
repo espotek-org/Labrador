@@ -12,6 +12,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -52,6 +53,79 @@ static void ToolbarSep()
     ImGui::SameLine(0.0f, 10.0f);
 }
 
+// ---- CRT chrome (retro themes) ----------------------------------------------
+
+// Frame the layout segment just closed (call right after EndChild). The CRT
+// themes use the bright phosphor line; the classic themes a subtle gray.
+static void FrameLastSegment()
+{
+    const ThemeSpec& t = CurrentTheme();
+    const ImVec2 mn = ImGui::GetItemRectMin();
+    const ImVec2 mx = ImGui::GetItemRectMax();
+    const ImVec4 col = t.retro ? ImVec4(t.line.x, t.line.y, t.line.z, 0.75f) : t.lineDim;
+    const float rounding = t.retro ? 0.0f : ImGui::GetStyle().ChildRounding;
+    ImGui::GetWindowDrawList()->AddRect(
+        mn, mx, ImGui::ColorConvertFloat4ToU32(col), rounding, 0, 1.0f);
+}
+
+// Vector-drawn CRT bezel around the scope area: soft glow, double frame,
+// corner brackets and graticule ticks at the edge midpoints.
+static void DrawCrtBezel(const ImVec2& mn, const ImVec2& mx)
+{
+    const ThemeSpec& t = CurrentTheme();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImU32 line = ImGui::ColorConvertFloat4ToU32(t.line);
+    const ImU32 dim = ImGui::ColorConvertFloat4ToU32(t.lineDim);
+    auto glow = [&](float a) {
+        return ImGui::ColorConvertFloat4ToU32(ImVec4(t.line.x, t.line.y, t.line.z, a));
+    };
+    const float sc = ImGui::GetStyle().FontScaleDpi > 0 ? ImGui::GetStyle().FontScaleDpi : 1.0f;
+
+    // Phosphor glow bleeding outward
+    dl->AddRect(ImVec2(mn.x - 2, mn.y - 2), ImVec2(mx.x + 2, mx.y + 2), glow(0.20f), 2.0f);
+    dl->AddRect(ImVec2(mn.x - 4, mn.y - 4), ImVec2(mx.x + 4, mx.y + 4), glow(0.08f), 4.0f);
+    // Main frame + inset line
+    dl->AddRect(mn, mx, line, 0.0f, 0, 1.5f);
+    dl->AddRect(ImVec2(mn.x + 4, mn.y + 4), ImVec2(mx.x - 4, mx.y - 4), dim, 0.0f, 0, 1.0f);
+
+    // Corner brackets (viewfinder style), drawn over the main frame
+    const float b = 14.0f * sc;
+    const float th = 2.0f * sc;
+    // top-left
+    dl->AddLine(ImVec2(mn.x, mn.y + th * 0.5f), ImVec2(mn.x + b, mn.y + th * 0.5f), line, th);
+    dl->AddLine(ImVec2(mn.x + th * 0.5f, mn.y), ImVec2(mn.x + th * 0.5f, mn.y + b), line, th);
+    // top-right
+    dl->AddLine(ImVec2(mx.x - b, mn.y + th * 0.5f), ImVec2(mx.x, mn.y + th * 0.5f), line, th);
+    dl->AddLine(ImVec2(mx.x - th * 0.5f, mn.y), ImVec2(mx.x - th * 0.5f, mn.y + b), line, th);
+    // bottom-left
+    dl->AddLine(ImVec2(mn.x, mx.y - th * 0.5f), ImVec2(mn.x + b, mx.y - th * 0.5f), line, th);
+    dl->AddLine(ImVec2(mn.x + th * 0.5f, mx.y - b), ImVec2(mn.x + th * 0.5f, mx.y), line, th);
+    // bottom-right
+    dl->AddLine(ImVec2(mx.x - b, mx.y - th * 0.5f), ImVec2(mx.x, mx.y - th * 0.5f), line, th);
+    dl->AddLine(ImVec2(mx.x - th * 0.5f, mx.y - b), ImVec2(mx.x - th * 0.5f, mx.y), line, th);
+
+    // Graticule ticks at the midpoint of each edge
+    const float tick = 5.0f * sc;
+    const float cx = (mn.x + mx.x) * 0.5f;
+    const float cy = (mn.y + mx.y) * 0.5f;
+    dl->AddLine(ImVec2(cx, mn.y), ImVec2(cx, mn.y + tick), line, 1.5f);
+    dl->AddLine(ImVec2(cx, mx.y - tick), ImVec2(cx, mx.y), line, 1.5f);
+    dl->AddLine(ImVec2(mn.x, cy), ImVec2(mn.x + tick, cy), line, 1.5f);
+    dl->AddLine(ImVec2(mx.x - tick, cy), ImVec2(mx.x, cy), line, 1.5f);
+}
+
+// Horizontal scanlines over the CRT face (drawn into the current window's
+// draw list, so call from inside the plot child after the plot renders).
+static void DrawScanlines(const ImVec2& mn, const ImVec2& mx)
+{
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float sc = ImGui::GetStyle().FontScaleDpi > 0 ? ImGui::GetStyle().FontScaleDpi : 1.0f;
+    const float step = 3.0f * sc;
+    const ImU32 shade = IM_COL32(0, 0, 0, 44);
+    for (float y = mn.y + step; y < mx.y; y += step)
+        dl->AddRectFilled(ImVec2(mn.x, y), ImVec2(mx.x, y + 1.0f * sc), shade);
+}
+
 // Accent-tinted collapsing header for the side-panel sections.
 static bool SectionHeader(const char* label, const float* accent)
 {
@@ -69,17 +143,41 @@ static bool SectionHeader(const char* label, const float* accent)
 const char* DesktopFrontend::panelName(int p)
 {
     static const char* names[PanelCount]
-        = { "Scope", "Signals", "Meter", "Logic", "Record", "Analysis" };
+        = { "Scope", "Signals", "PSU", "Meter", "Logic", "DAQ", "Analysis" };
     return names[p];
+}
+
+void DesktopFrontend::startUp(App& app)
+{
+    InstrumentFrontend::startUp(app);
+    // The desktop layout hosts UART TX on the Logic page (renderLogicPanel)
+    // instead of inline under SG1's waveform controls, and the plot-help "?"
+    // in the toolbar instead of under the plot.
+    SG1Widget.ShowUartInline = false;
+    PlotWidgetObj.ShowHelpButton = false;
 }
 
 const float* DesktopFrontend::panelAccent(int p)
 {
-    static const float* accents[PanelCount] = { constants::OSC1_ACCENT,
-        constants::SG1_ACCENT, constants::MATH_ACCENT,
-        constants::SPECTRUM_ANALYSER_ACCENT, constants::NETWORK_ANALYSER_ACCENT,
-        constants::SG2_ACCENT };
-    return accents[p];
+    // Most slots point into the theme-written accent arrays, so the rail and
+    // page chrome re-colour with the theme (mono CRT themes collapse them all
+    // to the phosphor line colour, Arcade installs its neon palette).
+    const ThemeSpec& t = CurrentTheme();
+    switch (p)
+    {
+    // Scope: classic themes keep the CH1-yellow rail; CRT themes use the
+    // themed scope chrome slot.
+    case PanelScope: return t.retro ? constants::OSC_ACCENT : constants::OSC1_ACCENT;
+    case PanelSignals: return constants::SG1_ACCENT;
+    case PanelPSU: return constants::PSU_ACCENT;
+    // Meter: MATH is a trace colour, so mono themes swap in a themed slot
+    // (they are all the line colour anyway).
+    case PanelMeter:
+        return (t.retro && t.mono) ? constants::OSC_ACCENT : constants::MATH_ACCENT;
+    case PanelLogic: return constants::SPECTRUM_ANALYSER_ACCENT;
+    case PanelDAQ: return constants::NETWORK_ANALYSER_ACCENT;
+    default: return constants::SG2_ACCENT; // Analysis
+    }
 }
 
 // ---- Settings ---------------------------------------------------------------
@@ -93,6 +191,7 @@ void DesktopFrontend::loadSettings(Settings& s)
         m_panel = (int)page;
     m_sidebar_width
         = std::clamp((float)s.getDouble("desk_panel_width", 440.0), 300.0f, 800.0f);
+    m_scanlines = s.getBool("desk_scanlines", true);
 }
 
 void DesktopFrontend::saveSettings(Settings& s)
@@ -101,6 +200,7 @@ void DesktopFrontend::saveSettings(Settings& s)
     s.set("desk_panel_visible", m_sidebar_visible);
     s.set("desk_panel_page", (double)m_panel);
     s.set("desk_panel_width", (double)m_sidebar_width);
+    s.set("desk_scanlines", m_scanlines);
 }
 
 // ---- Shortcuts (desktop-only; the shared set lives in handleShortcuts) ------
@@ -138,6 +238,7 @@ void DesktopFrontend::renderLayout(App& app)
 
     const float toolbar_h = ImGui::GetFrameHeight() + 12.0f;
     renderToolbar(app, toolbar_h);
+    FrameLastSegment();
 
     // --- middle strip: plot | splitter | side panel | rail ---
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -155,13 +256,27 @@ void DesktopFrontend::renderLayout(App& app)
     const float plot_w = avail_w - rail_w
         - (m_sidebar_visible ? m_sidebar_width + splitter_w : 0.0f);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6, 6));
+    const bool retro = CurrentTheme().retro;
+    // CRT themes reserve extra padding for the bezel's inset line
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+        retro ? ImVec2(10, 10) : ImVec2(6, 6));
     ImGui::BeginChild("##plotarea", ImVec2(plot_w, middle_h),
         ImGuiChildFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
     PlotWidgetObj.setSize(ImGui::GetContentRegionAvail());
     PlotWidgetObj.Render();
+    if (retro && m_scanlines)
+    {
+        // Scanlines live in the child's draw list so they overlay the plot
+        const ImVec2 wp = ImGui::GetWindowPos();
+        const ImVec2 ws = ImGui::GetWindowSize();
+        DrawScanlines(wp, ImVec2(wp.x + ws.x, wp.y + ws.y));
+    }
     ImGui::EndChild();
+    if (retro)
+        DrawCrtBezel(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    else
+        FrameLastSegment(); // classic themes frame the plot area too
 
     if (m_sidebar_visible)
     {
@@ -185,12 +300,15 @@ void DesktopFrontend::renderLayout(App& app)
 
         ImGui::SameLine(0.0f, 0.0f);
         renderSidePanel(app, middle_h);
+        FrameLastSegment();
     }
 
     ImGui::SameLine(0.0f, 0.0f);
     renderRail(middle_h);
+    FrameLastSegment();
 
     renderStatusBar(app);
+    FrameLastSegment();
 
     UpdateHardwareState(app);
 
@@ -252,7 +370,7 @@ void DesktopFrontend::renderDesktopMenuBar(App& app)
         }
         if (ImGui::MenuItem("Open DAQ recording..."))
         {
-            showPanel(PanelRecord);
+            showPanel(PanelDAQ);
             DAQReplayWidget.openFilePrompt();
         }
         ImGui::Separator();
@@ -421,11 +539,11 @@ void DesktopFrontend::renderDesktopMenuBar(App& app)
         }
         ImGui::Separator();
 
-        if (ImGui::MenuItem("Data Logger..."))
-            showPanel(PanelRecord);
+        if (ImGui::MenuItem("DAQ Recorder..."))
+            showPanel(PanelDAQ);
         if (ImGui::MenuItem("Replay DAQ file..."))
         {
-            showPanel(PanelRecord);
+            showPanel(PanelDAQ);
             DAQReplayWidget.openFilePrompt();
         }
         ImGui::EndMenu();
@@ -462,17 +580,34 @@ void DesktopFrontend::renderDesktopMenuBar(App& app)
         }
         if (ImGui::BeginMenu("Theme"))
         {
-            if (ImGui::MenuItem("Dark", NULL, app.darkTheme()))
-                app.setDarkTheme(true);
-            if (ImGui::MenuItem("Light", NULL, !app.darkTheme()))
-                app.setDarkTheme(false);
+            for (int i = 0; i < ThemeCount(); i++)
+            {
+                const ThemeSpec& t = ThemeAt(i);
+                if (ImGui::MenuItem(t.label, NULL, app.themeId() == t.id))
+                    app.setThemeId(t.id);
+            }
+            ImGui::Separator();
+            ImGui::BeginDisabled(!CurrentTheme().retro);
+            ImGui::MenuItem("CRT Scanlines", NULL, &m_scanlines);
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Text Size"))
+        {
+            auto sizeItem = [&app](const char* label, float s) {
+                if (ImGui::MenuItem(label, NULL, std::fabs(app.fontScale() - s) < 0.01f))
+                    app.setFontScale(s);
+            };
+            sizeItem("Small", 0.85f);
+            sizeItem("Normal", 1.0f);
+            sizeItem("Large", 1.2f);
+            sizeItem("Extra Large", 1.45f);
             ImGui::EndMenu();
         }
         ImGui::Separator();
 
         if (ImGui::BeginMenu("Debug"))
         {
-            ImGui::MenuItem("Demo windows", NULL, &app.showDemoWindows());
             ImGui::MenuItem("Debug console", NULL, &app.showDebugConsole());
             ImGui::EndMenu();
         }
@@ -511,17 +646,41 @@ void DesktopFrontend::renderToolbar(App& app, float height)
 
     const float btn_h = ImGui::GetFrameHeight();
 
-    // Run/Stop — shows the current acquisition state, click (or Space) toggles
+    // Button widths follow the font (the picker includes some very wide
+    // faces that would overflow fixed pixel widths).
+    const float run_w = ImGui::CalcTextSize("RUNNING").x + 24.0f;
+
+    // Run/Stop — shows the current acquisition state, click (or Space)
+    // toggles. CRT themes use inverse video for the running state (mono
+    // terminals had no red/green); classic themes keep the coloured button.
     const bool running = !OSCWidget.Paused;
-    if (SolidButton(running ? "Running##runstop" : "Stopped##runstop",
+    const ThemeSpec& th = CurrentTheme();
+    bool run_clicked;
+    if (th.retro)
+    {
+        auto L = [&th](float a) { return ImVec4(th.line.x, th.line.y, th.line.z, a); };
+        ImGui::PushStyleColor(ImGuiCol_Button, running ? L(0.85f) : L(0.06f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, running ? L(1.0f) : L(0.20f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, running ? L(0.70f) : L(0.30f));
+        ImGui::PushStyleColor(ImGuiCol_Text, running ? th.bg : th.dim);
+        run_clicked = ImGui::Button(
+            running ? "RUNNING##runstop" : "STOPPED##runstop", ImVec2(run_w, btn_h));
+        ImGui::PopStyleColor(4);
+    }
+    else
+    {
+        run_clicked = SolidButton(running ? "Running##runstop" : "Stopped##runstop",
             running ? ImVec4(0.07f, 0.53f, 0.0f, 1.0f) : ImVec4(0.56f, 0.0f, 0.0f, 1.0f),
-            ImVec2(92, btn_h)))
+            ImVec2(run_w, btn_h));
+    }
+    if (run_clicked)
         OSCWidget.Paused = !OSCWidget.Paused;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Run / stop acquisition (Space)");
 
     ImGui::SameLine();
-    if (WhiteOutlineButton("Auto Fit##toolbar", ImVec2(90, btn_h)))
+    if (WhiteOutlineButton("Auto Fit##toolbar",
+            ImVec2(ImGui::CalcTextSize("Auto Fit").x + 24.0f, btn_h)))
     {
         OSCWidget.AutofitX = true;
         OSCWidget.AutofitY = true;
@@ -582,9 +741,17 @@ void DesktopFrontend::renderToolbar(App& app, float height)
     ImGui::SameLine();
     ToolToggle("Cursor 2##toolbar", &OSCWidget.Cursor2toggle);
 
+    // Plot help (relocated from under the plot)
+    ImGui::SameLine();
+    if (ImGui::Button(" ? ##plot_help", ImVec2(0, btn_h)))
+        PlotWidgetObj.show_help = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Plot window help");
+
     // Right edge: side panel toggle
-    const float panel_btn_w = 100.0f;
-    ImGui::SameLine(ImGui::GetWindowWidth() - panel_btn_w - 8.0f);
+    const float panel_btn_w = ImGui::CalcTextSize("Show Panel").x + 22.0f;
+    ImGui::SameLine(std::max(ImGui::GetWindowWidth() - panel_btn_w - 8.0f,
+        ImGui::GetCursorPosX() + 10.0f));
     if (ImGui::Button(m_sidebar_visible ? "Hide Panel##tb" : "Show Panel##tb",
             ImVec2(panel_btn_w, btn_h)))
         m_sidebar_visible = !m_sidebar_visible;
@@ -634,7 +801,7 @@ void DesktopFrontend::renderRail(float height)
                 ImVec2(mn.x + 3.0f, mx.y), ImGui::ColorConvertFloat4ToU32(accent));
 
         // Red dot on the Record page while the DAQ writer is running
-        if (p == PanelRecord && DAQWidget.isRecording())
+        if (p == PanelDAQ && DAQWidget.isRecording())
         {
             const float r = 4.0f;
             ImGui::GetWindowDrawList()->AddCircleFilled(
@@ -655,8 +822,8 @@ void DesktopFrontend::renderSidePanel(App& app, float height)
     ImGui::PopStyleVar();
 
     static const char* titles[PanelCount] = { "Oscilloscope", "Signal Outputs",
-        "Multimeter", "Logic Analyzer", "Data Logger", "Analysis Tools" };
-    ControlWidget* help_for[PanelCount] = { &OSCWidget, &SG1Widget,
+        "Power Supply", "Multimeter", "Logic Analyzer", "DAQ", "Analysis Tools" };
+    ControlWidget* help_for[PanelCount] = { &OSCWidget, &SG1Widget, &PSUWidget,
         &MultimeterWidget, &LogicWidget, &DAQWidget, &analysisToolsWidget };
 
     // Title bar: accent-tinted strip + page name + help
@@ -685,13 +852,15 @@ void DesktopFrontend::renderSidePanel(App& app, float height)
 
     // Body scrolls per page (child ID per page keeps scroll positions apart)
     ImGui::BeginChild(panelName(m_panel), ImVec2(0, 0));
+    (void)app;
     switch (m_panel)
     {
     case PanelScope: renderScopePanel(); break;
     case PanelSignals: renderSignalsPanel(); break;
+    case PanelPSU: renderPSUPanel(); break;
     case PanelMeter: renderMeterPanel(); break;
     case PanelLogic: renderLogicPanel(); break;
-    case PanelRecord: renderRecordPanel(app); break;
+    case PanelDAQ: renderDAQPanel(); break;
     case PanelAnalysis: renderAnalysisPanel(); break;
     default: break;
     }
@@ -704,6 +873,21 @@ void DesktopFrontend::renderSidePanel(App& app, float height)
 
 void DesktopFrontend::renderScopePanel()
 {
+    // Acquisition run/pause, mirroring the toolbar button and Space
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Acquisition");
+    ImGui::SameLine();
+    bool running = !OSCWidget.Paused;
+    if (ToggleSwitch("##scope_panel_run", &running,
+            colourConvert(constants::GEN_ACCENT)))
+        OSCWidget.Paused = !running;
+    ImGui::SameLine();
+    if (running)
+        ImGui::TextUnformatted("Running");
+    else
+        ImGui::TextColored(constants::GRAY_TEXT, "Paused");
+
+    ImGui::Dummy(ImVec2(0, 8.0f));
     ImGui::SeparatorText("Display");
     OSCWidget.renderDisplaySection(false); // XY/eye live in the Scope menu
 
@@ -725,14 +909,6 @@ void DesktopFrontend::renderSignalsPanel()
     // Each section gets its own ID scope: unlike the old TreeNode chrome,
     // CollapsingHeader doesn't push one, and SG1/SG2 reuse identical child
     // names internally ("Sine_control" etc.).
-    if (SectionHeader("Power Supply", constants::PSU_ACCENT))
-    {
-        ImGui::PushID("psu");
-        PSUWidget.renderControl();
-        ImGui::PopID();
-    }
-    ImGui::Dummy(ImVec2(0, 6.0f));
-
     if (SectionHeader("Signal Generator 1", constants::SG1_ACCENT))
     {
         ImGui::PushID("sg1");
@@ -755,6 +931,16 @@ void DesktopFrontend::renderSignalsPanel()
         DigitalOutWidget.renderControl();
         ImGui::PopID();
     }
+}
+
+void DesktopFrontend::renderPSUPanel()
+{
+    PSUWidget.renderControl();
+    ImGui::Spacing();
+    ImGui::TextColored(constants::GRAY_TEXT,
+        "4.5 - 11 V programmable supply on the PSU pin.");
+    ImGui::TextColored(constants::GRAY_TEXT,
+        "Also limits the signal generators' output range.");
 }
 
 void DesktopFrontend::renderMeterPanel()
@@ -788,15 +974,25 @@ void DesktopFrontend::renderLogicPanel()
             InputsWidget.setMode(InputsControl::Mode::ScopeLogic);
         if (WhiteOutlineButton("CH1 + CH2 logic (I2C)", ImVec2(240, 30)))
             InputsWidget.setMode(InputsControl::Mode::LogicLogic);
-        return;
+    }
+    else
+    {
+        LogicWidget.renderControl();
     }
 
-    LogicWidget.renderControl();
+    // UART transmit lives with the rest of the serial tooling (state and
+    // servicing stay in SG1, which owns the CH1 output).
+    ImGui::Dummy(ImVec2(0, 10.0f));
+    if (SectionHeader("UART TX", constants::SG1_ACCENT))
+    {
+        ImGui::PushID("uart_tx");
+        SG1Widget.renderUartControl();
+        ImGui::PopID();
+    }
 }
 
-void DesktopFrontend::renderRecordPanel(App& app)
+void DesktopFrontend::renderDAQPanel()
 {
-    (void)app;
     if (SectionHeader("Record to File", constants::NETWORK_ANALYSER_ACCENT))
     {
         ImGui::PushID("daq");
@@ -899,7 +1095,9 @@ void DesktopFrontend::renderStatusBar(App& app)
     const float rw = ImGui::CalcTextSize(right).x;
     const bool rec = DAQWidget.isRecording();
     const float rec_w = rec ? ImGui::CalcTextSize("REC").x + 18.0f : 0.0f;
-    ImGui::SameLine(ImGui::GetWindowWidth() - rw - rec_w - 12.0f);
+    // Never overlap the left status text (very wide fonts / narrow windows)
+    ImGui::SameLine(std::max(ImGui::GetWindowWidth() - rw - rec_w - 12.0f,
+        ImGui::GetCursorPosX() + 16.0f));
     if (rec)
     {
         ImGui::TextColored(red, "REC");

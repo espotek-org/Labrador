@@ -143,7 +143,7 @@ public:
 				if (ImGui::BeginTable("SpectrumChannelsTable", 4))
 				{
 					const float width = ImGui::GetContentRegionAvail().x * 0.95f;
-					float labWidth = 120.0f;
+					float labWidth = ImGui::CalcTextSize("Channel 1 (OSC1)").x + 12.0f;
 					float controlWidth = (width - 2 * labWidth) / 2;
 					ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, labWidth);
 					ImGui::TableSetupColumn("Two", ImGuiTableColumnFlags_WidthFixed, controlWidth);

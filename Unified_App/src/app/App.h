@@ -46,14 +46,13 @@ class App : public AppBase
     LayoutMode layoutMode() const { return m_layout_mode; }
     void setLayoutMode(LayoutMode m) { m_layout_mode = m; }
 
-    // Theme (View menu). The app re-applies SetGlobalStyle every frame, so the
-    // setter just flips the flag.
-    bool darkTheme() const { return m_dark_theme; }
-    void setDarkTheme(bool dark) { m_dark_theme = dark; }
+    // Theme (View menu). The app re-applies SetGlobalStyle every frame, so
+    // the setter just records the id (must be one of the ThemeSpec table's).
+    const std::string& themeId() const { return m_theme; }
+    void setThemeId(const char* id) { m_theme = id; }
 
     // Shared debug/help toggles owned by App but toggled from the desktop menu
     // bar (returned by reference so ImGui::MenuItem can bind to them).
-    bool& showDemoWindows() { return m_show_demo_windows; }
     bool& showDebugConsole() { return m_show_debug_console; }
     bool& showShortcuts() { return m_show_shortcuts; }
 
@@ -94,13 +93,12 @@ class App : public AppBase
     // pushed into the store every frame and flushed on change (throttled),
     // because Android may never call ShutDown cleanly.
     Settings m_settings;
-    bool m_dark_theme = true;
+    std::string m_theme = "phosphor";
     bool m_layout_env_override = false; // LABRADOR_LAYOUT wins but is not saved
 
     int m_frames = 0;
     const int m_lab_refresh_rate = 60; // send controls to labrador every this many frames
     bool connected = false;
-    bool m_show_demo_windows = false;
     bool m_show_debug_console = false;
     bool m_show_shortcuts = false;
     DebugConsole m_debug_console;

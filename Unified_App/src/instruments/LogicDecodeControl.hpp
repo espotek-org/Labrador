@@ -1,6 +1,7 @@
 #pragma once
 #include "ControlWidget.hpp"
 #include "InputsControl.hpp"
+#include "UIComponents.hpp"
 #include "librador.h"
 #include "util.h"
 #include <algorithm>
@@ -20,6 +21,11 @@
 class LogicDecodeControl : public ControlWidget
 {
 public:
+	// Freeze the decode consoles: while set, controlLab stops polling the
+	// digital stream (so librador's decoders stop consuming) and no new text
+	// is appended. Settings changes still apply immediately on resume.
+	bool Paused = false;
+
 	LogicDecodeControl(std::string label, ImVec2 size, const float* accentColour)
 	    : ControlWidget(label, size, accentColour)
 	{}
@@ -55,6 +61,17 @@ public:
 			ImGui::TextWrapped("Set an Inputs channel to logic to decode UART "
 			                   "or I2C traffic.");
 			return;
+		}
+
+		// Pause: freeze the consoles without touching the device mode
+		ImGui::Text("Pause");
+		ImGui::SameLine();
+		ToggleSwitch((getLabel() + "_pause").c_str(), &Paused,
+		    colourConvert(constants::GEN_ACCENT));
+		if (Paused)
+		{
+			ImGui::SameLine();
+			ImGui::TextColored(constants::GRAY_TEXT, "decode frozen");
 		}
 
 		// Protocol selection. I2C decodes both channels at once, so it needs
@@ -157,6 +174,13 @@ public:
 		{
 			librador_set_i2c_is_decoding(want_i2c == 1);
 			applied_i2c_decoding = want_i2c;
+		}
+
+		// Paused: settings above still apply, but stop driving the decoders
+		// (no polling = librador consumes no bits) and collecting output.
+		if (Paused)
+		{
+			return true;
 		}
 
 		// Poll the digital sample stream to drive the decoders. The window /

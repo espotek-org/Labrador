@@ -32,9 +32,15 @@ bool inline ToggleSwitch(const char* id, bool* state, ImU32 accentColour)
 		    *state = !*state;
 		    switched = true;
 		}
-			
 
-		ImU32 col_bg = *state ? accentColour : IM_COL32(150, 150, 150, 255);
+		// CRT themes: OFF is a dark outlined well (unlit phosphor), the knob
+		// glows in the text colour; classic themes keep the gray/white look.
+		const ThemeSpec& th = CurrentTheme();
+		ImU32 col_off = th.retro ? ImGui::ColorConvertFloat4ToU32(th.fill)
+		                         : IM_COL32(150, 150, 150, 255);
+		ImU32 col_knob = th.retro ? ImGui::ColorConvertFloat4ToU32(th.text)
+		                          : constants::PRIM_LIGHT;
+		ImU32 col_bg = *state ? accentColour : col_off;
 
 		draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, rounding);
 
@@ -43,9 +49,13 @@ bool inline ToggleSwitch(const char* id, bool* state, ImU32 accentColour)
 						ImVec2(p.x + pad,							p.y + pad),  // OFF top-left
 	        *state ?	ImVec2(p.x + width - pad,					p.y + height - pad) : // ON bottom-right
 						ImVec2(p.x + pad + switch_width,			p.y + height - pad),  // OFF bottom-right
-			constants::PRIM_LIGHT, 
+			col_knob,
 			rounding);
-		
+
+		// 1px outline, matching the outlined widgets everywhere
+		draw_list->AddRect(p, ImVec2(p.x + width, p.y + height),
+		    ImGui::ColorConvertFloat4ToU32(th.lineDim), rounding);
+
 		return switched;
 	}
 
@@ -296,9 +306,15 @@ private:
 
 };
 
+// Outlined action button. Historically a white outline; the border now
+// follows the theme (phosphor line in the CRT themes, black in the light one).
 bool inline WhiteOutlineButton(const char* id, ImVec2 size=ImVec2(0, 0))
 {
-	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1, 1, 1, 0.5)); // White border for buttons
+	const ThemeSpec& th = CurrentTheme();
+	const ImVec4 border = th.retro ? th.line
+	    : th.light                 ? ImVec4(0, 0, 0, 0.5f)
+	                               : ImVec4(1, 1, 1, 0.5f);
+	ImGui::PushStyleColor(ImGuiCol_Border, border);
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1);
 	bool result = ImGui::Button(id, size);
 	ImGui::PopStyleVar();

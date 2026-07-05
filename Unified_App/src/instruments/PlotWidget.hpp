@@ -40,6 +40,10 @@ public:
 	double VisibleYMax = 0.0;
 	bool VisibleYValid = false;
 
+	// Where the plot-help "?" lives: under the plot (classic/lowres) or
+	// hosted by the desktop toolbar (which sets show_help itself).
+	bool ShowHelpButton = true;
+
 	/// <summary>
 	/// Constructor
 	/// </summary>
@@ -1160,17 +1164,19 @@ public:
 
 
 		
-		// Help Button
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		if (ImGui::Button(" ? "))
+		// Help Button (desktop hosts it in the toolbar instead)
+		if (ShowHelpButton)
 		{
-			show_help = true;
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			if (ImGui::Button(" ? "))
+			{
+				show_help = true;
+			}
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
 		}
 
-		ImGui::PopStyleColor();
-
 		// Signal and Cursor Properties
-		ImGui::SameLine();
 		if (ImGui::BeginTable("signal_props", 4))
 		{
 			ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, 180);
@@ -1504,14 +1510,42 @@ public:
 		// Label is in (ms, V)
 		snprintf(cursor_label, sizeof(cursor_label), (label + "(%.2f, %.2f)").c_str(), *cx, *cy);
 		ImPlot::PlotText(cursor_label, *cx, *cy, ImVec2(50, -12));
-		ImPlot::PlotInfLines((label + "vert").c_str(), cx, 1,
-			ImPlotSpec(ImPlotProp_LineWeight, 2.5f, ImPlotProp_LineColor, ImVec4(1, 1, 1, 0.8), ImPlotProp_Flags, ImPlotInfLinesFlags_None));
-		ImPlot::PlotInfLines((label + "vert").c_str(), cy, 1,
-			ImPlotSpec(ImPlotProp_LineWeight, 2.5f, ImPlotProp_LineColor, ImVec4(1, 1, 1, 0.8), ImPlotProp_Flags, ImPlotInfLinesFlags_Horizontal));
+		if (id == 2)
+		{
+			// Cursor 2 draws a dashed crosshair so the two cursors are
+			// distinguishable at a glance
+			ImDrawList* dl = ImPlot::GetPlotDrawList();
+			const ImVec2 pos = ImPlot::GetPlotPos();
+			const ImVec2 size = ImPlot::GetPlotSize();
+			const ImVec2 px = ImPlot::PlotToPixels(*cx, *cy);
+			const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(1, 1, 1, 0.8f));
+			const float dash = 8.0f, gap = 6.0f, weight = 2.5f;
+			ImPlot::PushPlotClipRect();
+			for (float y = pos.y; y < pos.y + size.y; y += dash + gap)
+				dl->AddLine(ImVec2(px.x, y),
+					ImVec2(px.x, ImMin(y + dash, pos.y + size.y)), col, weight);
+			for (float x = pos.x; x < pos.x + size.x; x += dash + gap)
+				dl->AddLine(ImVec2(x, px.y),
+					ImVec2(ImMin(x + dash, pos.x + size.x), px.y), col, weight);
+			ImPlot::PopPlotClipRect();
+		}
+		else
+		{
+			ImPlot::PlotInfLines((label + "vert").c_str(), cx, 1,
+				ImPlotSpec(ImPlotProp_LineWeight, 2.5f, ImPlotProp_LineColor, ImVec4(1, 1, 1, 0.8), ImPlotProp_Flags, ImPlotInfLinesFlags_None));
+			ImPlot::PlotInfLines((label + "vert").c_str(), cy, 1,
+				ImPlotSpec(ImPlotProp_LineWeight, 2.5f, ImPlotProp_LineColor, ImVec4(1, 1, 1, 0.8), ImPlotProp_Flags, ImPlotInfLinesFlags_Horizontal));
+		}
 	}
 
 	void UpdateOscData()
 	{
+		// Trace colours are theme-written; re-sync the caches every frame so
+		// the plot follows a theme switch even while the panels are hidden.
+		osc_control->refreshAccentCache();
+		analysis_tools_widget->OSC1Colour = colourConvert(constants::OSC1_ACCENT);
+		analysis_tools_widget->OSC2Colour = colourConvert(constants::OSC2_ACCENT);
+
 		// sets whether the osc is paused or not (if paused, data will not update)
 		OSC1Data->SetPaused(osc_control->Paused);
 		OSC2Data->SetPaused(osc_control->Paused);

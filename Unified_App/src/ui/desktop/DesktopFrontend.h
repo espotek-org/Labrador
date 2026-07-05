@@ -24,6 +24,7 @@
 class DesktopFrontend : public InstrumentFrontend
 {
   public:
+    void startUp(App& app) override;
     void loadSettings(Settings& s) override;
     void saveSettings(Settings& s) override;
 
@@ -36,9 +37,10 @@ class DesktopFrontend : public InstrumentFrontend
     {
         PanelScope = 0,
         PanelSignals,
+        PanelPSU,
         PanelMeter,
         PanelLogic,
-        PanelRecord,
+        PanelDAQ,
         PanelAnalysis,
         PanelCount
     };
@@ -57,9 +59,10 @@ class DesktopFrontend : public InstrumentFrontend
     // Panel bodies
     void renderScopePanel();
     void renderSignalsPanel();
+    void renderPSUPanel();
     void renderMeterPanel();
     void renderLogicPanel();
-    void renderRecordPanel(App& app);
+    void renderDAQPanel();
     void renderAnalysisPanel();
 
     // Open the side panel on a given page (menus/tools shortcuts).
@@ -78,4 +81,5 @@ class DesktopFrontend : public InstrumentFrontend
     float m_sidebar_width = 440.0f;
     bool m_show_calibration = false;
     bool m_show_about = false;
+    bool m_scanlines = true; // CRT themes only (View > Theme > CRT Scanlines)
 };

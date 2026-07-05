@@ -3,12 +3,14 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
+#include "instruments/util.h" // CurrentTheme(), for the per-theme font pick
 #include "platform/paths.h"
 #include "platform/file_dialog.h"
 #include "platform/android_ui.h"
 
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -128,33 +130,43 @@ AppBase::AppBase(const char* title)
     loadFonts();
 }
 
-// Hand the atlas an ImGui-allocated copy it can own (dynamic fonts in 1.92
-// keep reading the data for the atlas lifetime).
-static void* fontDataForAtlas(const std::vector<unsigned char>& buf)
+// Font file bytes, cached for the whole app lifetime: the registry loads
+// several base fonts that share the same (large) fallback files, and the
+// atlas keeps reading the data lazily, so the fonts reference one cached
+// copy each (FontDataOwnedByAtlas = false) instead of per-font duplicates.
+static void* fontData(const char* file, int* out_size)
 {
-    void* p = IM_ALLOC(buf.size());
-    memcpy(p, buf.data(), buf.size());
-    return p;
+    static std::map<std::string, std::vector<unsigned char>>* cache
+        = new std::map<std::string, std::vector<unsigned char>>(); // never freed
+    auto it = cache->find(file);
+    if (it == cache->end())
+        it = cache->emplace(file, loadAsset(file)).first;
+    *out_size = (int)it->second.size();
+    return it->second.data();
 }
 
-void AppBase::loadFonts()
+// Load one base font plus the shared merge fallbacks: arrows/greek (arial),
+// check marks (seguisym), and Brent's instrument glyph fonts (waveform
+// shapes, delta, DAQ icons). Every selectable font gets the same fallbacks
+// so glyphs survive font/theme switches.
+static ImFont* loadFontWithFallbacks(const char* file, float size_pixels)
 {
     ImGuiIO& io = ImGui::GetIO();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.FontSizeBase = 18.0f;
 
     // Fonts load from memory so the same path works on desktop and from the
     // Android APK's assets.
-    std::vector<unsigned char> roboto = loadAsset("fonts/Roboto-Medium.ttf");
-    ImFont* default_font
-        = io.Fonts->AddFontFromMemoryTTF(fontDataForAtlas(roboto), (int)roboto.size());
-    if (default_font == nullptr)
-        throw std::runtime_error("Failed to load Roboto-Medium.ttf");
+    ImFontConfig base_config;
+    base_config.FontDataOwnedByAtlas = false; // cached in fontData()
+    int base_size = 0;
+    void* base = fontData(file, &base_size);
+    ImFont* font
+        = io.Fonts->AddFontFromMemoryTTF(base, base_size, size_pixels, &base_config);
+    if (font == nullptr)
+        throw std::runtime_error(std::string("Failed to load font: ") + file);
 
-    // Merged fallbacks: arrows/greek (arial), check marks (seguisym), and
-    // Brent's instrument glyph fonts (waveform shapes, delta, DAQ icons).
     ImFontConfig config;
     config.MergeMode = true;
+    config.FontDataOwnedByAtlas = false;
     // ImGui 1.92 requires a non-zero reference size when a merge font sets a
     // GlyphOffset (the offset is expressed relative to that size). Sizes for
     // the glyph fonts are Brent's tuned values.
@@ -169,12 +181,24 @@ void AppBase::loadFonts()
     for (const MergeFont& mf : merge_fonts)
     {
         config.GlyphOffset = ImVec2(0.0f, mf.y_offset);
-        std::vector<unsigned char> data = loadAsset(mf.file);
-        ImFont* merged = io.Fonts->AddFontFromMemoryTTF(
-            fontDataForAtlas(data), (int)data.size(), mf.size, &config);
+        int size = 0;
+        void* data = fontData(mf.file, &size);
+        ImFont* merged = io.Fonts->AddFontFromMemoryTTF(data, size, mf.size, &config);
         if (merged == nullptr)
             throw std::runtime_error(std::string("Failed to load font: ") + mf.file);
     }
+    return font;
+}
+
+void AppBase::loadFonts()
+{
+    ImGui::GetStyle().FontSizeBase = 18.0f;
+
+    // Two faces (both OFL, licenses alongside the files in assets/fonts):
+    // Rajdhani for the classic and "Modern" CRT themes, VT323 (a DEC VT320
+    // revival) for the "Retro" CRT themes. Sizes tuned per face.
+    m_font_default = loadFontWithFallbacks("fonts/Rajdhani-Medium.ttf", 19.0f);
+    m_font_retro = loadFontWithFallbacks("fonts/VT323-Regular.ttf", 21.0f);
 }
 
 AppBase::~AppBase()
@@ -238,6 +262,20 @@ void AppBase::Run()
             SDL_Delay(10);
             continue;
         }
+
+        // Resolve the frame's font before NewFrame so the whole frame uses
+        // one font: VT323 for the "Retro" CRT themes, Rajdhani otherwise.
+        // CurrentTheme() reflects the theme applied at the end of the
+        // previous frame's Update.
+        if (m_font_default && m_font_retro)
+        {
+            const ThemeSpec& t = CurrentTheme();
+            ImGui::GetIO().FontDefault
+                = (t.retro && t.pixelFont) ? m_font_retro : m_font_default;
+        }
+        // Accessibility text-size factor (View > Text Size). Layout widths
+        // are CalcTextSize-driven, so everything reflows with the text.
+        ImGui::GetStyle().FontScaleMain = m_font_scale;
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
