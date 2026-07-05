@@ -88,8 +88,8 @@ unixUsbDriver::~unixUsbDriver(void){
     }
 
     if(handle != NULL){
-#ifdef PLATFORM_MAC
-        libusb_release_interface(handle, AIO_BULK_IFACE);
+#if AIO_STREAM_IFACE != 0
+        libusb_release_interface(handle, AIO_STREAM_IFACE);
 #endif
         libusb_release_interface(handle, 0);
         qDebug() << "Interface released";
@@ -141,17 +141,18 @@ unsigned char unixUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
         return 1;
     } else qDebug() << "Interface claimed!";
 
-#ifdef PLATFORM_MAC
-    //The AIO firmware carries the bulk transport on its own interface;
-    //claim it now, select alternate setting 1 (streaming) in usbIsoInit.
-    error = libusb_claim_interface(handle, AIO_BULK_IFACE);
+#if AIO_STREAM_IFACE != 0
+    //The AIO firmware carries this platform's transport on its own
+    //interface (mac: bulk on 2, linux/pi: iso1 on 1); claim it now and
+    //select alternate setting 1 (streaming) in usbIsoInit.
+    error = libusb_claim_interface(handle, AIO_STREAM_IFACE);
     if(error){
-        qDebug() << "libusb_claim_interface(bulk) FAILED";
+        qDebug() << "libusb_claim_interface(stream) FAILED";
         qDebug() << "ERROR" << error << libusb_error_name(error);
         //Not fatal here: an old (pre-AIO) firmware has only one interface.
         //The firmware version check will trigger a reflash, after which we
         //reconnect from scratch.
-    } else qDebug() << "Bulk interface claimed!";
+    } else qDebug() << "Streaming interface claimed!";
 #endif
 
     return 0;
@@ -204,17 +205,15 @@ static void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 int unixUsbDriver::usbIsoInit(void){
     int error;
 
-#ifdef PLATFORM_MAC
-    //Select the bulk streaming alternate setting; the firmware starts
-    //queueing padded frames from its SOF handler once alt 1 is active.
-    error = libusb_set_interface_alt_setting(handle, AIO_BULK_IFACE, 1);
+    //Select the streaming alternate setting; the firmware arms this
+    //transport's endpoints once alt 1 is active.
+    error = libusb_set_interface_alt_setting(handle, AIO_STREAM_IFACE, 1);
     if(error){
-        qDebug() << "libusb_set_interface_alt_setting(bulk, 1) FAILED";
+        qDebug() << "libusb_set_interface_alt_setting(stream, 1) FAILED";
         qDebug() << "ERROR" << libusb_error_name(error);
         return -1;
     }
-    qDebug() << "Bulk streaming alternate setting selected";
-#endif
+    qDebug() << "Streaming alternate setting selected";
 
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (unsigned char k=0;k<NUM_ISO_ENDPOINTS;k++){
@@ -642,8 +641,8 @@ int unixUsbDriver::flashFirmware(void){
         QApplication::processEvents();
     } while (exit_code);
 
-#ifdef PLATFORM_MAC
-    libusb_release_interface(handle, AIO_BULK_IFACE);
+#if AIO_STREAM_IFACE != 0
+    libusb_release_interface(handle, AIO_STREAM_IFACE);
 #endif
     libusb_release_interface(handle, 0);
     qDebug() << "Interface released";

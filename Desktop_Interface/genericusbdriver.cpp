@@ -68,7 +68,7 @@ genericUsbDriver::genericUsbDriver(QWidget *parent) : QLabel(parent)
     for(int k=0; k<NUM_ISO_ENDPOINTS; k++){
         //qDebug() << k;
         //qDebug() << NUM_ISO_ENDPOINTS;
-        pipeID[k] = 0x81+k;
+        pipeID[k] = AIO_DATA_EP_FIRST + k;
         qDebug() << "pipeID" << k << "=" << pipeID[k];
     }
 

@@ -31,20 +31,34 @@
     #define ISO_PACKET_SIZE 750
     #define NUM_ISO_ENDPOINTS (1)
     #define AIO_BULK_IFACE 2
+    #define AIO_STREAM_IFACE AIO_BULK_IFACE
+    #define AIO_DATA_EP_FIRST 0x88
     #define AIO_BULK_EP 0x88
     #define AIO_BULK_HDR_XFER 64
     #define AIO_BULK_PAYLOAD_XFER 768
     #define AIO_BULK_FRAME_STRIDE (AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER)
 #elif defined(WINDOWS_64_BIT)
-    #define EXPECTED_FIRMWARE_VERSION 0x0007
-    #define DEFINED_EXPECTED_VARIANT 1
+    // AIO firmware, iso6 transport: interface 0 alt 1 carries the classic
+    // 6x 128-byte iso endpoints at the same addresses (0x81..0x86) and
+    // packet sizes as the old variant-01 firmware - only the interface
+    // alternate setting and the expected version change.
+    #define EXPECTED_FIRMWARE_VERSION 0x000C
+    #define DEFINED_EXPECTED_VARIANT 3
     #define ISO_PACKET_SIZE 125
     #define NUM_ISO_ENDPOINTS (6)
+    #define AIO_STREAM_IFACE 0
+    #define AIO_DATA_EP_FIRST 0x81
 #else
-    #define EXPECTED_FIRMWARE_VERSION 0x0007
-    #define DEFINED_EXPECTED_VARIANT 2
+    // AIO firmware, iso1 transport (Linux, Raspberry Pi, 32-bit Windows):
+    // interface 1 alt 1 carries a single 1023-byte iso endpoint exactly
+    // like the old variant-02 firmware, but at address 0x87 instead of
+    // 0x81 (the AIO firmware shares EP addresses across its transports).
+    #define EXPECTED_FIRMWARE_VERSION 0x000C
+    #define DEFINED_EXPECTED_VARIANT 3
     #define ISO_PACKET_SIZE 750
     #define NUM_ISO_ENDPOINTS (1)
+    #define AIO_STREAM_IFACE 1
+    #define AIO_DATA_EP_FIRST 0x87
 #endif
 
 // Bytes per USB transfer context: the bulk stream carries framing overhead

@@ -143,6 +143,25 @@ int  winUsbDriver::usbIsoInit(void){
     bool success;
     DWORD errorCode = ERROR_SUCCESS;
 
+    //The AIO firmware (0x000C) exposes each transport on its own interface
+    //with alt setting 0 = idle and alt setting 1 = streaming: iso6 on
+    //interface 0 (64-bit builds), iso1 on interface 1 (32-bit builds).
+    //Claim the streaming interface and select alt 1 so the firmware arms
+    //this transport's endpoints.
+    success = UsbK_ClaimInterface(handle, AIO_STREAM_IFACE, FALSE);
+    if(!success){
+        errorCode = GetLastError();
+        qDebug() << "UsbK_ClaimInterface failed with error code" << errorCode;
+        return -6;
+    }
+    success = UsbK_SetAltInterface(handle, AIO_STREAM_IFACE, FALSE, 1);
+    if(!success){
+        errorCode = GetLastError();
+        qDebug() << "UsbK_SetAltInterface failed with error code" << errorCode;
+        return -7;
+    }
+    qDebug() << "Streaming alternate setting selected";
+
     //Setting up overlapped I/O.  It's easier than threading on Windows.
     success = OvlK_Init(&ovlPool, handle, MAX_OVERLAP, (KOVL_POOL_FLAG) 0);
     if(!success){
