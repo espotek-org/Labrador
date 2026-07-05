@@ -78,6 +78,11 @@ extern volatile unsigned char modeChanged;
 
 #ifdef AIO_INTERFACE
 extern volatile unsigned char active_transport;
+//Debug state readable via vendor request 0xab:
+//[0]=active_transport [1]=endpoint arm-failure mask [2]=iso_callback count
+//[3]=meta_callback count [4]=bulk hdr cb count [5]=bulk payload cb count
+//[6]=usb_state [7]=global_mode
+extern volatile unsigned char aio_dbg[8];
 #endif
 
 COMPILER_WORD_ALIGNED

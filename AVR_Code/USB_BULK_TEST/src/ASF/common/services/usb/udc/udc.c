@@ -1217,6 +1217,14 @@ static bool udc_reqvend(void){
 		case 0xa9:  //Variant Version Request
 			udd_set_setup_payload(&variant, udd_g_ctrlreq.req.wLength);
 			return 1;
+#ifdef AIO_INTERFACE
+		case 0xab:  //AIO debug state
+			aio_dbg[0] = active_transport;
+			aio_dbg[6] = usb_state;
+			aio_dbg[7] = global_mode;
+			udd_set_setup_payload((uint8_t *) aio_dbg, udd_g_ctrlreq.req.wLength);
+			return 1;
+#endif
 		case 0xaa:  //Soft reset Iso
 			return main_vendor_enable();
 		default:

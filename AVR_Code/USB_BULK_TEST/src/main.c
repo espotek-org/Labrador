@@ -102,28 +102,33 @@ static volatile unsigned short aio_seq = 0;
 static volatile unsigned char bulk_busy = 0;
 static volatile unsigned char meta_busy = 0;
 static volatile unsigned short meta_prev_seq;
-static volatile unsigned char meta_prev_csum;
+static volatile unsigned char meta_prev_csum0;
+static volatile unsigned char meta_prev_csum1;
 static volatile unsigned char meta_prev_mode;
 static volatile unsigned char meta_prev_valid = 0;
+volatile unsigned char aio_dbg[8];
 
-static unsigned char aio_frame_csum(void)
+static unsigned char aio_frame_csum(unsigned char state)
 {
-	//XOR of the payload bytes the host receives this frame, in all
-	//transport/mode combinations:
+	//XOR of the payload the host would receive for double-buffer half
+	//`state`:
 	// - iso6 in modes <5 sends two half-buffers (one per analog channel)
 	// - everything else sends one contiguous PACKET_SIZE half
+	//The meta packets carry the checksum of BOTH halves; whichever half a
+	//frame was armed from, the host can match it, and a frame overwritten
+	//mid-flight by the ADC/DMA loop matches neither.
 	unsigned short i;
 	unsigned char c = 0;
 	if((active_transport == TRANSPORT_ISO6) && (global_mode < 5)){
-		volatile unsigned char *a = &isoBuf[usb_state * HALFPACKET_SIZE];
-		volatile unsigned char *b = &isoBuf[PACKET_SIZE + usb_state * HALFPACKET_SIZE];
+		volatile unsigned char *a = &isoBuf[state * HALFPACKET_SIZE];
+		volatile unsigned char *b = &isoBuf[PACKET_SIZE + state * HALFPACKET_SIZE];
 		for(i = 0; i < HALFPACKET_SIZE; i++){
 			c ^= a[i];
 			c ^= b[i];
 		}
 	}
 	else{
-		volatile unsigned char *p = &isoBuf[usb_state * PACKET_SIZE];
+		volatile unsigned char *p = &isoBuf[state * PACKET_SIZE];
 		for(i = 0; i < PACKET_SIZE; i++){
 			c ^= p[i];
 		}
@@ -249,7 +254,7 @@ static void main_aio_bulk_kick(void)
 	bulk_hdr[3] = (aio_seq >> 8) & 0xff;
 	bulk_hdr[4] = PACKET_SIZE & 0xff;
 	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
-	bulk_hdr[6] = aio_frame_csum();
+	bulk_hdr[6] = aio_frame_csum(usb_state);
 	bulk_hdr[7] = global_mode;
 	bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
 	bulk_busy = 1;
@@ -258,33 +263,46 @@ static void main_aio_bulk_kick(void)
 	}
 }
 
+static void main_aio_meta_fill_and_arm(udd_ep_id_t meta_ep)
+{
+	//Arm the meta endpoint with the header describing the frame currently
+	//on the wire (latched at this frame's SOF); it transmits next frame,
+	//giving the lag-1 semantics the host expects.  The buffer is only
+	//written here, never while a transfer is pending.
+	iso_meta_buf[0] = AIO_HDR_MAGIC0;
+	iso_meta_buf[1] = AIO_HDR_MAGIC1_META;
+	iso_meta_buf[2] = meta_prev_seq & 0xff;
+	iso_meta_buf[3] = (meta_prev_seq >> 8) & 0xff;
+	iso_meta_buf[4] = meta_prev_csum0;
+	iso_meta_buf[5] = meta_prev_csum1;
+	iso_meta_buf[6] = usb_state;
+	iso_meta_buf[7] = meta_prev_mode;
+	meta_busy = 1;
+	if (!udd_ep_run(meta_ep, false, (uint8_t *)iso_meta_buf, sizeof(iso_meta_buf), meta_callback)) {
+		meta_busy = 0;
+		aio_dbg[1] |= 0x80;
+	}
+}
+
 static void main_aio_meta_kick(udd_ep_id_t meta_ep)
 {
-	//Send the header describing the PREVIOUS frame (lag-1), then compute
-	//and latch this frame's header for delivery at the next SOF.
+	//Latch this frame's header; the meta endpoint re-arms itself from its
+	//completion callback (once per frame).  Arming from here is only the
+	//backstop for a broken chain (failed re-arm, first frame after enable).
 	aio_seq++;
-	if (meta_prev_valid && !meta_busy) {
-		iso_meta_buf[0] = AIO_HDR_MAGIC0;
-		iso_meta_buf[1] = AIO_HDR_MAGIC1_META;
-		iso_meta_buf[2] = meta_prev_seq & 0xff;
-		iso_meta_buf[3] = (meta_prev_seq >> 8) & 0xff;
-		iso_meta_buf[4] = PACKET_SIZE & 0xff;
-		iso_meta_buf[5] = (PACKET_SIZE >> 8) & 0xff;
-		iso_meta_buf[6] = meta_prev_csum;
-		iso_meta_buf[7] = meta_prev_mode;
-		meta_busy = 1;
-		if (!udd_ep_run(meta_ep, false, (uint8_t *)iso_meta_buf, sizeof(iso_meta_buf), meta_callback)) {
-			meta_busy = 0;
-		}
-	}
 	meta_prev_seq = aio_seq;
-	meta_prev_csum = aio_frame_csum();
+	meta_prev_csum0 = aio_frame_csum(0);
+	meta_prev_csum1 = aio_frame_csum(1);
 	meta_prev_mode = global_mode;
 	meta_prev_valid = 1;
+	if (!meta_busy) {
+		main_aio_meta_fill_and_arm(meta_ep);
+	}
 }
 
 void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
 {
+	aio_dbg[4]++;
 	if (status != UDD_EP_TRANSFER_OK) {
 		bulk_busy = 0;
 		return;
@@ -296,12 +314,23 @@ void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep
 
 void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
 {
+	aio_dbg[5]++;
 	bulk_busy = 0;
 }
 
 void meta_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
 {
+	aio_dbg[3]++;
 	meta_busy = 0;
+	if (status != UDD_EP_TRANSFER_OK) {
+		return;
+	}
+	//Immediately re-arm for the next frame with the currently latched
+	//header.  Waiting for the next SOF instead would lose every other
+	//frame when the host polls this endpoint late in the frame.
+	if (meta_prev_valid) {
+		main_aio_meta_fill_and_arm(ep);
+	}
 }
 #endif
 
@@ -441,20 +470,27 @@ void main_vendor_disable(void)
 #ifdef AIO_INTERFACE
 static void main_aio_arm_endpoints(void)
 {
+	unsigned char i;
 	aio_seq = 0;
 	meta_prev_valid = 0;
 	meta_busy = 0;
+	aio_dbg[1] = 0;
+	aio_dbg[2] = 0;
+	aio_dbg[3] = 0;
+	aio_dbg[4] = 0;
+	aio_dbg[5] = 0;
 	switch(active_transport){
 		case TRANSPORT_ISO6:
-			udd_ep_run(0x81, false, (uint8_t *)&isoBuf[0], 125, iso_callback);
-			udd_ep_run(0x82, false, (uint8_t *)&isoBuf[125], 125, iso_callback);
-			udd_ep_run(0x83, false, (uint8_t *)&isoBuf[250], 125, iso_callback);
-			udd_ep_run(0x84, false, (uint8_t *)&isoBuf[375], 125, iso_callback);
-			udd_ep_run(0x85, false, (uint8_t *)&isoBuf[500], 125, iso_callback);
-			udd_ep_run(0x86, false, (uint8_t *)&isoBuf[625], 125, iso_callback);
+			for(i = 0; i < 6; i++){
+				if(!udd_ep_run(0x81 + i, false, (uint8_t *)&isoBuf[i * 125], 125, iso_callback)){
+					aio_dbg[1] |= (1 << i);
+				}
+			}
 			break;
 		case TRANSPORT_ISO1:
-			udd_ep_run(UDI_AIO_EP_ISO1_IN, false, (uint8_t *)&isoBuf[0], PACKET_SIZE, iso_callback);
+			if(!udd_ep_run(UDI_AIO_EP_ISO1_IN, false, (uint8_t *)&isoBuf[0], PACKET_SIZE, iso_callback)){
+				aio_dbg[1] |= 0x01;
+			}
 			break;
 		case TRANSPORT_BULK:
 			//Frames are queued from the SOF handler once the pipe is idle.
@@ -518,6 +554,7 @@ bool main_setup_in_received(void)
 
 void iso_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep){
 	#if defined(AIO_INTERFACE)
+		aio_dbg[2]++;
 		if(active_transport == TRANSPORT_ISO6){
 			unsigned short offset = (ep - 0x81) * 125;
 			if (global_mode < 5){
