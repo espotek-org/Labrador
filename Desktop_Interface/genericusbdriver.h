@@ -16,16 +16,43 @@
 //#include "buffercontrol.h"
 #include "unified_debug_structure.h"
 
-#define EXPECTED_FIRMWARE_VERSION 0x0007
-
-#ifdef WINDOWS_64_BIT
+#if defined(PLATFORM_MAC)
+    // macOS uses the AIO firmware's BULK interface: opening a full-speed
+    // isochronous pipe kernel-panics macOS Tahoe (IOUSBHostFamily
+    // getEndpointMult NULL-dereferences the missing SuperSpeed companion
+    // descriptor for full-speed iso endpoints).  The bulk stream carries
+    // the same 750-byte frame per millisecond, wrapped in a padded
+    // 832-byte stride: a 64-byte header block [EB 57 seqL seqH lenL lenH
+    // csum mode + zero pad] then a 768-byte payload block (750 data + 18
+    // pad).  Padding to 64-byte multiples means no short packets, so
+    // queued bulk URBs always fill completely.
+    #define EXPECTED_FIRMWARE_VERSION 0x000C
+    #define DEFINED_EXPECTED_VARIANT 3
+    #define ISO_PACKET_SIZE 750
+    #define NUM_ISO_ENDPOINTS (1)
+    #define AIO_BULK_IFACE 2
+    #define AIO_BULK_EP 0x88
+    #define AIO_BULK_HDR_XFER 64
+    #define AIO_BULK_PAYLOAD_XFER 768
+    #define AIO_BULK_FRAME_STRIDE (AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER)
+#elif defined(WINDOWS_64_BIT)
+    #define EXPECTED_FIRMWARE_VERSION 0x0007
     #define DEFINED_EXPECTED_VARIANT 1
     #define ISO_PACKET_SIZE 125
     #define NUM_ISO_ENDPOINTS (6)
 #else
+    #define EXPECTED_FIRMWARE_VERSION 0x0007
     #define DEFINED_EXPECTED_VARIANT 2
     #define ISO_PACKET_SIZE 750
     #define NUM_ISO_ENDPOINTS (1)
+#endif
+
+// Bytes per USB transfer context: the bulk stream carries framing overhead
+// on top of the 750-byte payloads the rest of the app consumes.
+#ifdef PLATFORM_MAC
+    #define USB_XFER_BYTES_PER_CTX (AIO_BULK_FRAME_STRIDE * ISO_PACKETS_PER_CTX)
+#else
+    #define USB_XFER_BYTES_PER_CTX (ISO_PACKET_SIZE * ISO_PACKETS_PER_CTX)
 #endif
 
 #ifdef PLATFORM_WINDOWS
