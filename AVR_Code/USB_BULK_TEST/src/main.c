@@ -18,7 +18,7 @@
 volatile bool main_b_vendor_enable = false;
 
 COMPILER_WORD_ALIGNED
-volatile unsigned char isoBuf[BUFFER_SIZE];
+volatile unsigned char isoBuf[BUFFER_SIZE + ISOBUF_BULK_PAD];
 COMPILER_WORD_ALIGNED
 volatile unsigned char dacBuf_CH1[DACBUF_SIZE];
 volatile unsigned char dacBuf_CH2[DACBUF_SIZE];
@@ -93,11 +93,18 @@ volatile unsigned char active_transport = TRANSPORT_NONE;
 #define AIO_HDR_MAGIC0       0xEB
 #define AIO_HDR_MAGIC1_BULK  0x57
 #define AIO_HDR_MAGIC1_META  0x58
+//64 bytes so the header transfer is a full USB packet, never short;
+//bytes 8..63 stay zero (bss) as padding the host's magic scan skips.
+#define BULK_HDR_XFER_LEN 64
+#define BULK_PAYLOAD_XFER_LEN 768   /* 750 payload + 18 pad = 12 x 64 */
 COMPILER_WORD_ALIGNED
-static volatile unsigned char bulk_hdr[8];
+static volatile unsigned char bulk_hdr[BULK_HDR_XFER_LEN];
 COMPILER_WORD_ALIGNED
 static volatile unsigned char iso_meta_buf[8];
 static volatile unsigned char *bulk_payload_ptr;
+//Padded payload segments (both always multiples of 64 so no packet in the
+//stream is ever short).  Segment 2, when present, always starts at
+//isoBuf[0] (rolling-window wrap in modes 6/7).
 static volatile unsigned short bulk_seg1_len;
 static volatile unsigned short bulk_seg2_len;
 static volatile unsigned short aio_seq = 0;
@@ -270,28 +277,29 @@ static void main_aio_bulk_kick(void)
 		//not phase-locked to the USB frame, so the fixed halves tear
 		//(measured ~50% checksum failures).  Bulk has no fixed framing:
 		//send a rolling window of the PACKET_SIZE bytes the DMA just
-		//finished writing, which is stable for the next full frame.
+		//finished writing, which is stable for the next full frame.  The
+		//Modes 6/7 run the DMA as one free-running 1500-byte circular
+		//buffer.  The calibration servo phase-locks the write position at
+		//SOF (median TRFCNT 400 => ~1100 bytes written), so the half the
+		//writer is NOT currently in is safe: the transmitter, starting
+		//now, stays ahead of the writer re-entering that half.  Single
+		//768-byte padded transfer; half B's 18 pad bytes read from the
+		//isoBuf pad tail.
 		unsigned short written = BUFFER_SIZE - DMA.CH0.TRFCNT;
-		unsigned short start;
+		unsigned char safe_half;
 		if (written > BUFFER_SIZE) written = 0; //TRFCNT mid-reload
-		start = (written >= PACKET_SIZE) ? (written - PACKET_SIZE)
-		                                 : (written + PACKET_SIZE);
-		bulk_payload_ptr = &isoBuf[start];
-		bulk_seg1_len = BUFFER_SIZE - start;
-		if (bulk_seg1_len >= PACKET_SIZE) {
-			bulk_seg1_len = PACKET_SIZE;
-			bulk_seg2_len = 0;
-		} else {
-			bulk_seg2_len = PACKET_SIZE - bulk_seg1_len;
-		}
-		csum = 0;
-		for (i = 0; i < bulk_seg1_len; i++) csum ^= bulk_payload_ptr[i];
-		for (i = 0; i < bulk_seg2_len; i++) csum ^= isoBuf[i];
+		safe_half = (written < PACKET_SIZE) ? 1 : 0;
+		bulk_payload_ptr = &isoBuf[safe_half * PACKET_SIZE];
+		bulk_seg1_len = BULK_PAYLOAD_XFER_LEN;
+		bulk_seg2_len = 0;
+		csum = aio_frame_csum(safe_half);
 	} else {
 		//Modes 0-4 ping-pong the halves in lockstep with the SOF, so the
-		//half the DMA is not writing this millisecond is stable.
+		//half the DMA is not writing this millisecond is stable.  The
+		//768-byte transfer carries 18 trailing pad bytes (adjacent buffer
+		//content, ignored by the host).
 		bulk_payload_ptr = &isoBuf[usb_state * PACKET_SIZE];
-		bulk_seg1_len = PACKET_SIZE;
+		bulk_seg1_len = BULK_PAYLOAD_XFER_LEN;
 		bulk_seg2_len = 0;
 		csum = aio_frame_csum(usb_state);
 	}
@@ -304,7 +312,7 @@ static void main_aio_bulk_kick(void)
 	bulk_hdr[6] = csum;
 	bulk_hdr[7] = global_mode;
 	bulk_busy = 1;
-	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, sizeof(bulk_hdr), bulk_hdr_callback)) {
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, BULK_HDR_XFER_LEN, bulk_hdr_callback)) {
 		bulk_busy = 0;
 	}
 }
@@ -328,6 +336,46 @@ static void main_aio_meta_fill_and_arm(udd_ep_id_t meta_ep)
 		meta_busy = 0;
 		aio_dbg[1] |= 0x80;
 	}
+}
+
+static void main_aio_int_kick(void)
+{
+	//Interrupt transport: 12 x 64-byte data endpoints + one header
+	//endpoint, all re-armed every SOF with slices of the frame the host
+	//should receive this millisecond.  The host controller polls each
+	//endpoint once per frame (reserved periodic bandwidth), so the whole
+	//frame drains inside the deadline by schedule, not by luck.
+	unsigned char i;
+	unsigned char state;
+	volatile unsigned char *base;
+	aio_seq++;
+	if (global_mode >= 5) {
+		unsigned short written = BUFFER_SIZE - DMA.CH0.TRFCNT;
+		if (written > BUFFER_SIZE) written = 0;
+		state = (written < PACKET_SIZE) ? 1 : 0;
+	} else {
+		state = usb_state;
+	}
+	base = &isoBuf[state * PACKET_SIZE];
+	bulk_hdr[0] = AIO_HDR_MAGIC0;
+	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
+	bulk_hdr[2] = aio_seq & 0xff;
+	bulk_hdr[3] = (aio_seq >> 8) & 0xff;
+	bulk_hdr[4] = PACKET_SIZE & 0xff;
+	bulk_hdr[5] = (PACKET_SIZE >> 8) & 0xff;
+	bulk_hdr[6] = aio_frame_csum(state);
+	bulk_hdr[7] = global_mode;
+	//Fresh arms every frame: abort first so a slice the host missed
+	//(retry, hiccup) is replaced rather than left to go stale.
+	for (i = 0; i < UDI_AIO_INT_DATA_EPS; i++) {
+		udd_ep_abort(UDI_AIO_EP_INT_FIRST + i);
+		udd_ep_run(UDI_AIO_EP_INT_FIRST + i, false,
+				(uint8_t *)&base[i * UDI_AIO_EPS_SIZE_INT_FS],
+				UDI_AIO_EPS_SIZE_INT_FS, NULL);
+	}
+	udd_ep_abort(UDI_AIO_EP_INT_HDR);
+	udd_ep_run(UDI_AIO_EP_INT_HDR, false, (uint8_t *)bulk_hdr,
+			UDI_AIO_EPS_SIZE_INT_FS, NULL);
 }
 
 static void main_aio_meta_kick(udd_ep_id_t meta_ep)
@@ -366,7 +414,6 @@ void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, ud
 		return;
 	}
 	if (bulk_seg2_len) {
-		//Rolling window wrapped the end of isoBuf: send the tail segment.
 		unsigned short len = bulk_seg2_len;
 		bulk_seg2_len = 0;
 		if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)&isoBuf[0], len, bulk_payload_callback)) {
@@ -478,6 +525,9 @@ void main_sof_action(void)
 				case TRANSPORT_BULK:
 					main_aio_bulk_kick();
 					break;
+				case TRANSPORT_INT:
+					main_aio_int_kick();
+					break;
 				case TRANSPORT_ISO6:
 					main_aio_meta_kick(UDI_AIO_EP_ISO6_META);
 					break;
@@ -560,6 +610,9 @@ static void main_aio_arm_endpoints(void)
 			udd_ep_abort(UDI_AIO_EP_BULK_IN);
 			bulk_busy = 0;
 			break;
+		case TRANSPORT_INT:
+			//Endpoints are armed every SOF by main_aio_int_kick.
+			break;
 	}
 }
 
@@ -569,6 +622,7 @@ bool main_aio_iface_enable(uint8_t iface)
 		case UDI_AIO_IFACE_ISO6: active_transport = TRANSPORT_ISO6; break;
 		case UDI_AIO_IFACE_ISO1: active_transport = TRANSPORT_ISO1; break;
 		case UDI_AIO_IFACE_BULK: active_transport = TRANSPORT_BULK; break;
+		case UDI_AIO_IFACE_INT:  active_transport = TRANSPORT_INT; break;
 		default: return false;
 	}
 	//The DMA regime (repeat vs. single-shot, block length, priority) depends
@@ -588,6 +642,7 @@ void main_aio_iface_disable(uint8_t iface)
 		case UDI_AIO_IFACE_ISO6: if(active_transport != TRANSPORT_ISO6) return; break;
 		case UDI_AIO_IFACE_ISO1: if(active_transport != TRANSPORT_ISO1) return; break;
 		case UDI_AIO_IFACE_BULK: if(active_transport != TRANSPORT_BULK) return; break;
+		case UDI_AIO_IFACE_INT:  if(active_transport != TRANSPORT_INT) return; break;
 		default: return;
 	}
 	active_transport = TRANSPORT_NONE;

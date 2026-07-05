@@ -21,6 +21,7 @@
 	#define TRANSPORT_ISO6 1
 	#define TRANSPORT_ISO1 2
 	#define TRANSPORT_BULK 3
+	#define TRANSPORT_INT  4
 #endif
 
 //#define VERO
@@ -42,8 +43,14 @@
 #define BUFFER_SIZE (PACKET_SIZE*2)
 #define DACBUF_SIZE 512
 
+//Bulk transfers are padded to 64-byte multiples so the stream never
+//contains a short packet (a short packet terminates the host's URB early,
+//collapsing its read-ahead queue to nothing and blowing the 1 ms drain
+//deadline).  The pad tail lets a 768-byte padded read of the second half
+//stay inside the array.
+#define ISOBUF_BULK_PAD 20
 COMPILER_WORD_ALIGNED
-extern volatile unsigned char isoBuf[BUFFER_SIZE];
+extern volatile unsigned char isoBuf[BUFFER_SIZE + ISOBUF_BULK_PAD];
 COMPILER_WORD_ALIGNED
 extern volatile unsigned char dacBuf_CH1[DACBUF_SIZE];
 extern volatile unsigned char dacBuf_CH2[DACBUF_SIZE];

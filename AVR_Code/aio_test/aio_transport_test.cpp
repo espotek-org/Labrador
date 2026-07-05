@@ -546,6 +546,83 @@ static void test_bulk_async_threaded(int seconds) {
     libusb_release_interface(g_h, 2);
 }
 
+// ------------------------------------------------------------ interrupt ----
+// 12 x 64B data EPs (0x81..0x8c) + header EP 0x8d, all bInterval=1.
+// Every packet is a full 64 bytes, so interrupt URBs fill completely.
+struct IntStream {
+    libusb_transfer *xfer = nullptr;
+    std::vector<uint8_t> buf;
+    std::vector<std::vector<uint8_t>> chunks;
+    uint64_t packets = 0, errors = 0;
+    volatile bool stopping = false, done = false;
+};
+static void int_cb(libusb_transfer *t) {
+    IntStream *s = (IntStream *)t->user_data;
+    if (t->status != LIBUSB_TRANSFER_COMPLETED || s->stopping) { s->done = true; return; }
+    for (int off = 0; off + 64 <= t->actual_length; off += 64) {
+        s->chunks.emplace_back(t->buffer + off, t->buffer + off + 64);
+        s->packets++;
+    }
+    if (libusb_submit_transfer(t)) s->done = true;
+}
+static bool int_start(IntStream &s, uint8_t ep) {
+    s.buf.resize(64 * 33);
+    s.xfer = libusb_alloc_transfer(0);
+    libusb_fill_interrupt_transfer(s.xfer, g_h, ep, s.buf.data(), (int)s.buf.size(), int_cb, &s, 0);
+    return libusb_submit_transfer(s.xfer) == 0;
+}
+static void int_stop(IntStream &s) {
+    if (!s.xfer) return;
+    s.stopping = true;
+    libusb_cancel_transfer(s.xfer);
+    for (int i = 0; i < 20 && !s.done; i++) { timeval tv{0,100000}; libusb_handle_events_timeout(nullptr,&tv); }
+    libusb_free_transfer(s.xfer); s.xfer = nullptr;
+}
+static void test_int(int seconds, Stats &st) {
+    printf("\n=== INTERRUPT transport (iface 3, EP 0x81-0x8c + hdr 0x8d) ===\n");
+    if (libusb_claim_interface(g_h, 3)) { fprintf(stderr, "claim(3) failed\n"); return; }
+    if (libusb_set_interface_alt_setting(g_h, 3, 1)) {
+        fprintf(stderr, "set_alt(3,1) failed\n");
+        libusb_release_interface(g_h, 3);
+        return;
+    }
+    printf("[+] alt setting 1 selected, streaming...\n");
+    IntStream data[12], hdr;
+    auto t0 = std::chrono::steady_clock::now();
+    bool ok = true;
+    for (int i = 0; i < 12; i++) ok = ok && int_start(data[i], (uint8_t)(0x81 + i));
+    ok = ok && int_start(hdr, 0x8d);
+    if (!ok) fprintf(stderr, "int_start failed\n");
+    else run_iso_events(seconds);
+    for (int i = 0; i < 12; i++) int_stop(data[i]);
+    int_stop(hdr);
+    double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    size_t nframes = SIZE_MAX;
+    for (int i = 0; i < 12; i++) nframes = std::min(nframes, data[i].chunks.size());
+    if (nframes == SIZE_MAX) nframes = 0;
+    printf("[i] per-EP packets: %llu..%llu, hdr packets: %zu, frames: %zu\n",
+           (unsigned long long)data[0].packets, (unsigned long long)data[11].packets,
+           hdr.chunks.size(), nframes);
+    std::vector<std::vector<uint8_t>> whole(nframes);
+    for (size_t k = 0; k < nframes; k++) {
+        auto &w = whole[k];
+        w.reserve(PACKET_SIZE);
+        for (int i = 0; i < 12 && w.size() < PACKET_SIZE; i++) {
+            size_t need = std::min<size_t>(64, PACKET_SIZE - w.size());
+            w.insert(w.end(), data[i].chunks[k].begin(), data[i].chunks[k].begin() + need);
+        }
+    }
+    std::vector<MetaRec> metas;
+    for (auto &c : hdr.chunks) {
+        if (c.size() >= 8 && c[0] == HDR_MAGIC0 && c[1] == HDR_MAGIC1_BULK)
+            metas.push_back({(uint16_t)(c[2] | (c[3] << 8)), c[6], c[6]});
+        else st.hdr_bad++;
+    }
+    iso_validate("interrupt", secs, whole, metas, st);
+    libusb_set_interface_alt_setting(g_h, 3, 0);
+    libusb_release_interface(g_h, 3);
+}
+
 // ---------------------------------------------------------------- main ----
 
 int main(int argc, char **argv) {
@@ -579,6 +656,7 @@ int main(int argc, char **argv) {
     if (which == "iso6" || which == "all") test_iso6(seconds, s6);
     if (which == "sig"  || which == "all") test_signal();
     if (which == "appthread") test_bulk_async_threaded(seconds);
+    if (which == "int") { Stats si; test_int(seconds, si); }
 
     libusb_close(g_h);
     libusb_exit(nullptr);

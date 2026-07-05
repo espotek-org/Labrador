@@ -92,7 +92,7 @@ UDC_DESC_STORAGE udi_api_t udi_api_vendor = {
  * in udc_process_setup()/udc_reqvend(), so the per-interface setup handlers
  * just reuse the classic vendor hooks.
  */
-static uint8_t udi_aio_alt[3] = {0, 0, 0};
+static uint8_t udi_aio_alt[4] = {0, 0, 0, 0};
 
 static bool udi_aio_enable_common(uint8_t iface)
 {
@@ -119,6 +119,9 @@ static uint8_t udi_aio_iso1_getsetting(void) { return udi_aio_alt[1]; }
 static bool udi_aio_bulk_enable(void)  { return udi_aio_enable_common(2); }
 static void udi_aio_bulk_disable(void) { udi_aio_disable_common(2); }
 static uint8_t udi_aio_bulk_getsetting(void) { return udi_aio_alt[2]; }
+static bool udi_aio_int_enable(void)  { return udi_aio_enable_common(3); }
+static void udi_aio_int_disable(void) { udi_aio_disable_common(3); }
+static uint8_t udi_aio_int_getsetting(void) { return udi_aio_alt[3]; }
 
 UDC_DESC_STORAGE udi_api_t udi_api_aio_iso6 = {
 	.enable = udi_aio_iso6_enable,
@@ -139,6 +142,13 @@ UDC_DESC_STORAGE udi_api_t udi_api_aio_bulk = {
 	.disable = udi_aio_bulk_disable,
 	.setup = udi_vendor_setup,
 	.getsetting = udi_aio_bulk_getsetting,
+	.sof_notify = NULL,
+};
+UDC_DESC_STORAGE udi_api_t udi_api_aio_int = {
+	.enable = udi_aio_int_enable,
+	.disable = udi_aio_int_disable,
+	.setup = udi_vendor_setup,
+	.getsetting = udi_aio_int_getsetting,
 	.sof_notify = NULL,
 };
 #endif // AIO_INTERFACE

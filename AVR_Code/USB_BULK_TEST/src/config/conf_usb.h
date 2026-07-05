@@ -143,6 +143,8 @@
 #define UDI_AIO_EPS_SIZE_BULK_FS     64
 //! Per-frame metadata endpoints on the iso interfaces
 #define UDI_AIO_EPS_SIZE_META_FS      8
+//! Interrupt-transport endpoints (12 data + 1 header, all 64 bytes)
+#define UDI_AIO_EPS_SIZE_INT_FS      64
 #endif
 
 //! endpoints size for high speed

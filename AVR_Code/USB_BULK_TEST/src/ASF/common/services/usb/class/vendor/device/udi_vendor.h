@@ -95,6 +95,7 @@ extern UDC_DESC_STORAGE udi_api_t udi_api_vendor;
 extern UDC_DESC_STORAGE udi_api_t udi_api_aio_iso6;
 extern UDC_DESC_STORAGE udi_api_t udi_api_aio_iso1;
 extern UDC_DESC_STORAGE udi_api_t udi_api_aio_bulk;
+extern UDC_DESC_STORAGE udi_api_t udi_api_aio_int;
 #endif
 //@}
 
@@ -187,6 +188,9 @@ typedef struct {
 	usb_iface_desc_t bulk_alt0;
 	usb_iface_desc_t bulk_alt1;
 	usb_ep_desc_t ep_bulk_in;
+	usb_iface_desc_t int_alt0;
+	usb_iface_desc_t int_alt1;
+	usb_ep_desc_t ep_int[UDI_AIO_INT_DATA_EPS + 1];  /* 12 data + header */
 } udi_aio_desc_t;
 
 #define UDI_AIO_IFACE_FIELDS(field, num, alt, neps) \
@@ -207,6 +211,14 @@ typedef struct {
 	.field.bmAttributes       = 0x05,\
 	.field.wMaxPacketSize     = LE16(UDI_VENDOR_EPS_SIZE_ISO_FS),\
 	.field.bInterval          = 1,
+
+#define UDI_AIO_INT_EP_FIELDS(idx, addr) \
+	.ep_int[idx].bLength          = sizeof(usb_ep_desc_t),\
+	.ep_int[idx].bDescriptorType  = USB_DT_ENDPOINT,\
+	.ep_int[idx].bEndpointAddress = addr,\
+	.ep_int[idx].bmAttributes     = USB_EP_TYPE_INTERRUPT,\
+	.ep_int[idx].wMaxPacketSize   = LE16(UDI_AIO_EPS_SIZE_INT_FS),\
+	.ep_int[idx].bInterval        = 1,
 
 #define UDI_AIO_META_EP_FIELDS(field, addr) \
 	.field.bLength            = sizeof(usb_ep_desc_t),\
@@ -243,6 +255,21 @@ typedef struct {
 	.ep_bulk_in.bmAttributes     = USB_EP_TYPE_BULK,\
 	.ep_bulk_in.wMaxPacketSize   = LE16(UDI_AIO_EPS_SIZE_BULK_FS),\
 	.ep_bulk_in.bInterval        = 0,\
+	UDI_AIO_IFACE_FIELDS(int_alt0, UDI_AIO_IFACE_INT, 0, 0) \
+	UDI_AIO_IFACE_FIELDS(int_alt1, UDI_AIO_IFACE_INT, 1, UDI_AIO_INT_DATA_EPS + 1) \
+	UDI_AIO_INT_EP_FIELDS(0,  UDI_AIO_EP_INT_FIRST) \
+	UDI_AIO_INT_EP_FIELDS(1,  UDI_AIO_EP_INT_FIRST + 1) \
+	UDI_AIO_INT_EP_FIELDS(2,  UDI_AIO_EP_INT_FIRST + 2) \
+	UDI_AIO_INT_EP_FIELDS(3,  UDI_AIO_EP_INT_FIRST + 3) \
+	UDI_AIO_INT_EP_FIELDS(4,  UDI_AIO_EP_INT_FIRST + 4) \
+	UDI_AIO_INT_EP_FIELDS(5,  UDI_AIO_EP_INT_FIRST + 5) \
+	UDI_AIO_INT_EP_FIELDS(6,  UDI_AIO_EP_INT_FIRST + 6) \
+	UDI_AIO_INT_EP_FIELDS(7,  UDI_AIO_EP_INT_FIRST + 7) \
+	UDI_AIO_INT_EP_FIELDS(8,  UDI_AIO_EP_INT_FIRST + 8) \
+	UDI_AIO_INT_EP_FIELDS(9,  UDI_AIO_EP_INT_FIRST + 9) \
+	UDI_AIO_INT_EP_FIELDS(10, UDI_AIO_EP_INT_FIRST + 10) \
+	UDI_AIO_INT_EP_FIELDS(11, UDI_AIO_EP_INT_FIRST + 11) \
+	UDI_AIO_INT_EP_FIELDS(12, UDI_AIO_EP_INT_HDR) \
    }
 
 #endif // AIO_INTERFACE
