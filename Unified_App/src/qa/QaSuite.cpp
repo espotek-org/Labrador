@@ -226,7 +226,7 @@ static void RegisterGuiTests(ImGuiTestEngine* e)
 // Crash-hunting tests: walk/mash every reachable interaction surface and rely
 // on the crash handler to catch anything that dies. Two categories:
 //   "fuzz"  (--qa=fuzz)  safe to run unattended with a board attached
-//   "fuzzx" (--qa=<name>) run individually and deliberately: they quit the
+//   "manual" (--qa=<name>) run individually and deliberately: they quit the
 //           app, wedge the headless harness, or rewrite board calibration.
 // Neither runs under plain --qa (see QaSetup: "all" maps to gui+hw).
 // Blacklist: quit/reflash (hardware safety), native file dialogs (cannot be
@@ -600,7 +600,7 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
 
     // Calibration wizard end-to-end (scope path). REWRITES the attached
     // board's calibration values in settings.ini — run deliberately.
-    t = IM_REGISTER_TEST(e, "fuzzx", "calibration_wizard");
+    t = IM_REGISTER_TEST(e, "manual", "calibration_wizard");
     t->TestFunc = [](ImGuiTestContext* ctx) {
         SetMainRef(ctx);
         ctx->MenuClick("Device/Calibration...");
@@ -638,7 +638,7 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     // Minimize / restore / fullscreen. CAVEAT: the main loop stops pumping
     // while minimized, so the queued restore never runs and the headless
     // harness wedges — run manually, be ready to un-minimize by hand.
-    t = IM_REGISTER_TEST(e, "fuzzx", "minimize_restore");
+    t = IM_REGISTER_TEST(e, "manual", "minimize_restore");
     t->TestFunc = [](ImGuiTestContext* ctx) {
         int nwin = 0;
         SDL_Window** wins = SDL_GetWindows(&nwin);
@@ -698,7 +698,7 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     // Quit through the app's own File menu while connected and streaming —
     // exercises the real shutdown path (thread joins, USB teardown). The app
     // exits mid-test, killing the run: run this one alone.
-    t = IM_REGISTER_TEST(e, "fuzzx", "quit_while_connected");
+    t = IM_REGISTER_TEST(e, "manual", "quit_while_connected");
     t->TestFunc = [](ImGuiTestContext* ctx) {
         SetMainRef(ctx);
         ctx->SleepNoSkip(3.0f, 0.5f); // make sure streaming is up

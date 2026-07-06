@@ -61,7 +61,9 @@ layouts), mashes shortcuts, abuses plots/zooms, drags values to extremes,
 cycles device modes, resizes the window to degenerate sizes, runs a seeded
 monkey, and spams Esc-resets timed to land inside connection setup
 (`esc_spam` — the repro for reset-during-reconnect races). Three more live in
-`fuzzx` and must be run individually and deliberately, by name:
+the `manual` category and must be run individually and deliberately, by
+name (the category was renamed from `fuzzx`: the engine's filter substring-
+matches, so `--qa=fuzz` silently queued the whole dangerous category too):
 `--qa=minimize_restore` (wedges the headless harness — the main loop stops
 while minimized), `--qa=quit_while_connected` (exits the app mid-run),
 `--qa=calibration_wizard` (rewrites the attached board's calibration).
