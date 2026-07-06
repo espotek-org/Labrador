@@ -11,6 +11,7 @@
 #include "imgui_te_engine.h"
 #include "imgui_te_ui.h"
 #include "librador.h"
+#include "instruments/util.h" // CheckIfInUninitialisedMode (hw wedge-detector test)
 
 #include <cmath>
 #include <cstdio>
@@ -1116,6 +1117,97 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     IM_CHECK_LT(hi - lo, 0.8);
 }
 
+// Manually setting the hardware gain too high used to trip the "device
+// powered up before the OS initialized USB" warning: the railed (perfectly
+// flat) CH1 capture was indistinguishable from a wedged device. The detector
+// now requires BOTH channels flat (a wedge is device-global; a railed input
+// is per-channel) and would auto-heal with a USB reset before ever showing
+// the popup. Drive CH1 into hard clipping (DC waveform at 64x) and assert
+// the app neither pops the warning nor burns a reset.
+static void HwMaxGainNoWedgePopup(ImGuiTestContext* ctx)
+{
+    for (int i = 0; i < 20; i++)
+    {
+        if (librador_is_connected() && librador_iso_thread_is_active())
+            break;
+        ctx->SleepNoSkip(0.25f, 0.25f);
+    }
+    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    {
+        ctx->LogWarning("No Labrador board connected - skipping hardware test");
+        return;
+    }
+
+    // Both channels sampling: CH2's live noise floor is the wedge veto.
+    SetMainRef(ctx);
+    ImGuiTestItemInfo toolbar = ctx->WindowInfo("//Main Window/##toolbar");
+    IM_CHECK(toolbar.Window != nullptr);
+    ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+    ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
+    ctx->SleepNoSkip(0.5f, 0.1f);
+
+    // SG1 driving DC onto the CH1 loopback wire.
+    EnsureSidePanelVisible(ctx);
+    ctx->MenuClick("View/Side Panel Page/Signals");
+    ctx->Yield(3);
+    ImGuiTestItemInfo signals_w = ctx->WindowInfo("//Main Window/##sidepanel/Signals");
+    IM_CHECK(signals_w.Window != nullptr);
+    const ImGuiID toggle_id
+        = ctx->GetID("sg1/Signal Generator 1 (SG1)_toggle", signals_w.Window->ID);
+    if (ctx->ItemInfo(toggle_id, ImGuiTestOpFlags_NoError).ID == 0)
+    {
+        ctx->ItemClick("**/Signal Generator 1");
+        ctx->Yield(2);
+    }
+    const ImGuiID selector_id = ctx->GetID(
+        "sg1/##Signal Generator 1 (SG1)wt_selector", signals_w.Window->ID);
+    ctx->ItemClick(selector_id);
+    ctx->ItemClick("//##Combo_00/DC");
+    ctx->Yield(2);
+    auto toggle_on = [&]() {
+        ImGuiTestItemInfo info = ctx->ItemInfo(toggle_id);
+        return (info.ID != 0) && (info.StatusFlags & ImGuiItemStatusFlags_Checked) != 0;
+    };
+    if (!toggle_on())
+    {
+        ctx->ItemClick(toggle_id);
+        ctx->Yield(2);
+    }
+    IM_CHECK(toggle_on());
+
+    // Manual max gain via the canonical menu (also flips AutoGain off).
+    ctx->MenuClick("Scope/Hardware Gain/64x");
+    // Detector timing: 2 s arm delay + 0.17 s enter threshold, plus margin
+    // for the gain change and a would-be auto-reset to play out.
+    ctx->SleepNoSkip(6.0f, 0.5f);
+
+    // How the rail quantises is bench-dependent (a hard rail can flicker one
+    // LSB), so don't demand a perfectly flat CH1 — log what the detector's
+    // own sampling saw, then assert the CONTRACT: the wedge detector must not
+    // classify a clipped input as a wedged device.
+    std::vector<double>* d1 = librador_get_analog_data_by_rate(1, 0.5, 30, 0.0, 0);
+    IM_CHECK(d1 != nullptr && !d1->empty());
+    bool ch1_flat = true;
+    for (double v : *d1)
+        ch1_flat = ch1_flat && (v == (*d1)[0]);
+    ctx->LogInfo("CH1 at 64x: %s (%.3f V)", ch1_flat ? "railed flat" : "clipped, flickering",
+        (*d1)[0]);
+    IM_CHECK(!CheckIfInUninitialisedMode());
+
+    // And the app must not have reacted: no wedge popup, no auto-reset (the
+    // connection never dropped).
+    IM_CHECK(librador_is_connected() && librador_iso_thread_is_active());
+    ImGuiWindow* popup = ctx->GetWindowByRef("//Warning!##UninitialisedModePopup");
+    IM_CHECK(popup == nullptr || !popup->Active);
+
+    // Leave the board and app in the default state.
+    ctx->MenuClick("Scope/Hardware Gain/Auto");
+    ctx->ItemClick(toggle_id); // SG1 off
+    ctx->ItemClick(selector_id);
+    ctx->ItemClick("//##Combo_00/Sine");
+    ctx->Yield(2);
+}
+
 // A USB reset must not silence the signal generators: onDeviceConnected
 // re-pushes the widgets' current settings (SGControl::markDirty), so a
 // generator that was running keeps running after the link comes back.
@@ -1217,6 +1309,8 @@ static void RegisterHwTests(ImGuiTestEngine* e)
     t->TestFunc = [](ImGuiTestContext* ctx) { HwPauseInspect(ctx); };
     t = IM_REGISTER_TEST(e, "hw", "reconnect_resends_sg2");
     t->TestFunc = [](ImGuiTestContext* ctx) { HwReconnectResendsSg2(ctx); };
+    t = IM_REGISTER_TEST(e, "hw", "max_gain_no_wedge_popup");
+    t->TestFunc = [](ImGuiTestContext* ctx) { HwMaxGainNoWedgePopup(ctx); };
 }
 
 // ---- Engine lifecycle ---------------------------------------------------------
