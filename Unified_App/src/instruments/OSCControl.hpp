@@ -291,14 +291,30 @@ public:
         const float width = ImGui::GetContentRegionAvail().x * 0.95f;
         float labWidth = ImGui::CalcTextSize("HW Gain").x + 14.0f;
         float labWidth2 = ImGui::CalcTextSize("Auto Level").x + 14.0f;
-        float controlWidth = (width - labWidth - labWidth2) / 2;
 
-        if (ImGui::BeginTable("GeneralTable", 4))
+        // The Type combo must fit its longest entry — in a narrow panel
+        // (compact 800x480, or large text) the two-pairs-per-row grid can't,
+        // so the label/control pairs wrap into a one-pair-per-row table
+        // instead of clipping "CH2 Falling" to "CH2 Falli".
+        float comboMin = 0.0f;
+        for (const char* t : TriggerTypeComboList)
+            comboMin = std::max(comboMin, ImGui::CalcTextSize(t).x);
+        comboMin += 2.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetFrameHeight();
+        const bool narrow = width < labWidth + labWidth2 + 2.0f * comboMin;
+        const float controlWidth = narrow
+            ? std::max(width - labWidth2, comboMin)
+            : (width - labWidth - labWidth2) / 2;
+
+        if (ImGui::BeginTable("GeneralTable", narrow ? 2 : 4))
         {
-            ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, labWidth);
+            ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed,
+                narrow ? labWidth2 : labWidth);
             ImGui::TableSetupColumn("Two", ImGuiTableColumnFlags_WidthFixed, controlWidth);
-            ImGui::TableSetupColumn("Three", ImGuiTableColumnFlags_WidthFixed, labWidth2);
-            ImGui::TableSetupColumn("Four", ImGuiTableColumnFlags_WidthFixed, controlWidth);
+            if (!narrow)
+            {
+                ImGui::TableSetupColumn("Three", ImGuiTableColumnFlags_WidthFixed, labWidth2);
+                ImGui::TableSetupColumn("Four", ImGuiTableColumnFlags_WidthFixed, controlWidth);
+            }
 
             // Trigger enable
             ImGui::TableNextColumn(); ImGui::Text("Trigger");
