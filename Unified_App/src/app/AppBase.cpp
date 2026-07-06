@@ -88,8 +88,27 @@ AppBase::AppBase(const char* title)
     SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &bounds);
     m_window = SDL_CreateWindow(title, bounds.w, bounds.h, window_flags);
 #else
-    m_window = SDL_CreateWindow(title,
-        (int)(1200 * m_main_scale), (int)(800 * m_main_scale), window_flags);
+    // Testing hook: LABRADOR_WINDOW_SIZE=WxH (pixels) pins the window to a
+    // target resolution — used by the QA screenshot matrix to verify the
+    // compact (800x480) and tablet (1024x768, 1280x720) layouts at the sizes
+    // they are designed for instead of the desktop default.
+    int win_w = (int)(1200 * m_main_scale);
+    int win_h = (int)(800 * m_main_scale);
+    if (const char* size_env = SDL_getenv("LABRADOR_WINDOW_SIZE"))
+    {
+        int w = 0, h = 0;
+        if (sscanf(size_env, "%dx%d", &w, &h) == 2 && w >= 320 && h >= 240)
+        {
+            win_w = w;
+            win_h = h;
+        }
+        else
+        {
+            fprintf(stderr, "LABRADOR_WINDOW_SIZE: expected WxH (e.g. 1024x768), got '%s'\n",
+                size_env);
+        }
+    }
+    m_window = SDL_CreateWindow(title, win_w, win_h, window_flags);
 #endif
     if (m_window == nullptr)
         throw std::runtime_error(std::string("SDL_CreateWindow: ") + SDL_GetError());
