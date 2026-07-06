@@ -93,7 +93,12 @@ what the interaction does, look at the `after` frame, record prediction/actual/
 verdict in a findings JSON (schema in `tools/qa_predict_findings.json`) →
 `qa_predict_report.py` bakes frames + findings into a browsable HTML where a
 human ticks Bug / Not a bug / Unsure per scenario and exports a reconciled JSON
-→ fix from the export. Publish the HTML with the Artifact tool for review. Add
+→ fix from the export. Publish the HTML with the Artifact tool for review.
+Every scenario must record `consistent` (did the after frame match the
+prediction?) — it is the report's gate: a real run has thousands of scenarios,
+so **only divergences surface to the human**; matches are counted in the
+summary but hidden (no card, no embedded frames — `--show-matched` overrides
+for debugging small runs). Don't notify the human when things work. Add
 scenarios by registering more `predict` tests (drive with the test engine,
 `QaCapture(ctx, "<id>", "before"/"after")` around the interaction). `predict`
 is opt-in (not run by bare `--qa`), like `fuzz`. The `autofit_zoom_persists`

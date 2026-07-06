@@ -62,20 +62,34 @@ def esc(s):
     return html.escape(s or "", quote=True)
 
 
-def build(findings, captures, max_width):
+def build(findings, captures, max_width, show_matched=False):
+    """A real run has thousands of scenarios and almost all of them match the
+    model's prediction — the human must only ever see the divergences. Matched
+    scenarios are counted in the summary but get no card and no embedded
+    frames (embedding every frame would also make the page gigabytes).
+    `consistent` is a required per-scenario field: it IS the report's gate,
+    so a scenario without a verdict on prediction-vs-actual is a broken run.
+    """
     scen = findings["scenarios"]
-    for s in scen:
+    matched = [s for s in scen if s["consistent"]]
+    shown = scen if show_matched else [s for s in scen if not s["consistent"]]
+    for s in shown:
         s["_before"] = frame_uri(captures, s["id"], "before", max_width)
         s["_after"] = frame_uri(captures, s["id"], "after", max_width)
-    payload = json.dumps(findings, ensure_ascii=False)
-    cards = "\n".join(card(i, s) for i, s in enumerate(scen))
-    total = len(scen)
+    payload = json.dumps({**findings, "scenarios": shown}, ensure_ascii=False)
+    cards = "\n".join(card(i, s) for i, s in enumerate(shown))
+    if not cards:
+        cards = ('<p class="allclear">All scenarios matched their predictions — '
+                 "nothing needs review.</p>")
     return PAGE.replace("{{TITLE}}", esc(findings.get("title", "Prediction QA"))) \
                .replace("{{SUBTITLE}}", esc(findings.get("subtitle", ""))) \
                .replace("{{RUNLABEL}}", esc(findings.get("run_label", ""))) \
-               .replace("{{TOTAL}}", str(total)) \
+               .replace("{{TOTAL}}", str(len(scen))) \
+               .replace("{{MATCHED}}", str(len(matched))) \
+               .replace("{{SHOWN}}", str(len(shown))) \
                .replace("{{CARDS}}", cards) \
-               .replace("{{PAYLOAD}}", base64.b64encode(payload.encode()).decode())
+               .replace("{{PAYLOAD}}", base64.b64encode(payload.encode()).decode()), \
+           len(matched), len(shown)
 
 
 def card(i, s):
@@ -142,6 +156,8 @@ header.top{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom
 h1{font-size:30px;line-height:1.15;margin:10px 0 8px;text-wrap:balance;font-weight:650}
 .sub{color:var(--ink-dim);max-width:66ch;margin:0}
 .summary{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.allclear{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:28px 24px;text-align:center;color:var(--ink-dim);font-size:15px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px;
   font-family:var(--mono);font-size:13px}
 .stat b{font-size:20px;display:block;font-variant-numeric:tabular-nums}
@@ -202,10 +218,12 @@ button.export:hover{filter:brightness(1.06)} button.export:focus-visible{outline
     <h1>{{TITLE}}</h1>
     <p class="sub">{{SUBTITLE}}</p>
     <div class="summary">
-      <div class="stat"><b>{{TOTAL}}</b>scenarios</div>
-      <div class="stat ok"><b id="s-not">0</b>marked not-a-bug</div>
+      <div class="stat"><b>{{TOTAL}}</b>scenarios ran</div>
+      <div class="stat ok"><b>{{MATCHED}}</b>matched prediction (hidden)</div>
+      <div class="stat flag"><b>{{SHOWN}}</b>divergences to review</div>
       <div class="stat flag"><b id="s-bug">0</b>marked bug</div>
-      <div class="stat"><b id="s-todo">{{TOTAL}}</b>unreviewed</div>
+      <div class="stat ok"><b id="s-not">0</b>marked not-a-bug</div>
+      <div class="stat"><b id="s-todo">{{SHOWN}}</b>unreviewed</div>
     </div>
   </header>
   <main>{{CARDS}}</main>
@@ -237,7 +255,7 @@ document.getElementById('export').addEventListener('click',()=>{
     const notes=document.querySelector('textarea[data-id="'+CSS.escape(s.id)+'"]');
     out.scenarios.push({id:s.id,title:s.title,state:s.state,interaction:s.interaction,
       prediction:s.prediction,actual:s.actual,model_verdict:s.model_verdict,
-      human_verdict:c?c.value:null,notes:notes?notes.value:""});
+      consistent:s.consistent,human_verdict:c?c.value:null,notes:notes?notes.value:""});
   }
   const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -253,13 +271,17 @@ def main():
     ap.add_argument("--findings", required=True, help="findings JSON")
     ap.add_argument("--out", required=True, help="output HTML")
     ap.add_argument("--max-width", type=int, default=1200)
+    ap.add_argument("--show-matched", action="store_true",
+                    help="include matched scenarios too (debugging small runs)")
     a = ap.parse_args()
     with open(a.findings) as f:
         findings = json.load(f)
-    html_out = build(findings, a.captures, a.max_width)
+    html_out, matched, shown = build(findings, a.captures, a.max_width, a.show_matched)
     with open(a.out, "w") as f:
         f.write(html_out)
-    print(f"wrote {a.out} ({len(html_out)//1024} KB, {len(findings['scenarios'])} scenarios)")
+    print(f"wrote {a.out} ({len(html_out)//1024} KB): "
+          f"{len(findings['scenarios'])} scenarios, {matched} matched prediction "
+          f"(hidden), {shown} shown for review")
 
 
 if __name__ == "__main__":
