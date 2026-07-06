@@ -40,6 +40,15 @@ public:
 	double VisibleYMax = 0.0;
 	bool VisibleYValid = false;
 
+	// Visible x-range (seconds) of the time view, captured like VisibleY —
+	// lets layouts render their own timebase controls (compact touch UI).
+	double VisibleXMin = 0.0;
+	double VisibleXMax = 0.0;
+	bool VisibleXValid = false;
+	// One-shot request from such a control: re-window the time view to this
+	// span (seconds), keeping the current centre. 0 = no request.
+	double PendingXSpan = 0.0;
+
 	// Where the plot-help "?" lives: under the plot (classic/lowres) or
 	// hosted by the desktop toolbar (which sets show_help itself).
 	bool ShowHelpButton = true;
@@ -110,12 +119,14 @@ public:
 		const ImGuiStyle& st = ImGui::GetStyle();
 		float row_height = ImGui::GetFrameHeightWithSpacing();
 
-		// Bottom UI: help button + small cursor props table row
-		// (your current layout has the help button and the tiny 1-row table).
-		float bottom_misc_h = row_height; // one line worth
+		// Bottom UI: help button + small cursor props table row. Reserve the
+		// line only when something will render there — an unconditional
+		// reservation left a dead strip under the plot when the help button
+		// is hosted elsewhere (desktop toolbar) or hidden (compact).
+		float bottom_misc_h = (ShowHelpButton || show_cursor_props) ? row_height : 0.0f;
 
 		// If cursor props are shown, add one more line (the values row you add)
-		if (osc_control->Cursor1toggle && osc_control->Cursor2toggle) {
+		if (show_cursor_props) {
 			bottom_misc_h += row_height;
 		}
 
@@ -298,6 +309,19 @@ public:
 		{
 			ImPlot::SetNextAxisLimits(ImAxis_Y1, next_autofitY_min, next_autofitY_max, ImPlotCond_Always);
 			next_autofitY = false;
+		}
+		// Timebase request from a layout's own controls (compact touch UI):
+		// re-window the time view around the current centre. An autofit
+		// requested the same frame wins (both are one-shots).
+		if (PendingXSpan > 0.0)
+		{
+			if (!xy_mode && !eye_mode && VisibleXValid && !next_autofitX)
+			{
+				const double c = 0.5 * (VisibleXMin + VisibleXMax);
+				ImPlot::SetNextAxisLimits(ImAxis_X1, c - PendingXSpan * 0.5,
+				    c + PendingXSpan * 0.5, ImPlotCond_Always);
+			}
+			PendingXSpan = 0.0;
 		}
 
 		// --- before BeginPlot ---
@@ -631,6 +655,10 @@ public:
 			VisibleYMin = ImPlot::GetPlotLimits().Y.Min;
 			VisibleYMax = ImPlot::GetPlotLimits().Y.Max;
 			VisibleYValid = true;
+			// ... and the visible time range for layout-owned timebase controls
+			VisibleXMin = ImPlot::GetPlotLimits().X.Min;
+			VisibleXMax = ImPlot::GetPlotLimits().X.Max;
+			VisibleXValid = true;
 			// Plot Oscilloscope 2 Signal
 			std::vector<double> time_osc2 = OSC2Data->GetTime();
 			if (osc_control->DisplayCheckOSC2)
@@ -1186,10 +1214,9 @@ public:
 		}
 
 		// Signal and Cursor Properties
-		if (ImGui::BeginTable("signal_props", 4))
+		if (show_cursor_props && ImGui::BeginTable("signal_props", 4))
 		{
 			ImGui::TableSetupColumn("One", ImGuiTableColumnFlags_WidthFixed, 180);
-			if (show_cursor_props)
 			{
 				ImGui::TableNextColumn();
 				ImGui::Text("Cursor properties:");

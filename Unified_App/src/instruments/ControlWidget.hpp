@@ -85,8 +85,12 @@ public:
 		}
 		first_render = false;
 		bool treeopen = ImGui::TreeNodeEx(label.c_str(), flags);
-		ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20);
-		
+		// Right-align the help button exactly (a fixed offset clips it once
+		// the font grows — compact scale, large text sizes)
+		const float help_w = ImGui::CalcTextSize("  ?  ").x
+		    + 2.0f * ImGui::GetStyle().FramePadding.x;
+		ImGui::SameLine(ImGui::GetContentRegionAvail().x - help_w);
+
 		// Help button
 		if (ImGui::Button("  ?  "))
 		{

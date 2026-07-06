@@ -152,8 +152,9 @@ App::LayoutMode App::resolvedLayout() const
     }
     return LayoutMode::Mobile;
 #else
-    // 800x480-class LCDs (Raspberry Pi) get the compact layout
-    if (ImGui::GetIO().DisplaySize.y <= 520.0f)
+    // Small touchscreen LCDs (Raspberry Pi 5-7" panels: 800x480, 1024x600)
+    // get the compact layout
+    if (ImGui::GetIO().DisplaySize.y <= 620.0f)
         return LayoutMode::Compact;
     return LayoutMode::Desktop;
 #endif

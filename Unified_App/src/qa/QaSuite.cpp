@@ -247,6 +247,39 @@ static bool FuzzBlacklisted(const char* label)
     return false;
 }
 
+// Switch layout via the View menu where the layout has one (desktop/tablet),
+// falling back to the compact touch UI's MENU page (it has no menu bar; its
+// Menu screen has one button per layout).
+static void QaSwitchLayout(ImGuiTestContext* ctx, const char* layout)
+{
+    if (ctx->GetWindowByRef("//Main Window") == nullptr)
+        return;
+    ctx->SetRef("Main Window");
+    ctx->MenuClick(ImGuiTestRef((std::string("View/Layout/") + layout).c_str()));
+    if (!ctx->IsError())
+    {
+        ctx->Yield(10);
+        return;
+    }
+    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+    // Compact touch UI path. Its layout buttons carry the bare mode name
+    // ("Desktop"/"Tablet"/"Mobile"); switching to Compact from here is moot.
+    std::string touch(layout);
+    if (const size_t paren = touch.find(" ("); paren != std::string::npos)
+        touch.resize(paren);
+    ctx->ItemClick("**/MENU");
+    ctx->Yield(2);
+    if (ctx->IsError())
+    {
+        ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        return;
+    }
+    ctx->ItemClick(ImGuiTestRef(("**/" + touch).c_str()));
+    if (ctx->IsError())
+        ctx->TestOutput->Status = ImGuiTestStatus_Running;
+    ctx->Yield(10);
+}
+
 // Click every gathered item under `parent` (skipping blacklisted labels),
 // closing any popup each click opens.
 static void FuzzClickAllUnder(ImGuiTestContext* ctx, ImGuiTestRef parent, int depth)
@@ -711,17 +744,10 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     // every safe item in every window, then switch on.
     t = IM_REGISTER_TEST(e, "fuzz", "layout_walk");
     t->TestFunc = [](ImGuiTestContext* ctx) {
-        const char* layouts[] = { "Mobile", "Compact (800x480)", "Tablet", "Desktop" };
+        const char* layouts[] = { "Mobile", "Compact (touchscreen)", "Tablet", "Desktop" };
         for (const char* layout : layouts)
         {
-            // Switch via the View menu if this layout still has one.
-            if (ctx->GetWindowByRef("//Main Window") != nullptr)
-            {
-                ctx->SetRef("Main Window");
-                ctx->MenuClick(ImGuiTestRef(
-                    (std::string("View/Layout/") + layout).c_str()));
-                ctx->Yield(10);
-            }
+            QaSwitchLayout(ctx, layout);
             if (ctx->IsError())
                 ctx->TestOutput->Status = ImGuiTestStatus_Running;
             ctx->LogInfo("fuzz: === walking layout %s ===", layout);
@@ -758,17 +784,11 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     t = IM_REGISTER_TEST(e, "fuzz", "layout_switch");
     t->TestFunc = [](ImGuiTestContext* ctx) {
         SetMainRef(ctx);
-        const char* layouts[] = { "Compact (800x480)", "Tablet", "Mobile", "Desktop" };
+        const char* layouts[] = { "Compact (touchscreen)", "Tablet", "Mobile", "Desktop" };
         for (const char* layout : layouts)
         {
             ctx->LogInfo("fuzz: layout -> %s", layout);
-            if (ctx->GetWindowByRef("//Main Window") != nullptr)
-            {
-                ctx->SetRef("Main Window");
-                ctx->MenuClick(ImGuiTestRef(
-                    (std::string("View/Layout/") + layout).c_str()));
-            }
-            ctx->Yield(10);
+            QaSwitchLayout(ctx, layout);
             if (ctx->IsError())
                 ctx->TestOutput->Status = ImGuiTestStatus_Running;
         }

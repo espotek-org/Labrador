@@ -28,8 +28,8 @@ class App : public AppBase
 
   public:
     // Layouts: desktop = the Monash arrangement (DesktopFrontend), mobile =
-    // Brent's tile design (AndroidFrontend), compact = 800x480 Raspberry Pi
-    // LCDs (LowResFrontend), tablet = the desktop layout under a touch-sized
+    // Brent's tile design (AndroidFrontend), compact = small (5-7") Raspberry
+    // Pi touch LCDs (LowResFrontend), tablet = the desktop layout under a touch-sized
     // style for 1024x768 / 1280x720-class Android tablets (TabletFrontend).
     enum class LayoutMode { Auto, Desktop, Mobile, Compact, Tablet };
 

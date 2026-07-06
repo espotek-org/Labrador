@@ -268,6 +268,20 @@ public:
 		return amplitude.getValue() + offset.getValue();
 	}
 
+	// ---- Direct value access for layouts that render their own controls
+	// (compact touch UI). After mutating a value, the caller must invoke
+	// SGControl::markSwitched() so the new settings reach the hardware.
+	SIValue& amplitudeValue() { return amplitude; }
+	SIValue& frequencyValue() { return frequency; }
+	SIValue& offsetValue() { return offset; }
+	SIValue& phaseValue() { return phase; }
+	bool hasDutyCycle() const { return label == "Square"; }
+	int dutyCycle() const { return dutycycle; }
+	void setDutyCycle(int dc) { dutycycle = std::clamp(dc, 1, 100); }
+	// Arbitrary (.tlw) waveforms have no phase control (see the
+	// ArbitrarySignal::renderProperties override).
+	virtual bool hasPhase() const { return true; }
+
 	/// <summary>
 	/// Hard-limit the output peak (amplitude + offset) to vmax by reducing
 	/// amplitude first, then offset. Returns true if anything was clamped.
@@ -576,6 +590,8 @@ public:
 		}
 		return changed;
 	}
+
+	bool hasPhase() const override { return false; }
 
 	// Preview shows the actual file samples (sample-and-hold between points).
 	std::vector<float> preview_generator(std::vector<float> t) override

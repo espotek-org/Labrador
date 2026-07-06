@@ -294,6 +294,11 @@ public:
 		updateDisplayValue();
 	}
 
+	// Bounds, for layouts that render their own value controls (compact
+	// touch UI steppers/keypad) and must clamp like renderInTable does.
+	float getMin() const { return min_val; }
+	float getMax() const { return max_val; }
+
 private:
 	const std::string label;
 	const std::string id;

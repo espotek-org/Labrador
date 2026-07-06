@@ -141,6 +141,11 @@ public:
 			{
 				resend_pending = false;
 			}
+			// Consume the change flag: renderControl() rewrites it every frame
+			// on the layouts that use it, but the compact touch UI only sets
+			// it via markSwitched()/setActive() — without this the send would
+			// repeat every frame there (and re-poke the USB sampling bug).
+			switched = false;
 			return true;
 		}
 		return false;
@@ -172,6 +177,30 @@ public:
 		}
 		resend_pending = true;
 	}
+
+	// ---- Touch-UI access (the compact layout renders its own controls) ----
+	bool isActive() const { return active; }
+	void setActive(bool on)
+	{
+		if (active == on)
+			return;
+		active = on;
+		switched = true;
+	}
+	int signalCount() const { return (int)signals.size(); }
+	int signalIndex() const { return signal_idx; }
+	std::string signalLabel(int i) const { return signals[i]->getLabel(); }
+	void selectSignal(int i)
+	{
+		if (i == signal_idx || i < 0 || i >= (int)signals.size())
+			return;
+		signal_idx = i;
+		switched = true;
+	}
+	GenericSignal& currentSignal() { return *signals[signal_idx]; }
+	// After mutating currentSignal() values: re-send to the hardware on the
+	// next controlLab pass.
+	void markSwitched() { switched = true; }
 
 	// Where the UART TX section renders: inline under the waveform controls
 	// (classic/lowres) or hosted by another page (desktop Logic panel).
