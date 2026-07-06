@@ -245,17 +245,20 @@ public:
 	}
 
 	/// <summary>
-	/// Set the Signal Generator on the labrador board.
+	/// Set the Signal Generator on the labrador board. Returns the librador
+	/// error code (0 = accepted) so a reconnect resend can retry on a
+	/// transient failure instead of silently dropping the state.
 	/// </summary>
-	virtual void controlLab(int channel) = 0;
+	virtual int controlLab(int channel) = 0;
 
 	/// <summary>
-	/// Set signal generator amplitude to zero
+	/// Set signal generator amplitude to zero. Returns the librador error
+	/// code (0 = accepted), like controlLab.
 	/// </summary>
 	/// <param name="channel"></param>
-	virtual void turnOff(int channel)
+	virtual int turnOff(int channel)
 	{
-		librador_send_sin_wave(channel, 100, 0.0, 0.0);
+		return librador_send_sin_wave(channel, 100, 0.0, 0.0);
 	}
 
 	virtual std::vector<float> preview_generator(std::vector<float> t) = 0;
@@ -328,9 +331,9 @@ public:
 	/// <summary>
 	/// Set the Signal Generator on the labrador board.
 	/// </summary>
-	void controlLab(int channel) override
+	int controlLab(int channel) override
 	{
-		librador_send_sin_wave(channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), phase.getValue()/180*M_PI);
+		return librador_send_sin_wave(channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), phase.getValue()/180*M_PI);
 	}
 
 	std::vector<float> preview_generator(std::vector<float> t) override {
@@ -357,9 +360,9 @@ public:
 	/// <summary>
 	/// Set the Signal Generator on the labrador board.
 	/// </summary>
-	void controlLab(int channel) override
+	int controlLab(int channel) override
 	{
-		librador_imgui_send_square_wave(
+		return librador_imgui_send_square_wave(
 		    channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), dutycycle / 100.0, phase.getValue());
 	}
 
@@ -402,11 +405,11 @@ public:
 			sampleBuffer[i] = sample_generator(x_temp-phase/180*M_PI, duty_cycle);
 		}
 
-		librador_update_signal_gen_settings(channel, sampleBuffer, num_samples,
+		int error = librador_update_signal_gen_settings(channel, sampleBuffer, num_samples,
 			usecs_between_samples, amplitude_v, offset_v);
 
 		free(sampleBuffer);
-		return 0;
+		return error;
 	}
 
 	unsigned char sample_generator(double x, double duty_cycle = 0.5)
@@ -441,9 +444,9 @@ public:
 	/// <summary>
 	/// Set the Signal Generator on the labrador board.
 	/// </summary>
-	void controlLab(int channel) override
+	int controlLab(int channel) override
 	{
-		librador_send_sawtooth_wave(
+		return librador_send_sawtooth_wave(
 		    channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), phase.getValue()/180*M_PI);
 	}
 
@@ -473,9 +476,9 @@ public:
 	/// <summary>
 	/// Set the Signal Generator on the labrador board.
 	/// </summary>
-	void controlLab(int channel) override
+	int controlLab(int channel) override
 	{
-		librador_send_triangle_wave(channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), phase.getValue()/180*M_PI);
+		return librador_send_triangle_wave(channel, frequency.getValue(), amplitude.getValue(), offset.getValue(), phase.getValue()/180*M_PI);
 	}
 
 	std::vector<float> preview_generator(std::vector<float> t) override {
@@ -514,7 +517,7 @@ public:
 	/// <summary>
 	/// Set the Signal Generator on the labrador board.
 	/// </summary>
-	void controlLab(int channel) override
+	int controlLab(int channel) override
 	{
 		// Work on a copy: the T-stretch below must never mutate the file data.
 		std::vector<unsigned char> buf(file.samples.begin(), file.samples.end());
@@ -540,7 +543,7 @@ public:
 		// divider pair the Qt driver computes (CLOCK_FREQ/(div*len*freq)-0.5).
 		const double usecs_between_samples
 		    = 1e6 / (static_cast<double>(buf.size()) * freq);
-		librador_update_signal_gen_settings(channel, buf.data(),
+		return librador_update_signal_gen_settings(channel, buf.data(),
 		    static_cast<int>(buf.size()), usecs_between_samples, amplitude.getValue(),
 		    offset.getValue());
 	}

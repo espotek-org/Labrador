@@ -130,17 +130,18 @@ public:
 		// while the widget is visible), which would otherwise drop the resend.
 		if (switched || resend_pending)
 		{
-			resend_pending = false;
-			if (!active)
+			// A reconnect resend must survive a transient send failure (the
+			// link can still be settling in the frames right after
+			// onDeviceConnected): only clear the flag once the hardware
+			// accepted the settings, so the next frame retries. `switched`
+			// sends stay fire-and-forget — the user sees those and retries.
+			const int error = active ? signals[signal_idx]->controlLab(channel)
+			                         : signals[signal_idx]->turnOff(channel);
+			if (error == 0)
 			{
-				signals[signal_idx]->turnOff(channel);
-				return true;
+				resend_pending = false;
 			}
-			else
-			{
-				signals[signal_idx]->controlLab(channel);
-				return true;
-			}
+			return true;
 		}
 		return false;
 
