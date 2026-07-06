@@ -124,6 +124,9 @@ class App : public AppBase
     uint64_t m_stream_total_last = 0;
     double m_stream_check_t = -1.0;
     double m_stream_stall_s = 0.0;
+    // Wall-clock timestamp of the previous Update, for the wedge debounce
+    // accumulators (capped per frame so a debugger pause can't jump them).
+    double m_uninit_last_wall_s = -1.0;
 
     // Desktop device polling (Android connects via USB attach intents)
     double m_last_poll_time = 0.0;

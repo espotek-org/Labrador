@@ -439,28 +439,31 @@ void App::Update()
         ImGui::EndPopup();
     }
 
-    // The uninitialised-wedge check looks for a perfectly flat capture, but
-    // for the first moments after connecting the sample buffer legitimately
-    // holds its uniform pre-fill — don't arm the check until the stream has
-    // had time to fill with real samples.
+    // ALL uninitialised-wedge timing below runs on the wall clock, NOT
+    // ImGui::GetTime()/DeltaTime: the wedge check judges REAL hardware
+    // behavior (buffer fill, frame arrival), and the QA runner accelerates
+    // simulated time ~16x — sim-timed arming fired on the pre-fill right
+    // after reconnects and burned the auto-heal budget on false positives.
+    const double now_s = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch())
+                             .count();
+
+    // The flat-capture check looks for a perfectly constant window, but for
+    // the first moments after connecting the sample buffer legitimately
+    // holds its uniform pre-fill — don't arm until the stream has had time
+    // to fill with real samples.
     if (connected && m_connected_since < 0.0)
-        m_connected_since = ImGui::GetTime();
+        m_connected_since = now_s;
     else if (!connected)
         m_connected_since = -1.0;
     const bool uninit_check_armed
-        = connected && (ImGui::GetTime() - m_connected_since) > 2.0;
+        = connected && (now_s - m_connected_since) > 2.0;
 
     // Stream-property wedge check: a device wedged in incomplete startup
     // stops (or never starts) delivering frames — something the flat-capture
     // scan cannot see, because an idle buffer replays its stale contents
     // forever. Any frame counter advancing counts as alive (not every
     // transport validates checksums, so frames_ok alone would false-stall).
-    // Wall clock, NOT ImGui::GetTime(): frame arrival is wall-time, and the
-    // QA runner accelerates simulated time ~16x — measured against that, a
-    // healthy stream would look stalled.
-    const double now_s = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch())
-                             .count();
     if (!connected)
     {
         m_stream_check_t = -1.0;
@@ -487,7 +490,12 @@ void App::Update()
 
     bool uninit_now = uninit_check_armed && !inspecting_paused
         && (stream_stalled || CheckIfInUninitialisedMode());
-    const double dt = ImGui::GetIO().DeltaTime;
+    // Wall-clock frame delta for the debounce accumulators (same reasoning
+    // as above; ImGui's DeltaTime is simulated under the QA runner).
+    const double dt = (m_uninit_last_wall_s >= 0.0)
+        ? std::min(now_s - m_uninit_last_wall_s, 0.25)
+        : 0.0;
+    m_uninit_last_wall_s = now_s;
     if (uninit_now)
     {
         uninit_enter_s += dt;
