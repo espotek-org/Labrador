@@ -608,13 +608,17 @@ void LowResFrontend::renderPanels(App& app)
     }
 
     // Anchored over the plot, just above the chip strip. The SG panels run
-    // two columns of steppers, so they get the wider format.
+    // two columns of steppers, so they get the wider format. Height is
+    // clamped to the display so an extra-large text size scrolls inside the
+    // panel instead of pushing its top row off-screen.
     const bool wide = m_active_panel == Panel::SG1 || m_active_panel == Panel::SG2;
     const float pw = std::min(
         ScaledPx(wide ? 560.0f : 410.0f), m_plot_max.x - m_plot_min.x - ScaledPx(8.0f));
+    const float max_h = ImGui::GetIO().DisplaySize.y - ScaledPx(16.0f);
     ImGui::SetNextWindowPos(
         ImVec2((m_plot_min.x + m_plot_max.x) * 0.5f, m_plot_max.y - ScaledPx(2.0f)),
         ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(pw, 0.0f), ImVec2(pw, max_h));
     ImGui::SetNextWindowSize(ImVec2(pw, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ScaledPx(12.0f), ScaledPx(12.0f)));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ScaledPx(8.0f), ScaledPx(8.0f)));
