@@ -774,6 +774,75 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
         ctx->SleepNoSkip(8.0f, 1.0f); // let the final reconnect settle
         ctx->Yield(4);
     };
+
+    // Text-entry fuzz. Activating ANY text field routes through the SDL3 IME
+    // path (ImGui_ImplSDL3_UpdateIme), which crashed on desktop when the OS
+    // gave the window keyboard focus (null io.UserData deref). Also feeds
+    // garbage into the numeric parsers. Run focused to exercise the IME path
+    // (headless has no keyboard focus, so SDL_GetKeyboardFocus() is null and
+    // the deref is skipped — see the focused-run note in the QA skill).
+    t = IM_REGISTER_TEST(e, "fuzz", "text_edit");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        const char* junk[] = { "abc", "1e9", "-999999", "nan", "inf",
+            "!@#$%^&*()", "", "999999999999999999999", "0x10", ".." };
+
+        // 1. Help search box (a plain InputText).
+        ctx->MenuClick("Help/User Guide");
+        ctx->Yield(4);
+        if (ctx->GetWindowByRef("//Labrador User Guide") != nullptr)
+        {
+            ctx->SetRef("Labrador User Guide");
+            if (ctx->ItemExists("##help_search"))
+                for (const char* s : junk)
+                {
+                    ctx->ItemClick("##help_search");
+                    ctx->Yield(2);
+                    ctx->KeyChars(s);
+                    ctx->Yield(2);
+                    ctx->KeyPress(ImGuiKey_Enter);
+                    ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_A);
+                    ctx->KeyPress(ImGuiKey_Delete);
+                    if (ctx->IsError())
+                        ctx->TestOutput->Status = ImGuiTestStatus_Running;
+                }
+        }
+        SetMainRef(ctx);
+
+        // 2. Numeric fields on the Signals page: double-click a DragFloat to
+        // type into it, then feed garbage values.
+        EnsureSidePanelVisible(ctx);
+        ctx->MenuClick("View/Side Panel Page/Signals");
+        ctx->Yield(3);
+        ImGuiTestItemInfo w = ctx->WindowInfo(
+            "//Main Window/##sidepanel/Signals", ImGuiTestOpFlags_NoError);
+        if (w.Window != nullptr)
+        {
+            ImGuiTestItemList items;
+            ctx->GatherItems(&items, w.Window->ID, 5);
+            int typed = 0;
+            for (int i = 0; i < items.GetSize() && typed < 14; i++)
+            {
+                const ImGuiTestItemInfo& it = *items[i];
+                if (FuzzBlacklisted(it.DebugLabel))
+                    continue;
+                if (ctx->ItemInfo(it.ID, ImGuiTestOpFlags_NoError).ID == 0)
+                    continue;
+                ctx->MouseSetViewport(it.Window);
+                ctx->ItemDoubleClick(it.ID);
+                ctx->Yield(2);
+                ctx->KeyChars(junk[typed % IM_ARRAYSIZE(junk)]);
+                ctx->Yield(2);
+                ctx->KeyPress(ImGuiKey_Enter);
+                ctx->Yield(2);
+                ctx->PopupCloseAll();
+                typed++;
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+        SetMainRef(ctx);
+    };
 }
 
 // ---- Hardware loopback tests -------------------------------------------------
