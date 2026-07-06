@@ -17,6 +17,12 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
+
 static ImGuiTestEngine* g_engine = nullptr;
 static bool g_headless = false;
 
@@ -873,11 +879,25 @@ static void QaCapture(ImGuiTestContext* ctx, const char* name, const char* which
     const char* dir = SDL_getenv("LABRADOR_QA_CAPTURE_DIR");
     if (dir == nullptr)
         dir = "/tmp/labqa_predict";
+#ifdef _WIN32
+    _mkdir(dir);
+#else
+    mkdir(dir, 0755);
+#endif
     char path[512];
     snprintf(path, sizeof path, "%s/%s_%s.ppm", dir, name, which);
+    // A stale frame from an earlier run must not pass for this one, and a
+    // failed dump must fail the scenario — a prediction made against the
+    // wrong frame is worse than no prediction.
+    remove(path);
     ctx->Yield(2); // let the UI settle before grabbing the frame
     QaRequestFrameDump(path);
     ctx->Yield(3); // the render loop dumps on one of these frames
+    FILE* dumped = fopen(path, "rb");
+    if (dumped == nullptr)
+        ctx->LogError("predict: frame dump failed (%s was not written)", path);
+    IM_CHECK(dumped != nullptr);
+    fclose(dumped);
     ctx->LogInfo("predict: captured %s", path);
 }
 
