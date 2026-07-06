@@ -75,8 +75,8 @@ public:
 
 		ImGui::BeginDisabled(!stream_active || recording || dialog_open);
 
-		renderChannelRow(1, "CH A", &record_a);
-		renderChannelRow(2, "CH B", &record_b);
+		renderChannelRow(1, "CH1 (OSC1)", &record_a);
+		renderChannelRow(2, "CH2 (OSC2)", &record_b);
 
 		// Duration of buffered history to write out (chronological order)
 		ImGui::Text("Duration");

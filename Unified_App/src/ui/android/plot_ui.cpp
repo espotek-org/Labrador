@@ -115,9 +115,9 @@ void plotUI::draw(bool iso_thread_active, inputsUI::Mode mode, bool chA_enabled,
             ImPlotSpec spec = ImPlotSpec();
             spec.LineWeight = 2;
             if(chA_enabled)
-                ImPlot::PlotLine("CH A", time_array.data(), from_librador_chA->data(), from_librador_chA->size(), spec);
+                ImPlot::PlotLine("CH1", time_array.data(), from_librador_chA->data(), from_librador_chA->size(), spec);
             if(chB_enabled)
-                ImPlot::PlotLine("CH B", time_array.data(), from_librador_chB->data(), from_librador_chB->size(), spec);
+                ImPlot::PlotLine("CH2", time_array.data(), from_librador_chB->data(), from_librador_chB->size(), spec);
 
             ImGuiContext& g = *GImGui;
 

@@ -34,10 +34,10 @@ void triggerUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::Text("CH: ");
         ImGui::SameLine();
         ALIGN_Y
-        ImGui::RadioButton("A  ", &ch_sel, 1);
+        ImGui::RadioButton("1  ", &ch_sel, 1);
         ImGui::SameLine();
         ALIGN_Y
-        ImGui::RadioButton("B", &ch_sel, 2); 
+        ImGui::RadioButton("2", &ch_sel, 2); 
         ImGui::EndTable();
     }
     curr_ch_trigger_settings = &both_ch_trigger_settings[ch_sel - 1];

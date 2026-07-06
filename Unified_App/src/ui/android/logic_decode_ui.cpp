@@ -11,7 +11,7 @@
 float logicDecodeUI::draw_grabber(float grabber_height, const char * label, float* backlog, int ch, bool parity_check)
 {
     ImGui::PushID(ch);
-    char chAB[2] = {'A', 'B'};
+    char chAB[2] = {'1', '2'}; // canonical CH1/CH2 naming
     ImGuiStyle& style = ImGui::GetStyle();
     ImVec2 init_pos = ImGui::GetCursorScreenPos();
     ImVec2 end_pos = init_pos + ImVec2(ImGui::GetContentRegionAvail().x,0.f);
@@ -226,7 +226,7 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
     const char * labels[2] = {"UART", "I2C"};
 
     bool open_ch_serial_settings = false;
-    char chAB[2] = {'A', 'B'};
+    char chAB[2] = {'1', '2'}; // canonical CH1/CH2 naming
 
     ImGui::BeginGroup(); // for bounding rect
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{0.f,0.f});
@@ -234,7 +234,7 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
     ImGui::PopStyleVar();
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2((width_pixels - ImGui::CalcTextSize("UART").x)/2.,style.FramePadding.y));
     ImGui::Text("UART");
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("CH ACH B").x - style.ItemSpacing.x - 4 * style.FramePadding.x)/2., 0.f ));
+    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("CH 1CH 2").x - style.ItemSpacing.x - 4 * style.FramePadding.x)/2., 0.f ));
     for (int ch: {1,2})
     {
         ImGui::BeginDisabled(!logic_enable[ch-1] || !(protocol_sel==Protocol::UART));

@@ -901,7 +901,10 @@ void usbCallHandler::daq_for_channel(int channel, int numToGet, int interval_sam
         sprintf(volts_fmt, volts_fmt_template, 3);
     }
 
-    const char* ch_names[2] = {"CH A", "CH B"};
+    // Channel names in the app's canonical form (CH1/CH2, matching the
+    // scope UI and the OSC1/OSC2 pins). Loaders keep accepting the legacy
+    // "CH A"/"CH B" headers written before the rename.
+    const char* ch_names[2] = {"CH1", "CH2"};
     SDL_IOprintf(iostream, "%s\n", ch_names[channel-1]);
     if(unit_sel==usbCallHandler::daqUnitOptions::Bits) {
         std::vector<double>* daq_vals = getMany_singleBit(channel, numToGet * 8, interval_samples, 0, true);

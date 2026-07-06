@@ -23,10 +23,10 @@
 /// ON-DISK FORMAT — matches the recorder EXACTLY. See librador
 /// usbcallhandler.cpp:
 ///   * drive_daq()        (usbcallhandler.cpp:417) writes, for "both channels",
-///     CH A then a bare "\n" (line 437) then CH B.
+///     CH1 then a bare "\n" (line 437) then CH2.
 ///   * daq_for_channel()  (usbcallhandler.cpp:375) writes, per channel:
 ///       - a header line: SDL_IOprintf(iostream, "%s\n", ch_names[channel-1])
-///         with ch_names[2] = {"CH A", "CH B"} (line 395-396), then
+///         with ch_names[2] = {"CH1", "CH2"} (legacy files say "CH A"/"CH B"), then
 ///       - all samples on ONE line, each value followed by a single space:
 ///         Volts -> "%.3g " ("%.4g " in multimeter mode 6/7)  (line 401-405)
 ///         Bits  -> "%.0f " (line 397-400)
@@ -168,8 +168,8 @@ public:
 				fit_requested = false;
 			}
 
-			plotChannel(ch_a, have_a, "CH A", constants::OSC1_ACCENT, x_scale, total);
-			plotChannel(ch_b, have_b, "CH B", constants::OSC2_ACCENT, x_scale, total);
+			plotChannel(ch_a, have_a, "CH1", constants::OSC1_ACCENT, x_scale, total);
+			plotChannel(ch_b, have_b, "CH2", constants::OSC2_ACCENT, x_scale, total);
 
 			// Draggable trim boundaries on the plot (Qt's start/end handles).
 			// Kept in sample space: convert to x-units, drag, convert back.
@@ -222,13 +222,15 @@ private:
 			size_t e = line.find_last_not_of(" \t\r\n");
 			std::string trimmed = line.substr(b, e - b + 1);
 
-			if (trimmed == "CH A")
+			// "CH1"/"CH2" is the current header; "CH A"/"CH B" is the legacy
+			// form older recordings carry — keep loading both.
+			if (trimmed == "CH1" || trimmed == "CH A")
 			{
 				target = &out_a;
 				out_have_a = true;
 				continue;
 			}
-			if (trimmed == "CH B")
+			if (trimmed == "CH2" || trimmed == "CH B")
 			{
 				target = &out_b;
 				out_have_b = true;
@@ -341,9 +343,9 @@ private:
 			// absent or shorter than the trim window.
 			f << (use_time_axis ? "Time (s)" : "Sample");
 			if (have_a)
-				f << ",CH A";
+				f << ",CH1";
 			if (have_b)
-				f << ",CH B";
+				f << ",CH2";
 			f << "\n";
 
 			const double x_scale = xScale();

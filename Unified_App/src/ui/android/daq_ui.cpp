@@ -133,13 +133,13 @@ void daqUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::SameLine();
         ALIGN_Y
         ImGui::BeginDisabled(!inputs_ui->ch_enabled(1));
-        ImGui::RadioButton("A", &ch_sel, 1);
+        ImGui::RadioButton("1", &ch_sel, 1);
         ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(style.ItemInnerSpacing.x, 0.f));
         ALIGN_Y
         ImGui::BeginDisabled(!inputs_ui->ch_enabled(2));
-        ImGui::RadioButton("B", &ch_sel, 2); 
+        ImGui::RadioButton("2", &ch_sel, 2); 
         ImGui::EndDisabled();
     ImGui::PopStyleVar();
     INDENTRIGHT
