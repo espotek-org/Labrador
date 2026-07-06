@@ -247,34 +247,88 @@ static bool FuzzBlacklisted(const char* label)
     return false;
 }
 
-// Switch layout via the View menu where the layout has one (desktop/tablet),
-// falling back to the compact touch UI's MENU page (it has no menu bar; its
-// Menu screen has one button per layout).
-static void QaSwitchLayout(ImGuiTestContext* ctx, const char* layout)
+// Click that tolerates a missing item (returns false instead of failing the
+// test) — the layout escape below probes for state-dependent buttons.
+static bool QaClickOk(ImGuiTestContext* ctx, const char* ref)
 {
-    if (ctx->GetWindowByRef("//Main Window") == nullptr)
+    ctx->ItemClick(ImGuiTestRef(ref));
+    if (!ctx->IsError())
+        return true;
+    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+    return false;
+}
+
+// Window lookup that ignores windows from layouts no longer rendering:
+// ImGui keeps every window it ever saw registered, so a bare GetWindowByRef
+// happily returns the desktop's stale "Main Window" while the mobile layout
+// is on screen (and clicks under it then go nowhere).
+static ImGuiWindow* QaActiveWindow(ImGuiTestContext* ctx, const char* ref)
+{
+    ImGuiWindow* w = ctx->GetWindowByRef(ref);
+    return (w != nullptr && w->WasActive) ? w : nullptr;
+}
+
+// Bring the app back to the desktop layout from whatever layout AND page the
+// fuzz walks left it on. Deliberately UI-driven: the escape paths are the
+// same ones a user has.
+static void QaEscapeToDesktop(ImGuiTestContext* ctx)
+{
+    ctx->PopupCloseAll();
+
+    // Mobile tile UI (window "MainWindow"): the escape tile sits under the
+    // control tiles; if fuzz collapsed the panel, pop it open again via the
+    // collapse chevron (label varies by orientation/state).
+    if (QaActiveWindow(ctx, "//Main Window") == nullptr
+        && QaActiveWindow(ctx, "//MainWindow") != nullptr)
+    {
+        ctx->SetRef("MainWindow");
+        if (!QaClickOk(ctx, "**/Desktop layout"))
+        {
+            for (const char* chevron : { "**/ > ", "**/ < ", "**/ v ", "**/ ^ " })
+                if (QaClickOk(ctx, chevron))
+                    break;
+            ctx->Yield(2);
+            QaClickOk(ctx, "**/Desktop layout");
+        }
+        ctx->Yield(10);
+        return;
+    }
+
+    if (QaActiveWindow(ctx, "//Main Window") == nullptr)
         return;
     ctx->SetRef("Main Window");
-    ctx->MenuClick(ImGuiTestRef((std::string("View/Layout/") + layout).c_str()));
+    ctx->MenuClick("View/Layout/Desktop");
     if (!ctx->IsError())
     {
         ctx->Yield(10);
         return;
     }
     ctx->TestOutput->Status = ImGuiTestStatus_Running;
-    // Compact touch UI path. Its layout buttons carry the bare mode name
-    // ("Desktop"/"Tablet"/"Mobile"); switching to Compact from here is moot.
-    std::string touch(layout);
-    if (const size_t paren = touch.find(" ("); paren != std::string::npos)
-        touch.resize(paren);
-    ctx->ItemClick("**/MENU");
-    ctx->Yield(2);
-    if (ctx->IsError())
+
+    // Compact touch UI: no menu bar. Its Menu page has a Desktop button —
+    // reachable directly (already on the Menu page), via the rail's MENU
+    // button (scope screen), or via Back (widget pages return to the Menu).
+    if (!QaClickOk(ctx, "**/Desktop"))
     {
-        ctx->TestOutput->Status = ImGuiTestStatus_Running;
-        return;
+        if (QaClickOk(ctx, "**/MENU") || QaClickOk(ctx, "**/Back"))
+        {
+            ctx->Yield(2);
+            QaClickOk(ctx, "**/Desktop");
+        }
     }
-    ctx->ItemClick(ImGuiTestRef(("**/" + touch).c_str()));
+    ctx->Yield(10);
+}
+
+// Switch layout: escape to the desktop layout first (its View menu can reach
+// every mode), then pick the target — so each hop starts from a known state
+// no matter what the previous walk did.
+static void QaSwitchLayout(ImGuiTestContext* ctx, const char* layout)
+{
+    QaEscapeToDesktop(ctx);
+    if (QaActiveWindow(ctx, "//Main Window") == nullptr)
+        return;
+    ctx->SetRef("Main Window");
+    ctx->MenuClick(ImGuiTestRef((std::string("View/Layout/") + layout).c_str()));
     if (ctx->IsError())
         ctx->TestOutput->Status = ImGuiTestStatus_Running;
     ctx->Yield(10);
@@ -756,10 +810,44 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
             // (Tablet shares the desktop arrangement but renders under the
             // touch style — walk it like the others to catch style-driven
             // layout breakage.)
-            ImGuiWindow* main = ctx->GetWindowByRef("//Main Window");
+            ImGuiWindow* main = QaActiveWindow(ctx, "//Main Window");
+            if (main == nullptr)
+                main = QaActiveWindow(ctx, "//MainWindow"); // mobile tile UI
             if (main == nullptr)
                 continue;
             ctx->SetRef(main->ID);
+            if (strcmp(layout, "Compact (touchscreen)") == 0)
+            {
+                // Touch UI: walk the scope screen, then every page behind
+                // the MENU grid. Navigation runs Back (widget page -> Menu)
+                // then MENU (scope screen -> Menu); from the Menu page the
+                // instrument cells are directly clickable.
+                const char* touch_pages[] = { "<scope>", "Meter", "Logic",
+                    "DAQ", "Analysis", "Inputs", "Digital Out", "Calibrate",
+                    "Scope Setup" };
+                for (const char* page : touch_pages)
+                {
+                    ctx->PopupCloseAll();
+                    QaClickOk(ctx, "**/Back");
+                    if (strcmp(page, "<scope>") == 0)
+                    {
+                        QaClickOk(ctx, "**/Back"); // Menu -> scope screen
+                    }
+                    else
+                    {
+                        QaClickOk(ctx, "**/MENU");
+                        ctx->Yield(2);
+                        if (!QaClickOk(ctx, (std::string("**/") + page).c_str()))
+                            continue;
+                    }
+                    ctx->Yield(4);
+                    ctx->LogInfo("fuzz: --- %s page '%s' ---", layout, page);
+                    FuzzClickAllUnder(ctx, main->ID, 5);
+                    if (ctx->IsError())
+                        ctx->TestOutput->Status = ImGuiTestStatus_Running;
+                }
+                continue;
+            }
             // Visit every page via its nav-rail label, then click everything
             // the page shows.
             const char* rail_pages[] = { "Scope", "Signals", "PSU", "Meter",

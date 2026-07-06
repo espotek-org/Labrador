@@ -75,7 +75,11 @@ void App::loadSettings()
 {
     m_settings.load();
 
-    const std::string layout = m_settings.getString("layout", "auto");
+    // QA runs ignore the machine's saved layout so the suite always starts on
+    // the desktop layout (see resolvedLayout) — but tests can still switch
+    // layouts live via setLayoutMode (layout_walk / layout_switch).
+    const std::string layout
+        = qaRun() ? "auto" : m_settings.getString("layout", "auto");
     if (layout == "desktop") m_layout_mode = LayoutMode::Desktop;
     else if (layout == "mobile") m_layout_mode = LayoutMode::Mobile;
     else if (layout == "compact") m_layout_mode = LayoutMode::Compact;
@@ -135,8 +139,14 @@ void App::pushSettings()
 
 App::LayoutMode App::resolvedLayout() const
 {
-    if (qaRun())
-        return LayoutMode::Desktop; // the QA suite drives the desktop layout
+    // QA runs resolve Auto to the desktop layout for determinism (whatever
+    // the display size), but an explicit mode — a test driving the View menu
+    // or the compact Menu page — is honoured, so the layout fuzz walks
+    // exercise the real mobile/compact/tablet frontends. (This used to
+    // force Desktop unconditionally, which silently turned every "walk the
+    // other layouts" test into a re-walk of the desktop UI.)
+    if (qaRun() && m_layout_mode == LayoutMode::Auto)
+        return LayoutMode::Desktop;
     if (m_layout_mode != LayoutMode::Auto)
         return m_layout_mode;
 #ifdef __ANDROID__
