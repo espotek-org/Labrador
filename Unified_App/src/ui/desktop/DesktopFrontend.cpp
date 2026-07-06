@@ -713,31 +713,8 @@ void DesktopFrontend::renderToolbar(App& app, float height)
 
     ToolbarSep();
 
-    // Hardware gain (also in Scope > Hardware Gain; combo here for reach)
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Gain");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(72.0f);
-    char cur_gain[16];
-    snprintf(cur_gain, sizeof cur_gain, "%gx", OSCWidget.getSelectedGain());
-    if (ImGui::BeginCombo("##toolbar_gain", cur_gain))
-    {
-        for (int i = 0; i < OSCControl::GainValueCount; i++)
-        {
-            char lab[16];
-            snprintf(lab, sizeof lab, "%gx", OSCControl::GainValues[i]);
-            if (ImGui::Selectable(lab, OSCWidget.GainComboCurrentItem == i))
-            {
-                OSCWidget.GainComboCurrentItem = i;
-                OSCWidget.AutoGain = false; // manual pick overrides auto (Qt rule)
-            }
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("Auto##toolbar_gain_auto", &OSCWidget.AutoGain);
-
-    ToolbarSep();
+    // Hardware gain lives in the Scope > Hardware Gain menu, which is the
+    // single source of truth (it was duplicated here next to the cursors).
 
     ToolToggle("Cursor 1##toolbar", &OSCWidget.Cursor1toggle);
     ImGui::SameLine();
