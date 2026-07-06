@@ -13,6 +13,7 @@
 #include "librador.h"
 #include "instruments/util.h" // CheckIfInUninitialisedMode (hw wedge-detector test)
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -966,17 +967,40 @@ static void RegisterPredictScenarios(ImGuiTestEngine* e)
 // drives a 1 kHz sine on the signal generator and checks amplitude and
 // frequency of the captured waveform. Skipped (warning) with no board.
 
-static void HwLoopback(ImGuiTestContext* ctx, int channel)
+// Hardware settle: wait real wall-clock time while keeping the app pumping
+// frames. SleepNoSkip advances SIMULATED time, which the headless fast
+// runner compresses ~16x — "1.5 s" passes in tens of real milliseconds,
+// long before the board has produced that much signal. A capture window
+// fetched that soon straddles whatever was just changed (generator turn-on,
+// a gain step), which corrupted both the Vpp and the frequency oracles.
+static void HwSettle(ImGuiTestContext* ctx, double seconds)
 {
-    // The run starts immediately while the board is still enumerating —
-    // give the connection a few real seconds before deciding to skip.
-    for (int i = 0; i < 20; i++)
+    const auto until = std::chrono::steady_clock::now()
+        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(seconds));
+    while (std::chrono::steady_clock::now() < until && !ctx->Abort)
+        ctx->Yield();
+}
+
+// Wall-clock wait for the board (the run starts while it is still
+// enumerating). Returns false when no board appears — the caller skips.
+static bool HwWaitConnected(ImGuiTestContext* ctx, double timeout_s = 5.0)
+{
+    const auto until = std::chrono::steady_clock::now()
+        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(timeout_s));
+    while (std::chrono::steady_clock::now() < until && !ctx->Abort)
     {
         if (librador_is_connected() && librador_iso_thread_is_active())
-            break;
-        ctx->SleepNoSkip(0.25f, 0.25f);
+            return true;
+        ctx->Yield();
     }
-    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    return librador_is_connected() && librador_iso_thread_is_active();
+}
+
+static void HwLoopback(ImGuiTestContext* ctx, int channel)
+{
+    if (!HwWaitConnected(ctx))
     {
         ctx->LogWarning("No Labrador board connected - skipping hardware test");
         return;
@@ -988,14 +1012,14 @@ static void HwLoopback(ImGuiTestContext* ctx, int channel)
     IM_CHECK(toolbar.Window != nullptr);
     ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
     ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
-    ctx->SleepNoSkip(0.5f, 0.1f);
+    HwSettle(ctx, 0.5);
 
     // 100-sample sine at 10 us/sample = 1 kHz, 2 V amplitude, 0 V base
     unsigned char wave[100];
     for (int i = 0; i < 100; i++)
         wave[i] = (unsigned char)(127.5 + 127.5 * sin(2.0 * IM_PI * i / 100.0));
     IM_CHECK_GE(librador_update_signal_gen_settings(channel, wave, 100, 10.0, 2.0, 0.0), 0);
-    ctx->SleepNoSkip(1.5f, 0.1f); // let the stream settle
+    HwSettle(ctx, 1.5); // let the stream settle (real seconds of samples)
 
     std::vector<double>* data = librador_get_analog_data(channel, 0.05, 5000, 0.0, 0);
     IM_CHECK(data != nullptr);
@@ -1022,6 +1046,22 @@ static void HwLoopback(ImGuiTestContext* ctx, int channel)
             crossings++;
     const double freq = crossings / 2.0 / 0.05;
     ctx->LogInfo("CH%d loopback: ~%.0f Hz", channel, freq);
+    // Post-mortem evidence: the captured window, one sample per line. A bad
+    // frequency with a good Vpp has meant stale/duplicated stretches in the
+    // window — the shape says more than the two numbers above.
+    {
+        const char* dir = SDL_getenv("LABRADOR_QA_CAPTURE_DIR");
+        if (dir == nullptr)
+            dir = "/tmp";
+        char csv_path[512];
+        snprintf(csv_path, sizeof csv_path, "%s/loopback_ch%d_window.csv", dir, channel);
+        if (FILE* f = fopen(csv_path, "w"))
+        {
+            for (double v : *data)
+                fprintf(f, "%.6f\n", v);
+            fclose(f);
+        }
+    }
     IM_CHECK_GT(freq, 800.0);
     IM_CHECK_LT(freq, 1200.0);
 
@@ -1035,13 +1075,7 @@ static void HwLoopback(ImGuiTestContext* ctx, int channel)
 // delay must reach seconds-old history — the Qt app's pause behaviour.
 static void HwPauseInspect(ImGuiTestContext* ctx)
 {
-    for (int i = 0; i < 20; i++)
-    {
-        if (librador_is_connected() && librador_iso_thread_is_active())
-            break;
-        ctx->SleepNoSkip(0.25f, 0.25f);
-    }
-    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    if (!HwWaitConnected(ctx))
     {
         ctx->LogWarning("No Labrador board connected - skipping hardware test");
         return;
@@ -1052,7 +1086,7 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     IM_CHECK(toolbar.Window != nullptr);
     ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
     ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
-    ctx->SleepNoSkip(0.5f, 0.1f);
+    HwSettle(ctx, 0.5);
     if (librador_get_paused(1)) // a previous failed run may have left it paused
     {
         ctx->ItemClick("**/###runstop");
@@ -1066,7 +1100,7 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     for (int i = 0; i < 100; i++)
         wave[i] = (unsigned char)(127.5 + 127.5 * sin(2.0 * IM_PI * i / 100.0));
     IM_CHECK_GE(librador_update_signal_gen_settings(1, wave, 100, 10.0, 2.0, 0.0), 0);
-    ctx->SleepNoSkip(4.0f, 0.1f);
+    HwSettle(ctx, 4.0); // the -3 s scrollback below needs >3 REAL seconds of record
 
     // Pause through the toolbar; PlotWidget syncs the device-side pause
     ctx->ItemClick("**/###runstop");
@@ -1082,7 +1116,7 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     // changing: park the generator, wait, and re-read
     unsigned char idle[16] = { 0 };
     librador_update_signal_gen_settings(1, idle, 16, 10.0, 0.0, 0.0);
-    ctx->SleepNoSkip(1.5f, 0.1f);
+    HwSettle(ctx, 1.5);
     fetched = librador_get_analog_data(1, 0.05, 5000, 0.0, 0);
     IM_CHECK(fetched != nullptr);
     IM_CHECK(frozen == *fetched);
@@ -1104,7 +1138,7 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
     ctx->ItemClick("**/###runstop");
     ctx->Yield(3);
     IM_CHECK(!librador_get_paused(1));
-    ctx->SleepNoSkip(1.5f, 0.1f);
+    HwSettle(ctx, 1.5);
     fetched = librador_get_analog_data(1, 0.05, 5000, 0.0, 0);
     IM_CHECK(fetched != nullptr);
     lo = 1e9; hi = -1e9;
@@ -1126,13 +1160,7 @@ static void HwPauseInspect(ImGuiTestContext* ctx)
 // the app neither pops the warning nor burns a reset.
 static void HwMaxGainNoWedgePopup(ImGuiTestContext* ctx)
 {
-    for (int i = 0; i < 20; i++)
-    {
-        if (librador_is_connected() && librador_iso_thread_is_active())
-            break;
-        ctx->SleepNoSkip(0.25f, 0.25f);
-    }
-    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    if (!HwWaitConnected(ctx))
     {
         ctx->LogWarning("No Labrador board connected - skipping hardware test");
         return;
@@ -1144,7 +1172,7 @@ static void HwMaxGainNoWedgePopup(ImGuiTestContext* ctx)
     IM_CHECK(toolbar.Window != nullptr);
     ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
     ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
-    ctx->SleepNoSkip(0.5f, 0.1f);
+    HwSettle(ctx, 0.5);
 
     // SG1 driving DC onto the CH1 loopback wire.
     EnsureSidePanelVisible(ctx);
@@ -1179,7 +1207,7 @@ static void HwMaxGainNoWedgePopup(ImGuiTestContext* ctx)
     ctx->MenuClick("Scope/Hardware Gain/64x");
     // Detector timing: 2 s arm delay + 0.17 s enter threshold, plus margin
     // for the gain change and a would-be auto-reset to play out.
-    ctx->SleepNoSkip(6.0f, 0.5f);
+    HwSettle(ctx, 6.0);
 
     // How the rail quantises is bench-dependent (a hard rail can flicker one
     // LSB), so don't demand a perfectly flat CH1 — log what the detector's
@@ -1214,13 +1242,7 @@ static void HwMaxGainNoWedgePopup(ImGuiTestContext* ctx)
 // Regression test for reconnect going dark (reset() used to send turnOff).
 static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
 {
-    for (int i = 0; i < 20; i++)
-    {
-        if (librador_is_connected() && librador_iso_thread_is_active())
-            break;
-        ctx->SleepNoSkip(0.25f, 0.25f);
-    }
-    if (!librador_is_connected() || !librador_iso_thread_is_active())
+    if (!HwWaitConnected(ctx))
     {
         ctx->LogWarning("No Labrador board connected - skipping hardware test");
         return;
@@ -1232,7 +1254,7 @@ static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
     IM_CHECK(toolbar.Window != nullptr);
     ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
     ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
-    ctx->SleepNoSkip(0.5f, 0.1f);
+    HwSettle(ctx, 0.5);
 
     // Drive SG2 through the UI like a user: Signals page, power toggle ON.
     EnsureSidePanelVisible(ctx);
@@ -1258,7 +1280,7 @@ static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
         ctx->Yield(2);
     }
     IM_CHECK(toggle_on());
-    ctx->SleepNoSkip(1.5f, 0.1f); // default 1 kHz sine onto the loopback wire
+    HwSettle(ctx, 1.5); // default 1 kHz sine onto the loopback wire (real seconds)
 
     auto osc2_vpp = [&]() -> double {
         std::vector<double>* d = librador_get_analog_data(2, 0.05, 5000, 0.0, 0);
@@ -1281,14 +1303,8 @@ static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
     // onDeviceConnected must re-push the generator settings by itself — no
     // UI interaction below this line until the post-reconnect capture.
     librador_reset_usb();
-    for (int i = 0; i < 40; i++)
-    {
-        if (librador_is_connected() && librador_iso_thread_is_active())
-            break;
-        ctx->SleepNoSkip(0.25f, 0.25f);
-    }
-    IM_CHECK(librador_is_connected() && librador_iso_thread_is_active());
-    ctx->SleepNoSkip(1.5f, 0.1f); // fresh samples of the (resent) waveform
+    IM_CHECK(HwWaitConnected(ctx, 10.0));
+    HwSettle(ctx, 1.5); // fresh samples of the (resent) waveform (real seconds)
 
     const double vpp_after = osc2_vpp();
     ctx->LogInfo("SG2/OSC2 after reconnect: Vpp = %.2f V", vpp_after);
