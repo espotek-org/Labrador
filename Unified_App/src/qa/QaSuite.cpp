@@ -798,6 +798,50 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
         ctx->Yield(4);
     };
 
+    // Text-size x page x gain stress. Cycles every View > Text Size step
+    // across every side-panel page (the panel width and all widget sizes are
+    // computed from the font — this walks exactly those layout paths), then
+    // walks the Scope > Hardware Gain entries (each one is a device-side DMA
+    // rebuild when a board is attached; a plain menu walk without one).
+    t = IM_REGISTER_TEST(e, "fuzz", "scale_gain_stress");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        const char* sizes[] = { "Small", "Large", "Extra Large", "Normal" };
+        const char* pages[] = { "Scope", "Signals", "PSU", "Meter", "Logic",
+            "DAQ", "Analysis" };
+        for (const char* size : sizes)
+        {
+            char size_path[64];
+            snprintf(size_path, sizeof size_path, "View/Text Size/%s", size);
+            ctx->MenuClick(size_path);
+            ParkMouse(ctx);
+            ctx->Yield(8); // font rebuild + panel width recompute
+            for (const char* page : pages)
+            {
+                char page_path[64];
+                snprintf(page_path, sizeof page_path, "View/Side Panel Page/%s", page);
+                ctx->MenuClick(page_path);
+                ctx->Yield(4);
+                if (ctx->IsError())
+                    ctx->TestOutput->Status = ImGuiTestStatus_Running;
+            }
+        }
+        ctx->MenuClick("View/Side Panel Page/Scope");
+        ctx->Yield(2);
+        // Gain walk: every manual step, then back to Auto.
+        const char* gains[] = { "0.5x", "1x", "2x", "4x", "8x", "16x", "32x",
+            "64x", "Auto" };
+        for (const char* gain : gains)
+        {
+            char gain_path[64];
+            snprintf(gain_path, sizeof gain_path, "Scope/Hardware Gain/%s", gain);
+            ctx->MenuClick(gain_path);
+            ctx->Yield(4);
+            if (ctx->IsError())
+                ctx->TestOutput->Status = ImGuiTestStatus_Running;
+        }
+    };
+
     // Text-entry fuzz. Activating ANY text field routes through the SDL3 IME
     // path (ImGui_ImplSDL3_UpdateIme), which crashed on desktop when the OS
     // gave the window keyboard focus (null io.UserData deref). Also feeds
