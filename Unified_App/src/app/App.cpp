@@ -449,7 +449,38 @@ void App::Update()
     const bool uninit_check_armed
         = connected && (ImGui::GetTime() - m_connected_since) > 2.0;
 
-    bool uninit_now = uninit_check_armed && CheckIfInUninitialisedMode();
+    // Stream-property wedge check: a device wedged in incomplete startup
+    // stops (or never starts) delivering frames — something the flat-capture
+    // scan cannot see, because an idle buffer replays its stale contents
+    // forever. Any frame counter advancing counts as alive (not every
+    // transport validates checksums, so frames_ok alone would false-stall).
+    const double now_s = ImGui::GetTime();
+    if (!connected)
+    {
+        m_stream_check_t = -1.0;
+        m_stream_stall_s = 0.0;
+    }
+    else if (now_s - m_stream_check_t >= 1.0)
+    {
+        uint64_t ok = 0, bad = 0, dropped = 0, unvalidated = 0;
+        librador_get_frame_stats(&ok, &bad, &dropped, &unvalidated);
+        const uint64_t total = ok + bad + dropped + unvalidated;
+        if (m_stream_check_t >= 0.0 && total == m_stream_total_last)
+            m_stream_stall_s += now_s - m_stream_check_t;
+        else
+            m_stream_stall_s = 0.0;
+        m_stream_total_last = total;
+        m_stream_check_t = now_s;
+    }
+    const bool stream_stalled = m_stream_stall_s >= 2.0;
+
+    // A paused record is frozen — it can't be judged, and the user is
+    // inspecting it; never trigger a wedge response (USB reset!) from it.
+    const bool inspecting_paused
+        = connected && (librador_get_paused(1) || librador_get_paused(2));
+
+    bool uninit_now = uninit_check_armed && !inspecting_paused
+        && (stream_stalled || CheckIfInUninitialisedMode());
     const double dt = ImGui::GetIO().DeltaTime;
     if (uninit_now)
     {
@@ -463,11 +494,37 @@ void App::Update()
     }
     if (!uninitialised_mode && uninit_enter_s >= UNINIT_ENTER_THRESHOLD_S)
     {
-        // NOTE: an automatic USB-port-reset auto-heal was tried here and
-        // crashed (resetting with live iso transfers is fragile on macOS);
-        // manual replug it is until librador can stop the stream first.
-        uninitialised_mode = true;
-        ImGui::OpenPopup("Warning!##UninitialisedModePopup");
+        if (m_uninit_auto_resets < 2)
+        {
+            // Auto-heal before bothering the user: the reset the Esc shortcut
+            // uses clears a wedged device too. (An earlier attempt at this
+            // "crashed" — that was PSUControl's std::exit on the reset's -421,
+            // fixed in 6478c9e; esc_spam now proves mid-stream resets safe.)
+            m_uninit_auto_resets++;
+            fprintf(stderr,
+                "uninitialised-state suspicion (%s): automatic USB reset %d/2\n",
+                stream_stalled ? "stream stalled" : "flat capture",
+                m_uninit_auto_resets);
+            librador_reset_usb();
+            uninit_enter_s = 0.0; // re-judge after the reconnect settles
+        }
+        else
+        {
+            uninitialised_mode = true;
+            ImGui::OpenPopup("Warning!##UninitialisedModePopup");
+        }
+    }
+    // Wedge-free long enough: forgive the spent auto-resets so a wedge next
+    // week (same plug session) heals silently again.
+    if (connected && !uninit_now && uninit_check_armed)
+    {
+        m_uninit_healthy_s += dt;
+        if (m_uninit_healthy_s >= 300.0)
+            m_uninit_auto_resets = 0;
+    }
+    else
+    {
+        m_uninit_healthy_s = 0.0;
     }
     if (uninitialised_mode && uninit_exit_s >= UNINIT_EXIT_THRESHOLD_S)
     {
@@ -475,8 +532,10 @@ void App::Update()
     }
     if (ImGui::BeginPopupModal("Warning!##UninitialisedModePopup", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("The device powered up before the OS initialized USB and is stuck in an "
-                    "incomplete startup state.\nPlease disconnect and reconnect the device.\n");
+        ImGui::Text("The device is not producing data — it may have powered up before the\n"
+                    "OS initialized USB and be stuck in an incomplete startup state.\n"
+                    "Automatic USB resets did not recover it.\n"
+                    "Please disconnect and reconnect the device.\n");
         if (ImGui::Button("OK") || !uninitialised_mode)
         {
             ImGui::CloseCurrentPopup();

@@ -657,31 +657,47 @@ bool CheckIfInSafetyMode()
 	}
 	return true;
 }
-bool CheckIfInUninitialisedMode()
+// One channel's capture is perfectly constant (every sample bit-identical).
+// *known is false when the channel has no data to judge (e.g. CH2 in a
+// single-channel mode).
+static bool ChannelPerfectlyFlat(int channel, bool* known)
 {
-	int channel = 1;
-	double time_window = 0.5;
-	double sample_rate_hz = 30;
-	double delay = 0;
-	int filter_mode = 0;
+	const double time_window = 0.5;
+	const double sample_rate_hz = 30;
 
-	std::vector<double>* data =
-		librador_get_analog_data_by_rate(channel, time_window, sample_rate_hz, delay, filter_mode);
-
+	std::vector<double>* data = librador_get_analog_data_by_rate(
+		channel, time_window, sample_rate_hz, 0, 0);
 	if (data == nullptr || data->empty())
+	{
+		*known = false;
 		return false;
+	}
+	*known = true;
 
-	// Take the first sample as reference
 	double first = (*data)[0];
-
 	for (double v : *data)
 	{
 		if (v != first)
-			return false;   // not constant
+			return false; // not constant
 	}
+	return true;
+}
 
-	return true; // all values are identical
+bool CheckIfInUninitialisedMode()
+{
+	// A device wedged in an incomplete startup state flattens EVERYTHING it
+	// captures, so require BOTH scope channels to be perfectly constant. A
+	// single flat channel is an input condition, not a wedge — a quiet DC
+	// source, or the hardware gain set high enough to rail that channel's
+	// ADC (both false-triggered this warning when only CH1 was checked).
+	bool ch1_known = false;
+	if (!ChannelPerfectlyFlat(1, &ch1_known) || !ch1_known)
+		return false;
 
+	bool ch2_known = false;
+	const bool ch2_flat = ChannelPerfectlyFlat(2, &ch2_known);
+	// In single-channel modes CH2 can't vote; CH1 alone decides, as before.
+	return ch2_known ? ch2_flat : true;
 }
 // Export Stuff
 std::string BuildDelimited2Col(const std::vector<double>& x,

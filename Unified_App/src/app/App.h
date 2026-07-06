@@ -6,6 +6,7 @@
 #include "ui/Frontend.h"
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <thread>
 
@@ -111,6 +112,18 @@ class App : public AppBase
     double uninit_exit_s = 0.0;
     const double UNINIT_ENTER_THRESHOLD_S = 0.17; // sustained time to enter
     const double UNINIT_EXIT_THRESHOLD_S = 1.0;   // sustained time to exit
+    // Wedge auto-heal: spend up to two automatic USB resets before showing
+    // the disconnect-and-reconnect popup. The budget is only forgiven after
+    // a sustained healthy period — NOT on disconnect, because our own reset
+    // causes one (that would re-arm an infinite reset loop).
+    int m_uninit_auto_resets = 0;
+    double m_uninit_healthy_s = 0.0;
+    // Stream-property wedge check: a wedged device stops (or never starts)
+    // delivering frames, which no sample-based check can see — an idle
+    // buffer just replays its stale contents.
+    uint64_t m_stream_total_last = 0;
+    double m_stream_check_t = -1.0;
+    double m_stream_stall_s = 0.0;
 
     // Desktop device polling (Android connects via USB attach intents)
     double m_last_poll_time = 0.0;
