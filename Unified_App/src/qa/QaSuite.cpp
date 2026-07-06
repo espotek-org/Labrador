@@ -711,7 +711,7 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     // every safe item in every window, then switch on.
     t = IM_REGISTER_TEST(e, "fuzz", "layout_walk");
     t->TestFunc = [](ImGuiTestContext* ctx) {
-        const char* layouts[] = { "Mobile", "Compact (800x480)", "Desktop" };
+        const char* layouts[] = { "Mobile", "Compact (800x480)", "Tablet", "Desktop" };
         for (const char* layout : layouts)
         {
             // Switch via the View menu if this layout still has one.
@@ -727,6 +727,9 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
             ctx->LogInfo("fuzz: === walking layout %s ===", layout);
             if (strcmp(layout, "Desktop") == 0)
                 break; // back home; the desktop walk already ran elsewhere
+            // (Tablet shares the desktop arrangement but renders under the
+            // touch style — walk it like the others to catch style-driven
+            // layout breakage.)
             ImGuiWindow* main = ctx->GetWindowByRef("//Main Window");
             if (main == nullptr)
                 continue;
@@ -755,7 +758,7 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     t = IM_REGISTER_TEST(e, "fuzz", "layout_switch");
     t->TestFunc = [](ImGuiTestContext* ctx) {
         SetMainRef(ctx);
-        const char* layouts[] = { "Compact (800x480)", "Mobile", "Desktop" };
+        const char* layouts[] = { "Compact (800x480)", "Tablet", "Mobile", "Desktop" };
         for (const char* layout : layouts)
         {
             ctx->LogInfo("fuzz: layout -> %s", layout);

@@ -570,6 +570,7 @@ void DesktopFrontend::renderDesktopMenuBar(App& app)
             };
             layoutItem("Auto", App::LayoutMode::Auto);
             layoutItem("Desktop", App::LayoutMode::Desktop);
+            layoutItem("Tablet", App::LayoutMode::Tablet);
             layoutItem("Mobile", App::LayoutMode::Mobile);
             layoutItem("Compact (800x480)", App::LayoutMode::Compact);
             ImGui::EndMenu();

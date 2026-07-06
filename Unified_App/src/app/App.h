@@ -29,8 +29,9 @@ class App : public AppBase
   public:
     // Layouts: desktop = the Monash arrangement (DesktopFrontend), mobile =
     // Brent's tile design (AndroidFrontend), compact = 800x480 Raspberry Pi
-    // LCDs (LowResFrontend).
-    enum class LayoutMode { Auto, Desktop, Mobile, Compact };
+    // LCDs (LowResFrontend), tablet = the desktop layout under a touch-sized
+    // style for 1024x768 / 1280x720-class Android tablets (TabletFrontend).
+    enum class LayoutMode { Auto, Desktop, Mobile, Compact, Tablet };
 
     // ---- Interface used by the Frontends -----------------------------------
     // Connection / hardware status.
@@ -88,6 +89,7 @@ class App : public AppBase
     std::unique_ptr<Frontend> m_desktop_frontend;
     std::unique_ptr<Frontend> m_lowres_frontend;
     std::unique_ptr<Frontend> m_android_frontend;
+    std::unique_ptr<Frontend> m_tablet_frontend;
     Frontend* m_active_frontend = nullptr;
 
     // Persistent settings (settings.ini in getPrefPath()). Live UI state is

@@ -8,6 +8,7 @@
 #include "ui/desktop/DesktopFrontend.h"
 #include "ui/lowres/LowResFrontend.h"
 #include "ui/android/AndroidFrontend.h"
+#include "ui/tablet/TabletFrontend.h"
 
 #include <algorithm>
 #include <chrono>
@@ -63,6 +64,7 @@ void App::StartUp()
         if (l == "desktop") m_layout_mode = LayoutMode::Desktop;
         else if (l == "mobile") m_layout_mode = LayoutMode::Mobile;
         else if (l == "compact") m_layout_mode = LayoutMode::Compact;
+        else if (l == "tablet") m_layout_mode = LayoutMode::Tablet;
         else
             l.clear();
         m_layout_env_override = !l.empty();
@@ -77,6 +79,7 @@ void App::loadSettings()
     if (layout == "desktop") m_layout_mode = LayoutMode::Desktop;
     else if (layout == "mobile") m_layout_mode = LayoutMode::Mobile;
     else if (layout == "compact") m_layout_mode = LayoutMode::Compact;
+    else if (layout == "tablet") m_layout_mode = LayoutMode::Tablet;
     else m_layout_mode = LayoutMode::Auto;
 
     const char* theme_default = "classic-dark";
@@ -121,6 +124,7 @@ void App::pushSettings()
         case LayoutMode::Desktop: layout = "desktop"; break;
         case LayoutMode::Mobile: layout = "mobile"; break;
         case LayoutMode::Compact: layout = "compact"; break;
+        case LayoutMode::Tablet: layout = "tablet"; break;
         default: break;
         }
         m_settings.set("layout", layout);
@@ -136,6 +140,16 @@ App::LayoutMode App::resolvedLayout() const
     if (m_layout_mode != LayoutMode::Auto)
         return m_layout_mode;
 #ifdef __ANDROID__
+    // Tablets get the desktop-derived touch layout, phones the tile UI.
+    // Android's classic tablet threshold: smaller dimension >= 600 dp.
+    // The 1024x768 / 1280x720 class (density ~1.0-1.25) clears it; a 1080p
+    // phone at density 2.5+ does not.
+    {
+        const ImVec2 disp = ImGui::GetIO().DisplaySize;
+        const float density = mainScale() > 0.0f ? mainScale() : 1.0f;
+        if (std::min(disp.x, disp.y) / density >= 600.0f)
+            return LayoutMode::Tablet;
+    }
     return LayoutMode::Mobile;
 #else
     // 800x480-class LCDs (Raspberry Pi) get the compact layout
@@ -158,6 +172,7 @@ void App::ensureFrontend()
     {
     case LayoutMode::Mobile: slot = &m_android_frontend; break;
     case LayoutMode::Compact: slot = &m_lowres_frontend; break;
+    case LayoutMode::Tablet: slot = &m_tablet_frontend; break;
     default:
         want = LayoutMode::Desktop;
         slot = &m_desktop_frontend;
@@ -170,6 +185,7 @@ void App::ensureFrontend()
         {
         case LayoutMode::Mobile: *slot = std::make_unique<AndroidFrontend>(); break;
         case LayoutMode::Compact: *slot = std::make_unique<LowResFrontend>(); break;
+        case LayoutMode::Tablet: *slot = std::make_unique<TabletFrontend>(); break;
         default: *slot = std::make_unique<DesktopFrontend>(); break;
         }
         (*slot)->startUp(*this);

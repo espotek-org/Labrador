@@ -25,9 +25,9 @@ green, and re-capture the screenshot that showed the problem. Rules:
 - Fix root causes, not symptoms (a truncated label means a hardcoded width —
   make it CalcTextSize-driven rather than shortening the text; a modal during
   a fast run may be frame-rate-dependent logic — make it time-based).
-- After all fixes: run the FULL `--qa` suite + smoke test all three layouts
-  (`LABRADOR_LAYOUT=desktop|compact|mobile ./labrador --smoke`) to catch
-  regressions, and spot-check 2–3 screenshots from the visual matrix.
+- After all fixes: run the FULL `--qa` suite + smoke test all four layouts
+  (`LABRADOR_LAYOUT=desktop|compact|mobile|tablet ./labrador --smoke`) to
+  catch regressions, and spot-check 2–3 screenshots from the visual matrix.
 - Keep app fixes and test-suite fixes in separate commits when committing.
 
 ## 0. Build the QA build
@@ -144,14 +144,16 @@ Drive the state matrix through `settings.ini`
 **back it up and restore it around every run**; the app rewrites it on exit):
 - `theme=` classic-dark | classic-light | phosphor-retro | phosphor-modern |
   amber-retro | amber-modern | vector-retro | vector-modern
+- `LABRADOR_WINDOW_SIZE=WxH` pins the window (env, not settings) — use the
+  layouts' design resolutions: compact 800x480, tablet 1024x768 / 1280x720
 - `desk_panel_page=` 0..6 (Scope, Signals, PSU, Meter, Logic, DAQ, Analysis)
 - `font_scale=` 0.85 | 1.0 | 1.2 | 1.45
 - `desk_panel_visible=`, `desk_scanlines=` (panel width is computed from the
   text size — not a settings knob)
 
 Minimum sweep: every theme on page 0; every page in one retro + one classic
-theme; font_scale 1.45 on pages 0 and 1; LABRADOR_LAYOUT=compact and =mobile
-once each. Read each PNG and look for:
+theme; font_scale 1.45 on pages 0 and 1; LABRADOR_LAYOUT=compact (at
+LABRADOR_WINDOW_SIZE=800x480), =mobile, and =tablet (at 1024x768) once each. Read each PNG and look for:
 - truncated/cut-off text (labels ending in fragments, clipped combo previews)
 - overlapping widgets, text on same-colour backgrounds, unreadable contrast
 - layout overflow (widgets escaping their segment frames), misaligned rows
