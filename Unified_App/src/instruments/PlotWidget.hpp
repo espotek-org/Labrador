@@ -704,6 +704,15 @@ public:
 		}
 
 
+		// Auto Fit is a one-shot: now that this frame's plot (whichever view)
+		// has consumed the request, clear it. It was previously reset only as a
+		// side effect of the Scope side-panel's Auto Fit buttons, so whenever
+		// that panel wasn't being drawn (hidden, or on another page/layout) the
+		// flag stayed set, the view re-fit every frame and could never be
+		// panned or zoomed — "auto fit can't be turned off".
+		osc_control->AutofitX = false;
+		osc_control->AutofitY = false;
+
 		// --- Spectrum Analyser ---
 		// Always-run acquisition (independent of visibility/tab)
 		if (analysis_tools_widget->SA.Acquire) {
