@@ -10,6 +10,7 @@
 #include "ui/android/AndroidFrontend.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -454,7 +455,12 @@ void App::Update()
     // scan cannot see, because an idle buffer replays its stale contents
     // forever. Any frame counter advancing counts as alive (not every
     // transport validates checksums, so frames_ok alone would false-stall).
-    const double now_s = ImGui::GetTime();
+    // Wall clock, NOT ImGui::GetTime(): frame arrival is wall-time, and the
+    // QA runner accelerates simulated time ~16x — measured against that, a
+    // healthy stream would look stalled.
+    const double now_s = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch())
+                             .count();
     if (!connected)
     {
         m_stream_check_t = -1.0;
