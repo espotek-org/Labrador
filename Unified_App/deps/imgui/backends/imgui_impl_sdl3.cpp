@@ -208,9 +208,18 @@ static void ImGui_ImplSDL3_UpdateIme()
         SDL_SetTextInputArea(window, &r, 0);
         bd->ImeWindow = window;
     }
-    SDL_PropertiesID props;
     if (!SDL_TextInputActive(window) && (data->WantVisible || data->WantTextInput))
-        SDL_StartTextInputWithProperties(window,*((SDL_PropertiesID*) io.UserData));
+    {
+        // io.UserData carries an SDL_PropertiesID* with the Android numeric-
+        // keyboard hint, but it is only set under __ANDROID__ (see AppBase).
+        // On desktop it is null, so start text input without properties —
+        // dereferencing it here crashed on the first text field to gain focus
+        // (SIGSEGV in ImGui_ImplSDL3_UpdateIme).
+        if (io.UserData != nullptr)
+            SDL_StartTextInputWithProperties(window, *((SDL_PropertiesID*) io.UserData));
+        else
+            SDL_StartTextInput(window);
+    }
 }
 
 // Not static to allow third-party code to use that if they want to (but undocumented)
