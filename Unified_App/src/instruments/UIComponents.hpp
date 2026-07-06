@@ -728,13 +728,34 @@ inline void DrawExportRow2Col(const char* whichLabel,    // "OSC1", "Spectrum", 
 	const char* xHeader,       // e.g. "Time" or "Frequency"
 	const char* yHeader,       // e.g. "Voltage" or "Magnitude"
 	const char* fileExtension, // e.g. "csv"
-	float comboWidth = ScaledPx(100.0f),
-	float buttonWidth = ScaledPx(100.0f))
+	float comboWidth = 0.0f,   // 0 = size to fit the widest entry
+	float buttonWidth = 0.0f)  // 0 = size to fit the label
 {
 	const char* destList[] = { "clipboard", "csv" };
 
 	// ----- Button label & status flash -----
 	std::string btnLabel = std::string("Export ") + whichLabel;
+
+	// Fixed 100 px design widths clipped their own content ("Export OSC1
+	// Spectrum" -> "Export OSC1 Spectrun", "clipboard" -> "clipboar") — at
+	// every text size in the retro pixel font, and at large text everywhere.
+	// Size from the content instead.
+	const ImGuiStyle& row_style = ImGui::GetStyle();
+	if (buttonWidth <= 0.0f)
+	{
+		// The label swaps to "Copied!"/"Saved!" while flashing; the initial
+		// label is the widest. Hide the ## id suffix from measurement.
+		buttonWidth = ImGui::CalcTextSize(btnLabel.c_str(), nullptr, true).x
+		    + 2.0f * row_style.FramePadding.x + ScaledPx(8.0f);
+	}
+	if (comboWidth <= 0.0f)
+	{
+		float widest = 0.0f;
+		for (const char* dest : destList)
+			widest = std::max(widest, ImGui::CalcTextSize(dest).x);
+		// entry + frame padding + the arrow button square
+		comboWidth = widest + 2.0f * row_style.FramePadding.x + ImGui::GetFrameHeight();
+	}
 	int frame = ImGui::GetFrameCount();
 
 	if (state.copiedFlag) {
@@ -748,7 +769,7 @@ inline void DrawExportRow2Col(const char* whichLabel,    // "OSC1", "Spectrum", 
 
 	// ----- Export button -----
 	if (WhiteOutlineButton((btnLabel + "##" + whichLabel + "ExportButton").c_str(),
-		ImVec2(buttonWidth, 30)))
+		ImVec2(buttonWidth, ScaledPx(30.0f))))
 	{
 		if (state.destComboIdx == 0) {
 			// Clipboard

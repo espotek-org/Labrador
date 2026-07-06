@@ -461,7 +461,7 @@ void DesktopFrontend::renderDesktopMenuBar(App& app)
         }
         if (OSCWidget.EyeDiagram)
         {
-            ImGui::SetNextItemWidth(110.0f);
+            ImGui::SetNextItemWidth(ScaledPx(110.0f));
             if (ImGui::InputInt("Eye traces", &OSCWidget.EyeTraces, 1, 8))
                 OSCWidget.EyeTraces = std::clamp(OSCWidget.EyeTraces,
                     OSCControl::EyeTracesMin, OSCControl::EyeTracesMax);
@@ -691,7 +691,13 @@ void DesktopFrontend::renderToolbar(App& app, float height)
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Inputs");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(230.0f);
+    // Fit the widest mode label at the current font — a fixed 230 px clipped
+    // "CH1 + CH2 oscilloscope" in the wide retro pixel font at large text.
+    float mode_w = 0.0f;
+    for (int i = 0; i < InputsControl::ModeCount; i++)
+        mode_w = std::max(mode_w, ImGui::CalcTextSize(InputsControl::modeLabel(i)).x);
+    ImGui::SetNextItemWidth(
+        mode_w + 2.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetFrameHeight());
     if (ImGui::BeginCombo(
             "##toolbar_mode", InputsControl::modeLabel(InputsWidget.selectedIndex())))
     {

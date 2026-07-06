@@ -25,7 +25,6 @@ public:
     ExportRowState OSC1ExportState;
     ExportRowState OSC2ExportState;
     ExportRowState MathExportState;
-    float ExportPathComboWidth = 100.f;
     const char* ExportFileExtension = "csv"; // or use your existing FileExtension
 
     // ===== General / Trigger =====
@@ -407,8 +406,7 @@ public:
             OSC1ExportState,
             t1, v1,
             "Time", "Voltage",
-            ExportFileExtension,
-            ExportPathComboWidth);
+            ExportFileExtension);
 
         // Get OSC2 data
         std::vector<double> t2 = OSC2Data->GetTime();
@@ -418,8 +416,7 @@ public:
             OSC2ExportState,
             t2, v2,
             "Time", "Voltage",
-            ExportFileExtension,
-            ExportPathComboWidth);
+            ExportFileExtension);
 
         // Get MATH data
         std::vector<double> tMath = MathData->GetTime();
@@ -429,8 +426,7 @@ public:
             MathExportState,
             tMath, vMath,
             "Time", "Voltage",
-            ExportFileExtension,
-            ExportPathComboWidth);
+            ExportFileExtension);
     }
 
     /// Math-channel toggle + highlighted expression input

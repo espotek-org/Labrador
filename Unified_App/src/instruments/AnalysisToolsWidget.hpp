@@ -78,9 +78,6 @@ public:
 	ExportRowState SpecOSC2ExportState;
 	ExportRowState NAMagExportState;
 	ExportRowState NAPhaseExportState;
-	float ExportPathComboWidth = 100.f;
-	float SAExportButtonWidth = 180.0f;
-	float NAExportButtonWidth = 180.0f;
 	const char* ExportFileExtension = "csv"; // or use your existing FileExtension
 
 	AnalysisToolsWidget(std::string label, ImVec2 size, const float* borderColor)
@@ -174,9 +171,7 @@ public:
 					SpecOSC1ExportState,
 					f1, m1,
 					"Frequency (Hz)", magLabel.c_str(),
-					ExportFileExtension,
-					ExportPathComboWidth,
-					SAExportButtonWidth);
+					ExportFileExtension);
 
 				// Get OSC2 data
 				std::vector<double> f2 = spectrum_plots->osc2.x;
@@ -186,9 +181,7 @@ public:
 					SpecOSC2ExportState,
 					f2, m2,
 					"Frequency (Hz)", magLabel.c_str(),
-					ExportFileExtension,
-					ExportPathComboWidth,
-					SAExportButtonWidth);
+					ExportFileExtension);
 				// Advanced Options
 				ImGui::SetNextItemOpen(false, ImGuiCond_Once);
 				if (ImGui::CollapsingHeader("Advanced Options##SpectrumOptions", ImGuiTreeNodeFlags_SpanAvailWidth)) {
@@ -310,9 +303,7 @@ public:
 					NAMagExportState,
 					f, m,
 					"Frequency (Hz)", magLabel.c_str(),
-					ExportFileExtension,
-					ExportPathComboWidth,
-					NAExportButtonWidth);
+					ExportFileExtension);
 
 				// Get phase data
 				std::vector<double> p = network_plots->phase;
@@ -321,9 +312,7 @@ public:
 					NAPhaseExportState,
 					f, p,
 					"Frequency (Hz)", "Phase (rads)",
-					ExportFileExtension,
-					ExportPathComboWidth,
-					NAExportButtonWidth);
+					ExportFileExtension);
 
 				ImGui::SetNextItemOpen(false, ImGuiCond_Once);
 				if (ImGui::CollapsingHeader("Advanced Options##NetworkOptions", ImGuiTreeNodeFlags_SpanAvailWidth)) {
