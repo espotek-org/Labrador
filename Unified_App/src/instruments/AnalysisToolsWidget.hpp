@@ -123,12 +123,12 @@ public:
 						else SA.Acquire = false;
 						break;
 					case 1: // lookback
-						SA.Acquire = WhiteOutlineButton("Acquire", ImVec2(100, 30));
+						SA.Acquire = WhiteOutlineButton("Acquire", ImVec2(ScaledPx(100), ScaledPx(30)));
 						if (SA.Acquire) SA.TimeWindow = SA.LookbackTimeWindow;
 						break;
 					}
 					ImGui::TableNextColumn();
-					SA.Autofit = WhiteOutlineButton("Auto Fit##SpectrumAnalyser", ImVec2(100, 30));
+					SA.Autofit = WhiteOutlineButton("Auto Fit##SpectrumAnalyser", ImVec2(ScaledPx(100), ScaledPx(30)));
 					ImGui::TableNextColumn();
 					if (SA.AcquisitionExists) {
 						ImGui::TextDisabled("OSC1 Last captured: %.2f s", SA.OSC1_last_captured);
@@ -249,13 +249,13 @@ public:
 					ImGui::TableNextColumn();
 					// acquire button with overlay/progress
 					static NetworkAcquireState st;
-					if (DrawNetworkAcquireButton(st, na_, cfg_, ImVec2(200, 30))) {
+					if (DrawNetworkAcquireButton(st, na_, cfg_, ImVec2(ScaledPx(200), ScaledPx(30)))) {
 #ifndef NDEBUG
 						printf("Network Analyser acquisition started\n");
 #endif
 					}
 					ImGui::TableNextColumn();
-					NA.Autofit = WhiteOutlineButton("Auto Fit##NetworkAnalyser", ImVec2(100, 30));
+					NA.Autofit = WhiteOutlineButton("Auto Fit##NetworkAnalyser", ImVec2(ScaledPx(100), ScaledPx(30)));
 					ImGui::EndTable();
 				}
 				

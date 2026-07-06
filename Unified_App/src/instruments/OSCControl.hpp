@@ -206,13 +206,13 @@ public:
     {
         if (ImGui::BeginTable("Buttons", 3))
         {
-            float button_width = 100.f;
+            const ImVec2 button_size(ScaledPx(100.0f), ScaledPx(30.0f));
             ImGui::TableNextColumn();
-            ToggleButton("Run/Stop", ImVec2(button_width, 30), &Paused, Red, Green);
+            ToggleButton("Run/Stop", button_size, &Paused, Red, Green);
             ImGui::TableNextColumn();
-            AutofitY = WhiteOutlineButton(u8"Auto Fit  \u2195##Vertical", ImVec2(button_width, 30));
+            AutofitY = WhiteOutlineButton(u8"Auto Fit  \u2195##Vertical", button_size);
             ImGui::TableNextColumn();
-            AutofitX = WhiteOutlineButton(u8"Auto Fit  \u2194##Horizontal", ImVec2(button_width, 30));
+            AutofitX = WhiteOutlineButton(u8"Auto Fit  \u2194##Horizontal", button_size);
             ImGui::EndTable();
         }
     }

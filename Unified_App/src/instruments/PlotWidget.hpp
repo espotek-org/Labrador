@@ -1518,7 +1518,7 @@ public:
 		std::string label = std::to_string(id) + ":";
 		// Label is in (ms, V)
 		snprintf(cursor_label, sizeof(cursor_label), (label + "(%.2f, %.2f)").c_str(), *cx, *cy);
-		ImPlot::PlotText(cursor_label, *cx, *cy, ImVec2(50, -12));
+		ImPlot::PlotText(cursor_label, *cx, *cy, ImVec2(ScaledPx(50.0f), ScaledPx(-12.0f)));
 		if (id == 2)
 		{
 			// Cursor 2 draws a dashed crosshair so the two cursors are

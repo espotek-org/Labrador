@@ -211,11 +211,11 @@ public:
 			ImGui::TextDisabled("(wave settings above are suspended)");
 		}
 
-		ImGui::SetNextItemWidth(100.0f);
+		ImGui::SetNextItemWidth(ScaledPx(100.0f));
 		ImGui::Combo(("Baud##" + label).c_str(), &uart_baud_idx, uart_baud_labels,
 		    IM_ARRAYSIZE(uart_baud_labels));
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(100.0f);
+		ImGui::SetNextItemWidth(ScaledPx(100.0f));
 		if (ImGui::DragFloat(("TX level##" + label).c_str(), &uart_level_v, 0.05f, 0.5f,
 		        9.0f, "%.2f V", ImGuiSliderFlags_AlwaysClamp)
 		    && uart_enabled)

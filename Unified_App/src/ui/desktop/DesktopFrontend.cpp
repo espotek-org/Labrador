@@ -190,8 +190,8 @@ void DesktopFrontend::loadSettings(Settings& s)
     const double page = s.getDouble("desk_panel_page", (double)PanelScope);
     if (page >= 0 && page < PanelCount)
         m_panel = (int)page;
-    m_sidebar_width
-        = std::clamp((float)s.getDouble("desk_panel_width", 440.0), 300.0f, 800.0f);
+    // desk_panel_width is no longer read or written: the panel is not
+    // user-resizeable — its width is computed from the text size each frame.
     m_scanlines = s.getBool("desk_scanlines", true);
 }
 
@@ -200,7 +200,6 @@ void DesktopFrontend::saveSettings(Settings& s)
     InstrumentFrontend::saveSettings(s);
     s.set("desk_panel_visible", m_sidebar_visible);
     s.set("desk_panel_page", (double)m_panel);
-    s.set("desk_panel_width", (double)m_sidebar_width);
     s.set("desk_scanlines", m_scanlines);
 }
 
@@ -249,10 +248,13 @@ void DesktopFrontend::renderLayout(App& app)
     const float rail_w = ImGui::GetFontSize() * 5.0f;
     const float splitter_w = 6.0f;
 
-    // Keep both the plot and the panel usable at any window size.
+    // The side panel is not user-resizeable: its width is fixed but dynamic —
+    // the 440 px design width (authored at the default text size, like all
+    // panel content) scales with the font, so everything keeps fitting when
+    // the text grows. Still capped so the plot stays usable at any window size.
     const float avail_w = ImGui::GetContentRegionAvail().x;
     float max_panel = avail_w - rail_w - splitter_w - 320.0f;
-    m_sidebar_width = std::clamp(m_sidebar_width, 300.0f, std::max(300.0f, max_panel));
+    m_sidebar_width = std::clamp(ScaledPx(440.0f), 300.0f, std::max(300.0f, max_panel));
 
     const float plot_w = avail_w - rail_w
         - (m_sidebar_visible ? m_sidebar_width + splitter_w : 0.0f);
@@ -281,22 +283,15 @@ void DesktopFrontend::renderLayout(App& app)
 
     if (m_sidebar_visible)
     {
+        // Plain visual divider — the panel is not user-resizeable.
         ImGui::SameLine(0.0f, 0.0f);
-        ImGui::InvisibleButton("##panel_splitter", ImVec2(splitter_w, middle_h));
-        if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        if (ImGui::IsItemActive())
-            m_sidebar_width -= ImGui::GetIO().MouseDelta.x;
+        ImGui::Dummy(ImVec2(splitter_w, middle_h));
         {
             const ImVec2 mn = ImGui::GetItemRectMin();
             const ImVec2 mx = ImGui::GetItemRectMax();
             const float x = (mn.x + mx.x) * 0.5f;
-            const ImU32 col = ImGui::GetColorU32(
-                ImGui::IsItemActive() ? ImGuiCol_SeparatorActive
-                                      : ImGui::IsItemHovered() ? ImGuiCol_SeparatorHovered
-                                                               : ImGuiCol_Separator);
-            ImGui::GetWindowDrawList()->AddLine(
-                ImVec2(x, mn.y), ImVec2(x, mx.y), col, 1.0f);
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(x, mn.y), ImVec2(x, mx.y),
+                ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
         }
 
         ImGui::SameLine(0.0f, 0.0f);
@@ -820,11 +815,11 @@ void DesktopFrontend::renderSidePanel(App& app, float height)
         ImDrawFlags_RoundCornersLeft);
 
     ImGui::SetCursorScreenPos(
-        ImVec2(tl.x + 12.0f, tl.y + (title_h - ImGui::GetTextLineHeight()) * 0.5f));
+        ImVec2(tl.x + ScaledPx(12.0f), tl.y + (title_h - ImGui::GetTextLineHeight()) * 0.5f));
     ImGui::TextUnformatted(titles[m_panel]);
 
     ImGui::SameLine();
-    ImGui::SetCursorScreenPos(ImVec2(tl.x + w - 28.0f,
+    ImGui::SetCursorScreenPos(ImVec2(tl.x + w - ScaledPx(28.0f),
         tl.y + (title_h - ImGui::GetFrameHeight()) * 0.5f + 2.0f));
     if (ImGui::SmallButton("?##panel_help"))
         help_for[m_panel]->show_help = true;

@@ -204,7 +204,7 @@ public:
 		// font scales, so don't discard 10% of the column to a margin.
 		const float width = ImGui::GetContentRegionAvail().x;
 		const float labWidth = propertyLabelWidth();
-		const float unitWidth = 50.0f;
+		const float unitWidth = ScaledPx(50.0f);
 		const float inpWidth = std::max(width - labWidth - unitWidth, 40.0f);
 
 		if (ImGui::BeginTable((label + "_prop_table").c_str(), 2))
@@ -560,7 +560,7 @@ public:
 		// font scales, so don't discard 10% of the column to a margin.
 		const float width = ImGui::GetContentRegionAvail().x;
 		const float labWidth = propertyLabelWidth();
-		const float unitWidth = 50.0f;
+		const float unitWidth = ScaledPx(50.0f);
 		const float inpWidth = std::max(width - labWidth - unitWidth, 40.0f);
 
 		if (ImGui::BeginTable((label + "_prop_table").c_str(), 2))

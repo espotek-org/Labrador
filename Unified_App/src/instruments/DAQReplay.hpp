@@ -104,7 +104,7 @@ public:
 		if (use_time_axis)
 		{
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(120.0f);
+			ImGui::SetNextItemWidth(ScaledPx(120.0f));
 			ImGui::InputFloat("kSa/s##daqreplay_rate", &sample_rate_kSa, 0.0f, 0.0f,
 			    "%.4g");
 			if (sample_rate_kSa <= 0.0f)
@@ -114,10 +114,10 @@ public:
 
 		// --- Start/end trim (Qt daqLoad_startChanged/endChanged). Trim is kept
 		// in SAMPLE space so it is invariant to the index<->time axis toggle. ---
-		ImGui::SetNextItemWidth(140.0f);
+		ImGui::SetNextItemWidth(ScaledPx(140.0f));
 		ImGui::DragInt("Start##daqreplay", &trim_start, 1.0f, 0, total - 1, "%d");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(140.0f);
+		ImGui::SetNextItemWidth(ScaledPx(140.0f));
 		ImGui::DragInt("End##daqreplay", &trim_end, 1.0f, 0, total, "%d");
 		clampTrim(total);
 

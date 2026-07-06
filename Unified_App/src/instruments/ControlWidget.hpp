@@ -4,6 +4,7 @@
 #include <sstream>
 #include "util.h"
 #include "OscData.hpp"
+#include "UIComponents.hpp" // ScaledPx
 
 
 /// <summary>
@@ -213,7 +214,7 @@ public:
 		else if (md_text.compare(0, 4, "  - ") == 0)
 		{
 			md_text.erase(0, 4);
-			ImGui::Dummy(ImVec2(10, 0));
+			ImGui::Dummy(ImVec2(ScaledPx(10.0f), 0));
 			ImGui::SameLine();
 			ImGui::BulletText("");
 			ImGui::SameLine();
@@ -222,7 +223,7 @@ public:
 		else if (md_text.compare(0, 6, "    - ") == 0)
 		{
 			md_text.erase(0, 6);
-			ImGui::Dummy(ImVec2(20, 0));
+			ImGui::Dummy(ImVec2(ScaledPx(20.0f), 0));
 			ImGui::SameLine();
 			ImGui::BulletText("");
 			ImGui::SameLine();

@@ -78,6 +78,8 @@ class DesktopFrontend : public InstrumentFrontend
 
     int m_panel = PanelScope;
     bool m_sidebar_visible = true;
+    // Computed every frame from the text size (not user-resizeable, not
+    // persisted): 440 px design width at the default text size.
     float m_sidebar_width = 440.0f;
     bool m_show_calibration = false;
     bool m_show_about = false;

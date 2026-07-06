@@ -81,7 +81,7 @@ public:
 		// Duration of buffered history to write out (chronological order)
 		ImGui::Text("Duration");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(120.0f);
+		ImGui::SetNextItemWidth(ScaledPx(120.0f));
 		ImGui::InputFloat("##daq_duration", &duration, 0.0f, 0.0f, "%.3f s");
 		duration = ImMin(duration, 10.0f); // device buffer holds ~10 s
 		duration = ImMax(duration, 0.0f);
@@ -90,7 +90,7 @@ public:
 		// Keep every Nth sample
 		ImGui::Text("Downsample");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(120.0f);
+		ImGui::SetNextItemWidth(ScaledPx(120.0f));
 		ImGui::InputScalar("##daq_downsample", ImGuiDataType_U8,
 		    &downsample_factor, &u8_one, NULL, "%u");
 		downsample_factor = ImMax(downsample_factor, u8_one);
@@ -184,7 +184,7 @@ private:
 		ImGui::BeginDisabled(!chActive(ch));
 		ImGui::Checkbox((std::string(name) + "##daq_rec").c_str(), record);
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(90.0f);
+		ImGui::SetNextItemWidth(ScaledPx(90.0f));
 		int sel = units_sel[ch - 1];
 		if (ImGui::BeginCombo((std::string("##daq_units_") + name).c_str(),
 		        usbCallHandler::daq_unit_labels[sel]))

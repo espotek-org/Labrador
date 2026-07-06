@@ -12,6 +12,19 @@
 #include "platform/file_dialog.h"
 
 /// <summary>
+/// A width/height authored in pixels at the default text size, scaled to
+/// track the current font. GetFontSize() already folds in the DPI scale and
+/// the View > Text Size factor (FontScaleMain), so sizes expressed through
+/// this grow with the text instead of clipping it — a bare pixel constant
+/// cuts its content off the moment the text is made larger.
+/// </summary>
+float inline ScaledPx(float px_at_default_text)
+{
+	return px_at_default_text * ImGui::GetFontSize()
+	    / ImGui::GetStyle().FontSizeBase;
+}
+
+/// <summary>
 /// Report a custom widget's on/off state so tooling (the UI test engine)
 /// sees it like a checkbox. Must re-fire the item-info hook: widgets capture
 /// their status flags internally, before the caller can mutate LastItemData.
@@ -94,8 +107,10 @@ bool inline ToggleButton(const char* id, ImVec2 size, bool* state, ImU32 trueCol
 
 	ImU32 ButtonColour = *state ? trueColour : falseColour;
 
-	float height = 30;
-	float width = 100;
+	// The caller-provided size was silently ignored (hardcoded 100x30), so
+	// these buttons could never scale with the text.
+	float height = size.y;
+	float width = size.x;
 
 	float rounding = 0.0f;
 	bool switched = false;
@@ -654,7 +669,7 @@ inline bool RangeSliderDoubleLog(const char* label,
 
 static bool DrawNetworkAcquireButton(
 	NetworkAcquireState& st, NetworkAnalyser* na, NetworkAnalyser::Config* cfg,
-	ImVec2 size = ImVec2(200, 30))
+	ImVec2 size = ImVec2(ScaledPx(200.0f), ScaledPx(30.0f)))
 {
 	const double now = ImGui::GetTime();
 	bool clicked = false;
@@ -713,8 +728,8 @@ inline void DrawExportRow2Col(const char* whichLabel,    // "OSC1", "Spectrum", 
 	const char* xHeader,       // e.g. "Time" or "Frequency"
 	const char* yHeader,       // e.g. "Voltage" or "Magnitude"
 	const char* fileExtension, // e.g. "csv"
-	float comboWidth = 100.f,
-	float buttonWidth = 100.f)
+	float comboWidth = ScaledPx(100.0f),
+	float buttonWidth = ScaledPx(100.0f))
 {
 	const char* destList[] = { "clipboard", "csv" };
 

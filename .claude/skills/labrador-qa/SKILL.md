@@ -144,7 +144,8 @@ Drive the state matrix through `settings.ini`
   amber-retro | amber-modern | vector-retro | vector-modern
 - `desk_panel_page=` 0..6 (Scope, Signals, PSU, Meter, Logic, DAQ, Analysis)
 - `font_scale=` 0.85 | 1.0 | 1.2 | 1.45
-- `desk_panel_width=`, `desk_panel_visible=`, `desk_scanlines=`
+- `desk_panel_visible=`, `desk_scanlines=` (panel width is computed from the
+  text size — not a settings knob)
 
 Minimum sweep: every theme on page 0; every page in one retro + one classic
 theme; font_scale 1.45 on pages 0 and 1; LABRADOR_LAYOUT=compact and =mobile

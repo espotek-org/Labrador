@@ -70,7 +70,7 @@ public:
 		// Measurement type (Qt multimeterModeSelect)
 		ImGui::Text("Measure");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(140.0f);
+		ImGui::SetNextItemWidth(ScaledPx(140.0f));
 		if (ImGui::BeginCombo("##mm_mode", mode_labels[(int)meter_mode]))
 		{
 			for (int i = 0; i < (int)IM_ARRAYSIZE(mode_labels); i++)
@@ -90,7 +90,7 @@ public:
 		ImGui::SameLine();
 		ImGui::Text("Range");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(80.0f);
+		ImGui::SetNextItemWidth(ScaledPx(80.0f));
 		int* range = &range_sel[(int)meter_mode];
 		if (ImGui::BeginCombo(
 		        "##mm_range", range_labels[(int)meter_mode][*range]))
@@ -114,7 +114,7 @@ public:
 		{
 			ImGui::Text("Series R");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(120.0f);
+			ImGui::SetNextItemWidth(ScaledPx(120.0f));
 			ImGui::InputDouble(
 			    "##mm_series_r", &series_resistance, 0.0, 0.0, u8"%.0f Ω");
 			series_resistance = ImClamp(series_resistance, 0.0, 1000000.0);
@@ -126,7 +126,7 @@ public:
 		{
 			ImGui::Text("Source");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(140.0f);
+			ImGui::SetNextItemWidth(ScaledPx(140.0f));
 			if (ImGui::BeginCombo("##mm_rsource", rsource_labels[rsource_idx]))
 			{
 				for (int i = 0; i < (int)IM_ARRAYSIZE(rsource_labels); i++)
