@@ -321,6 +321,11 @@ void AppBase::Run()
         if (m_smoke_frames > 0 && m_done)
             if (const char* dump = SDL_getenv("LABRADOR_FRAME_DUMP"))
                 dumpFramebufferPpm(dump, display_w, display_h);
+#ifdef LABRADOR_QA
+        // Prediction-QA: a running test asked for this frame to be captured.
+        if (const char* cap = QaConsumeFrameDump())
+            dumpFramebufferPpm(cap, display_w, display_h);
+#endif
         SDL_GL_SwapWindow(m_window);
 
 #ifdef LABRADOR_QA

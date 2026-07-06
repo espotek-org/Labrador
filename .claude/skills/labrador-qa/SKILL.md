@@ -71,6 +71,35 @@ is a crash even if the exit code looks tame — check
 `lldb -o run -- ./labrador --qa=<test>`. Fuzz runs rewrite `settings.ini`
 (calibration included) — restore your backup afterwards.
 
+### Prediction QA (state → predict → interact → verify → report)
+
+A model-in-the-loop visual QA pass that catches *behavioural* and *interaction*
+regressions a static screenshot sweep misses. Each scenario in the `predict`
+group (`RegisterPredictScenarios` in `QaSuite.cpp`) reaches a state, captures a
+frame, performs ONE interaction, and captures another. The enabling primitive
+is `QaRequestFrameDump(path)` (declared in `QaSuite.h`): a running test asks
+the render loop to dump the next frame's framebuffer, so before/after live in
+one session.
+
+```sh
+LABRADOR_QA_CAPTURE_DIR=/tmp/labqa_predict ./build/macos-qa/labrador --qa=predict
+uv run tools/qa_predict_report.py \
+    --captures /tmp/labqa_predict --findings tools/qa_predict_findings.json \
+    --out /tmp/qa_report.html      # self-contained, images embedded
+```
+
+The loop: run the scenarios → for each, look at the `before` frame, **predict**
+what the interaction does, look at the `after` frame, record prediction/actual/
+verdict in a findings JSON (schema in `tools/qa_predict_findings.json`) →
+`qa_predict_report.py` bakes frames + findings into a browsable HTML where a
+human ticks Bug / Not a bug / Unsure per scenario and exports a reconciled JSON
+→ fix from the export. Publish the HTML with the Artifact tool for review. Add
+scenarios by registering more `predict` tests (drive with the test engine,
+`QaCapture(ctx, "<id>", "before"/"after")` around the interaction). `predict`
+is opt-in (not run by bare `--qa`), like `fuzz`. The `autofit_zoom_persists`
+scenario doubles as the behavioural regression guard for the Auto Fit one-shot
+fix (a stuck auto-fit makes the `after` frame identical to `before`).
+
 Exit code 0 = all queued tests passed. The registered tests live in
 `src/qa/QaSuite.cpp`. When writing new tests:
 - The engine's `**/` wildcard matches by *label*; ID-only widgets (`##foo`)

@@ -32,4 +32,11 @@ int QaReportAndExitCode();
 // Stop the engine (end of Run, while the ImGui context is still alive).
 void QaShutdown();
 
+// Prediction-QA capture: a running test asks the render loop to dump the next
+// rendered frame's framebuffer to `path` (binary PPM). Lets a scenario grab a
+// screenshot before and after an interaction within one session.
+void QaRequestFrameDump(const char* path);
+// Render loop consumes a pending request: returns the path (once) or nullptr.
+const char* QaConsumeFrameDump();
+
 #endif // LABRADOR_QA

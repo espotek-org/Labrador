@@ -1,0 +1,37 @@
+{
+  "title": "Labrador Unified_App — Prediction QA",
+  "subtitle": "State → predict → interact → verify. Each scenario captures a frame before and after one interaction; the model predicts the result from the before frame and checks it against the after frame.",
+  "run_label": "demo run (3 scenarios)",
+  "scenarios": [
+    {
+      "id": "autofit_zoom_persists",
+      "title": "Auto Fit, then zoom — the zoom must persist",
+      "state": "Scope page, side panel hidden (the Auto-Fit-stuck trigger condition). A fitted view: Y −20..20 V, X −6..6 ms.",
+      "interaction": "Click Auto Fit, then wheel-zoom in 8 notches over the plot at 30% / 40%.",
+      "prediction": "The manual zoom persists: the after frame shows a narrower, off-centre axis range, not the symmetric fit. (If Auto Fit were still stuck, the view would re-fit every frame and the after frame would match the before frame exactly.)",
+      "actual": "Y top moved 20 V → ~12 V (range ~12..−20 V) and a mouse-position readout appeared; the view did NOT snap back to the fit.",
+      "model_verdict": "not_bug",
+      "note": "Behaviourally confirms the Auto Fit one-shot fix (commit 3ba0e78)."
+    },
+    {
+      "id": "theme_switch",
+      "title": "Theme switch — Classic Dark → Amber Retro",
+      "state": "Scope page, Classic Dark theme (neutral grey chrome).",
+      "interaction": "View → Theme → Amber Retro.",
+      "prediction": "The whole UI recolours to amber-on-black with the CRT bezel and segment frames of the retro theme; layout unchanged.",
+      "actual": "UI is amber-on-black with the CRT bezel present. (A board also connected mid-run — live traces + ‘Connected — firmware 12.3’ — incidental to the theme change.)",
+      "model_verdict": "not_bug",
+      "note": "Theme applied cleanly; no layout shift or unstyled chrome."
+    },
+    {
+      "id": "page_nav_signals",
+      "title": "Side-panel navigation — Scope → Signals",
+      "state": "Scope page with the side panel visible.",
+      "interaction": "View → Side Panel Page → Signals.",
+      "prediction": "The side panel switches to the Signals page: Signal Generator 1 & 2 with Sine Wave Properties and Digital Outputs.",
+      "actual": "Signals panel shown with SG1/SG2 sine controls and Digital Outputs; ‘Vpeak-peak’ label renders in full (label-width fix holding).",
+      "model_verdict": "not_bug",
+      "note": "Navigation correct; no truncation at this font scale."
+    }
+  ]
+}

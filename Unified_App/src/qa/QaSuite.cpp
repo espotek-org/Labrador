@@ -20,6 +20,21 @@
 static ImGuiTestEngine* g_engine = nullptr;
 static bool g_headless = false;
 
+// Prediction-QA: a test sets the pending capture path; the render loop dumps
+// the next frame to it and clears it (single-shot). Same thread hand-off model
+// as the rest of the engine's coroutine/main-loop interplay.
+static std::string g_capture_path;
+void QaRequestFrameDump(const char* path) { g_capture_path = path ? path : ""; }
+const char* QaConsumeFrameDump()
+{
+    if (g_capture_path.empty())
+        return nullptr;
+    static std::string taken;
+    taken.swap(g_capture_path);
+    g_capture_path.clear();
+    return taken.c_str();
+}
+
 // ---- The test suite ---------------------------------------------------------
 // Conventions: tests drive the DESKTOP layout (main() forces it for --qa) and
 // interact through the UI like a user would — click by label path, verify
@@ -845,6 +860,86 @@ static void RegisterFuzzTests(ImGuiTestEngine* e)
     };
 }
 
+// ---- Prediction QA scenarios -------------------------------------------------
+// A scenario reaches a state, captures a "before" frame, performs one named
+// interaction, and captures an "after" frame. A human/model then predicts what
+// the interaction should do from the before frame and checks the after frame
+// against that prediction (see tools/qa_predict_report.py). Capture dir comes
+// from LABRADOR_QA_CAPTURE_DIR (default /tmp/labqa_predict). Run with
+// --qa=predict; the group is opt-in like fuzz.
+
+static void QaCapture(ImGuiTestContext* ctx, const char* name, const char* which)
+{
+    const char* dir = SDL_getenv("LABRADOR_QA_CAPTURE_DIR");
+    if (dir == nullptr)
+        dir = "/tmp/labqa_predict";
+    char path[512];
+    snprintf(path, sizeof path, "%s/%s_%s.ppm", dir, name, which);
+    ctx->Yield(2); // let the UI settle before grabbing the frame
+    QaRequestFrameDump(path);
+    ctx->Yield(3); // the render loop dumps on one of these frames
+    ctx->LogInfo("predict: captured %s", path);
+}
+
+static void RegisterPredictScenarios(ImGuiTestEngine* e)
+{
+    ImGuiTest* t = nullptr;
+
+    // 1. Auto Fit then zoom: the manual zoom must persist. Before this fix the
+    //    view re-fit every frame with the panel hidden, so the zoom snapped
+    //    back — the "after" frame would look identical to "before".
+    t = IM_REGISTER_TEST(e, "predict", "autofit_zoom_persists");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+        if (ctx->ItemExists("**/Hide Panel##tb"))
+            ctx->ItemClick("**/Hide Panel##tb");
+        ctx->Yield(4);
+        ctx->ItemClick("**/Auto Fit##toolbar"); // start from a fitted view
+        ctx->Yield(4);
+        QaCapture(ctx, "autofit_zoom_persists", "before");
+        // interaction: zoom the plot in with the wheel, several notches
+        ImGuiWindow* w = ctx->GetWindowByRef("//Main Window");
+        if (w != nullptr)
+        {
+            const ImRect r = w->Rect();
+            ctx->MouseMoveToPos(ImVec2(r.Min.x + r.GetWidth() * 0.30f,
+                r.Min.y + r.GetHeight() * 0.40f));
+            for (int i = 0; i < 8; i++)
+                ctx->MouseWheelY(2.0f);
+        }
+        ctx->Yield(8); // a stuck auto-fit would undo the zoom within a frame
+        QaCapture(ctx, "autofit_zoom_persists", "after");
+    };
+
+    // 2. Theme switch: classic-dark -> amber-retro.
+    t = IM_REGISTER_TEST(e, "predict", "theme_switch");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        ctx->MenuClick("View/Theme/Classic Dark");
+        ParkMouse(ctx);
+        ctx->Yield(8);
+        QaCapture(ctx, "theme_switch", "before");
+        ctx->MenuClick("View/Theme/Amber Retro");
+        ParkMouse(ctx);
+        ctx->Yield(8);
+        QaCapture(ctx, "theme_switch", "after");
+    };
+
+    // 3. Side-panel page navigation: Scope -> Signals.
+    t = IM_REGISTER_TEST(e, "predict", "page_nav_signals");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        SetMainRef(ctx);
+        EnsureSidePanelVisible(ctx);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+        ctx->Yield(4);
+        QaCapture(ctx, "page_nav_signals", "before");
+        ctx->MenuClick("View/Side Panel Page/Signals");
+        ctx->Yield(4);
+        QaCapture(ctx, "page_nav_signals", "after");
+    };
+}
+
 // ---- Hardware loopback tests -------------------------------------------------
 // Harness: SG1 wired to OSC1, SG2 wired to OSC2, board plugged in. Each test
 // drives a 1 kHz sine on the signal generator and checks amplitude and
@@ -1124,6 +1219,7 @@ void QaSetup(const char* run_filter)
 
     RegisterGuiTests(g_engine);
     RegisterFuzzTests(g_engine);
+    RegisterPredictScenarios(g_engine);
     RegisterHwTests(g_engine);
 
     ImGuiTestEngine_Start(g_engine, ImGui::GetCurrentContext());
