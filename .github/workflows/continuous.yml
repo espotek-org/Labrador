@@ -1,11 +1,25 @@
+# Continuous release fan-in for the Unified_App (SDL3/ImGui). Builds every
+# platform via the reusable per-platform workflows, then publishes all assets to
+# the unified app's OWN rolling tag "unified-continuous".
+#
+# It deliberately NEVER touches the Qt app's "continuous"/"stable" tags, and the
+# release job is gated on the unified-app branch ref so it can't collide with
+# the Qt pipeline (which releases from master).
 name: Continuous Release
 
 permissions:
   contents: read
   pull-requests: write
-  
+
 on:
+  push:
+    branches:
+      - unified-app
   workflow_dispatch:
+
+concurrency:
+  group: unified-continuous-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-android:
@@ -29,58 +43,62 @@ jobs:
       - build-linux
       - build-mac
       - build-windows
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/unified-app'
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: unified-continuous
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: asset-*
           merge-multiple: true
+          path: dist
 
-      - name: Run uploadtool
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPLOADTOOL_BODY: |-
-            ## Android
+      - name: List assets
+        run: ls -la dist
 
-            Download `Labrador-<version>-release-signed.apk` for manual installation on Android 7.1 "Nougat" or later (API Level 25).
-
-            ## Linux (including Raspberry Pi)
-
-            The packages below have been compiled for 64-bit distros.  If you're running 32-bit, please see the [build instructions](https://github.com/espotek-org/Labrador/wiki/Building-from-source).
-
-            ### AppImage
-
-            Download the `aarch64` AppImage for 64-bit ARM computers (e.g. Raspberry Pi), or the `x86_64` AppImage for 64-bit Intel/AMD computers.
-
-            - First make the AppImage file executable by running `chmod +x Labrador-<version>-<arch>.AppImage`
-            - Now you can run it just like any other program or script: `./Labrador-<version>-<arch>.AppImage`
-
-            ### Debian package
-
-            Download the `arm64` Debian package for 64-bit ARM computers (e.g. Raspberry Pi), or the `amd64` Debian package for 64-bit Intel/AMD computers.
-
-            To install, run `sudo dpkg -i Labrador-<version>-<arch>.deb`.
-
-            ## macOS
-
-            Download `Labrador-<version>.dmg` for macOS 10.13 and later.
-            If you are running an older version of macOS, please use the macOS Legacy build below.
-
-            - Drag the Labrador app into `/Applications`
-            - Right-click and Open the Labrador app in your `/Applications` directory (you need to right-click and open, you can't just double-click)
-            - If you see a warning message, just press the `Open` button to continue
-            - That's it, you're done!  From now on you can open by simply double-clicking as you would any other app
-
-            ## Windows
-
-            Download `Labrador-<version>-installer.exe` for Windows 7 or later (32-bit and 64-bit supported).
+      - name: Publish rolling release
         run: |
-          UPLOADTOOL_BODY="$(echo "$UPLOADTOOL_BODY" | jq -Rsa '.')"
-          UPLOADTOOL_BODY="${UPLOADTOOL_BODY%\"}"
-          UPLOADTOOL_BODY="${UPLOADTOOL_BODY#\"}"
+          set -euxo pipefail
+          NOTES=$(cat <<'EOF'
+          Rolling build of the EspoTek Labrador unified app (SDL3/ImGui), built
+          from the `unified-app` branch. This is a pre-release; the assets are
+          replaced on every push.
 
-          wget -N https://github.com/probonopd/uploadtool/raw/master/upload.sh
-          chmod +x ./upload.sh
-          find . -type f -not -path ./upload.sh -exec ./upload.sh {} +
+          ## macOS
+
+          `Labrador-for-macOS.dmg` — signed + notarized universal build (Apple
+          Silicon and Intel). Drag Labrador into `/Applications`.
+
+          ## Windows
+
+          `Labrador-for-Windows.exe` — installer bundling the app, firmware, and
+          USB driver. Run it and accept the driver-install prompt at the end.
+
+          ## Linux (including Raspberry Pi)
+
+          - `Labrador_x86_64.AppImage` / `Labrador_arm64.AppImage` — `chmod +x`
+            the file, then run it. Installs the udev rules on first launch.
+          - `Labrador_x86_64.deb` / `Labrador_arm64.deb` — `sudo dpkg -i <file>`.
+
+          ## Android
+
+          `Labrador-for-Android.apk` — sideload on Android 7.1 "Nougat" or later
+          (API level 25).
+          EOF
+          )
+          # Recreate the release each run so stale assets never linger, mirroring
+          # the old uploadtool "continuous" behaviour, but on our own tag.
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Unified App (continuous)" \
+            --notes "$NOTES" \
+            --prerelease \
+            dist/*

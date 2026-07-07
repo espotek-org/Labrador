@@ -1,181 +1,176 @@
+# Build + package the Unified_App (SDL3/ImGui) macOS app: a signed + notarized
+# universal (arm64 + x86_64) .app inside a DMG. Reusable (called by
+# continuous.yml) and directly dispatchable. Uploads asset-dmg.
 name: Build macOS
 
 permissions:
   contents: read
   pull-requests: write
-  
-on: 
+
+on:
   workflow_dispatch:
   workflow_call:
 
-  push:
-    branches:
-      - master
-      - main
-
-  pull_request:
-    branches:
-      - master
-      - main
-
 env:
-  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  # NOTE: secrets are only provided in the original repo (empty in forks), which
+  # the conditional signing/notarization steps below rely on.
   MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
   MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
 
+defaults:
+  run:
+    working-directory: Unified_App
+
 jobs:
   build-dmg:
-    runs-on: macos-15-intel
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
-      - name: Setup Homebrew dependencies
-        run: |
-          brew update
-          brew remove --force $(brew list --formula) || true
-          brew install fftw libomp qt@5 libusb eigen create-dmg
-          brew link libomp qt@5 --force
+      - name: Dependencies
+        run: brew install ninja pkg-config create-dmg
 
-      - name: Build librador
-        working-directory: Librador_API/___librador/librador
+      # Homebrew libusb is single-arch; build a universal libusb from source so
+      # the app can be a real universal (arm64 + x86_64) binary.
+      - name: Build universal libusb
         run: |
-          qmake -config release
+          set -euxo pipefail
+          curl -sSL -o libusb.tar.bz2 \
+            https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
+          tar xjf libusb.tar.bz2
+          cd libusb-1.0.29
+          ./configure --prefix="$PWD/../libusb-univ" --enable-shared --disable-static \
+            CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=11.0" \
+            LDFLAGS="-arch arm64 -arch x86_64"
           make -j$(sysctl -n hw.ncpu)
+          make install
+          lipo -info ../libusb-univ/lib/libusb-1.0.0.dylib
 
-      - name: Build librademo
-        working-directory: Librador_API/___librador/librademo
+      - name: Configure
         run: |
-          qmake -config release
-          make -j$(sysctl -n hw.ncpu)
+          # pkg_check_modules() reads PKG_CONFIG_PATH from the environment, so
+          # point it at the universal libusb we just built.
+          export PKG_CONFIG_PATH="$PWD/libusb-univ/lib/pkgconfig"
+          cmake -S . -B build/macos -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
-      - name: Build basicdemo
-        working-directory: Librador_API/___librador/basicdemo
-        run: |
-          qmake -config release
-          make -j$(sysctl -n hw.ncpu)
+      - name: Build
+        run: cmake --build build/macos -j$(sysctl -n hw.ncpu)
 
-      - name: Build libdfuprog
-        working-directory: libdfuprog
+      - name: Assemble Labrador.app
         run: |
-          qmake -config release
-          make -j$(sysctl -n hw.ncpu)
+          set -euxo pipefail
+          APP=Labrador.app
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+
+          # Binary + resources (bundle the firmware hex the librador flashes).
+          cp build/macos/labrador "$APP/Contents/MacOS/labrador"
+          cp -R assets "$APP/Contents/Resources/assets"
+          rm -rf "$APP/Contents/Resources/assets/firmware"
+          cp -R firmware "$APP/Contents/Resources/assets/firmware"
+
+          # Icon (.icns) generated from the 256px app icon.
+          ICONSET=Labrador.iconset
+          rm -rf "$ICONSET"; mkdir "$ICONSET"
+          SRC=packaging/icon256.png
+          for s in 16 32 128 256; do
+            sips -z $s $s "$SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+          done
+          sips -z 32  32  "$SRC" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
+          sips -z 64  64  "$SRC" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
+          sips -z 256 256 "$SRC" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
+          sips -z 512 512 "$SRC" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
+          iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/iconfile.icns"
+
+          # Info.plist with the CI version stamped in.
+          VER="2.0.${{ github.run_number }}"
+          sed -e "s/__SHORT_VERSION__/2.0/" -e "s/__BUNDLE_VERSION__/${VER}/" \
+            packaging/macos/Info.plist > "$APP/Contents/Info.plist"
+
+          # Bundle libusb and repoint the binary at it (@executable_path/../Frameworks).
+          cp libusb-univ/lib/libusb-1.0.0.dylib "$APP/Contents/Frameworks/"
+          chmod u+w "$APP/Contents/Frameworks/libusb-1.0.0.dylib"
+          OLD=$(otool -L "$APP/Contents/MacOS/labrador" | awk '/libusb-1.0.0.dylib/ {print $1; exit}')
+          echo "Rewriting libusb path: $OLD"
+          install_name_tool -change "$OLD" "@executable_path/../Frameworks/libusb-1.0.0.dylib" \
+            "$APP/Contents/MacOS/labrador"
+          install_name_tool -id "@executable_path/../Frameworks/libusb-1.0.0.dylib" \
+            "$APP/Contents/Frameworks/libusb-1.0.0.dylib"
+          otool -L "$APP/Contents/MacOS/labrador" | grep -i usb
 
       - name: Import code signing certificate
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
-        working-directory: Desktop_Interface
         run: |
-          # Create keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
-          # Import certificate
           CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
           echo -n "$MACOS_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
           security import $CERTIFICATE_PATH -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
-          
-          # Allow codesign to access the keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-      - name: Build macOS app
-        working-directory: Desktop_Interface
-        run: |
-          if ( env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != '' ); then
-            qmake -config release
-          else
-            # for debugging
-            qmake -config debug  
-          fi
-          make -j$(sysctl -n hw.ncpu)
-          macdeployqt Labrador.app -verbose=2 -libpath=build_mac/libdfuprog/lib/
-
       - name: Code sign app bundle
-        working-directory: Desktop_Interface
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         run: |
-          # Find the signing identity
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
           echo "Using signing identity: $IDENTITY"
-          
-          # Sign all frameworks and dylibs first
-          find Labrador.app/Contents/Frameworks -name "*.dylib" -o -name "*.framework" | while read file; do
-            codesign --force --timestamp --options runtime --sign "$IDENTITY" "$file" || true
-          done
-          
-          # Sign the main app bundle
+          codesign --force --timestamp --options runtime --sign "$IDENTITY" \
+            Labrador.app/Contents/Frameworks/libusb-1.0.0.dylib
           codesign --force --deep --timestamp --options runtime --sign "$IDENTITY" Labrador.app
-          
-          # Verify the signature is valid (but don't check Gatekeeper yet - app isn't notarized)
           codesign -vv --deep --strict Labrador.app
           echo "App bundle signed successfully"
 
-      - name: Create and sign DMG
-        working-directory: Desktop_Interface
-        if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
+      - name: Create DMG
         run: |
-          # Get the git hash for the filename
-          GIT_HASH=$(git rev-parse --short HEAD)
-          
-          # Find the signing identity
-          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
-          
-          # Create a beautiful DMG with:
-          # - Applications folder symlink for drag-and-drop
-          # - Custom window size and icon positions
-          # - App icon extracted and used as DMG icon
+          set -euxo pipefail
+          ARGS=()
+          if [ -n "$MACOS_CERTIFICATE" ] && [ -n "$MACOS_CERTIFICATE_PWD" ]; then
+            IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+            ARGS+=(--codesign "$IDENTITY")
+          fi
           create-dmg \
             --volname "Labrador" \
             --volicon "Labrador.app/Contents/Resources/iconfile.icns" \
+            --background "assets/media/dmg-background.png" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "Labrador.app" 175 190 \
+            --icon "Labrador.app" 150 200 \
             --hide-extension "Labrador.app" \
-            --app-drop-link 425 190 \
-            --codesign "$IDENTITY" \
-            "Labrador-${GIT_HASH}.dmg" \
+            --app-drop-link 450 200 \
+            "${ARGS[@]}" \
+            "Labrador-for-macOS.dmg" \
             "Labrador.app"
 
       - name: Notarize DMG
-        working-directory: Desktop_Interface
+        if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
         run: |
-          GIT_HASH=$(git rev-parse --short HEAD)
-          DMG_PATH="Labrador-${GIT_HASH}.dmg"
-          
-          # Submit for notarization
+          DMG_PATH="Labrador-for-macOS.dmg"
           echo "Submitting DMG for notarization..."
           xcrun notarytool submit "$DMG_PATH" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_ID_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-          
-          # Staple the notarization ticket to the DMG
+            --apple-id "$APPLE_ID" --password "$APPLE_ID_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           echo "Stapling notarization ticket..."
           xcrun stapler staple "$DMG_PATH"
-          
-          # Verify notarization
-          echo "Verifying notarization..."
           xcrun stapler validate "$DMG_PATH"
           spctl -a -vvv -t install "$DMG_PATH"
 
       - name: Upload artifacts
-        if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''  
         uses: actions/upload-artifact@v4
         with:
           name: asset-dmg
-          path: Desktop_Interface/Labrador*.dmg
+          path: Unified_App/Labrador-for-macOS.dmg
           compression-level: 0
           if-no-files-found: error

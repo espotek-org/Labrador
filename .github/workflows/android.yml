@@ -1,28 +1,24 @@
+# Build + package the Unified_App (SDL3/ImGui) Android APK. The gradle project
+# lives in Unified_App/android and drives the same CMake tree as the desktop
+# builds; its release buildType only wires up a signing config when
+# keystore.properties exists, so CI produces an unsigned release APK that we
+# sign afterwards with apksigner (falling back to a debug APK if no cert secret
+# is present). Reusable (called by continuous.yml) and directly dispatchable.
+# Uploads asset-apk.
 name: Build Android
 
 permissions:
   contents: read
   pull-requests: write
-  
-on: 
+
+on:
   workflow_dispatch:
   workflow_call:
 
-  push:
-    branches:
-      - master
-      - main
-
-  pull_request:
-    branches:
-      - master
-      - main
-
 env:
-  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
+  # NOTE: secrets are only provided in the original repo (empty in forks).
   ANDROID_CERTIFICATE_BASE64: ${{ secrets.ANDROID_CERTIFICATE_BASE64 }}
   ANDROID_PRIVATE_KEY_BASE64: ${{ secrets.ANDROID_PRIVATE_KEY_BASE64 }}
-
 
 jobs:
   build-apk:
@@ -31,58 +27,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Install Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
-          distribution: 'jetbrains'
-          java-version: '25'
+          distribution: temurin
+          java-version: '17'
 
-      - name: Install SDK
-        run: ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install 'platforms;android-36' 'build-tools;36.1.0' 'ndk;28.2.13676358'
+      - uses: android-actions/setup-android@v3
 
-      # Secrets should be the base64 portion of the PEM format
-      # (i.e. the stuff between the BEGIN/END lines):
-      #
-      # -----BEGIN CERTIFICATE-----
-      # ... base64-encoded X.509 certificate ...
-      # -----END CERTIFICATE-----
-      #
-      # -----BEGIN PRIVATE KEY-----
-      # ... base64-encoded PKCS#8 private key ...
-      # -----END PRIVATE KEY-----
-      #
-      # These can be extracted from a PKCS#12 .keystore file using:
-      # openssl pkcs12 -in path/to/.keystore -info -noenc
-
+      # Secrets are the base64 PEM bodies (between the BEGIN/END lines):
+      #   -----BEGIN CERTIFICATE-----      (X.509 certificate)  -> cert.cer
+      #   -----BEGIN PRIVATE KEY-----       (PKCS#8 private key) -> cert.p8
+      # Extract from a .keystore with:
+      #   openssl pkcs12 -in path/to/.keystore -info -noenc
       - name: Install certificate and private key
-        if: env.ANDROID_PRIVATE_KEY_BASE64 != '' && env.ANDROID_CERTIFICATE_BASE64 != ''
-        working-directory: Desktop_Interface
+        if: env.ANDROID_CERTIFICATE_BASE64 != '' && env.ANDROID_PRIVATE_KEY_BASE64 != ''
+        working-directory: Unified_App/android
         run: |
           echo "$ANDROID_CERTIFICATE_BASE64" | base64 --decode > cert.cer
           echo "$ANDROID_PRIVATE_KEY_BASE64" | base64 --decode > cert.p8
 
-      # The .apk must be signed to be useful.  If the previous step
-      # was unsuccessful or skipped, build a debug package which will
-      # be signed with debug keys.
-
-      - name: Build Android package
-        working-directory: Android_App
+      - name: Build APK
+        working-directory: Unified_App/android
         run: |
-          APK_BASENAME="Labrador-$(git rev-parse --short HEAD)"
+          set -euxo pipefail
+          APK=Labrador-for-Android.apk
+          APKSIGNER=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
           if [ -e cert.cer ] && [ -e cert.p8 ]; then
-            ./gradlew assembleRelease
-            ${ANDROID_SDK_ROOT}/build-tools/36.1.0/apksigner sign --in app/build/outputs/apk/release/app-release-unsigned.apk --out ${APK_BASENAME}-release-signed.apk --key cert.p8 --cert cert.cer --verbose
+            ./gradlew assembleRelease --no-daemon
+            "$APKSIGNER" sign \
+              --in app/build/outputs/apk/release/app-release-unsigned.apk \
+              --out "$APK" --key cert.p8 --cert cert.cer --verbose
           else
-            ./gradlew assembleDebug
-            cp app/build/outputs/apk/debug/app-debug.apk ${APK_BASENAME}-debug.apk
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$APK"
           fi
 
       - name: Upload apk artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-apk
-          path: Android_App/Labrador*.apk
+          path: Unified_App/android/Labrador-for-Android.apk
           compression-level: 0
           if-no-files-found: error

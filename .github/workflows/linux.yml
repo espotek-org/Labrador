@@ -1,27 +1,22 @@
+# Build + package the Unified_App (SDL3/ImGui) Linux artifacts: AppImage and
+# .deb for x86_64 and arm64 (Raspberry Pi), each carrying the firmware hex, udev
+# rules, icon and .desktop entry. Also a Raspberry-Pi GLES2 compile check.
+# Reusable (called by continuous.yml) and directly dispatchable. Uploads
+# asset-appimage-<arch> and asset-deb-<arch>.
 name: Build Linux
 
 permissions:
   contents: read
   pull-requests: write
-  
-on: 
+
+on:
   workflow_dispatch:
   workflow_call:
 
-  push:
-    branches:
-      - master
-      - main
+defaults:
+  run:
+    working-directory: Unified_App
 
-  pull_request:
-    branches:
-      - master
-      - main
-      
-#env:
-  # NOTE: secrets are only provided in original repo, ideal for conditional logic in forks
-  # ToDo: when required, add secrets for privilidged tasks here
-  
 jobs:
   build-appimage:
     strategy:
@@ -30,55 +25,74 @@ jobs:
         include:
           - os: ubuntu-22.04
             arch: x86_64
+            ldarch: x86_64
           - os: ubuntu-22.04-arm
-            arch: aarch64
+            arch: arm64
+            ldarch: aarch64
     runs-on: ${{ matrix.os }}
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: 1
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common
-          sudo apt-get install -y build-essential libfftw3-dev qtbase5-dev libusb-1.0-0-dev libeigen3-dev wget
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config wget \
+            libusb-1.0-0-dev libgl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
+            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
 
-      - name: Build librador
-        working-directory: Librador_API/___librador/librador
+      - name: Build
         run: |
-          qmake -config release
-          make -j$(nproc)
+          cmake --preset linux
+          cmake --build --preset linux
 
-      - name: Build librademo
-        working-directory: Librador_API/___librador/librademo
+      - name: Assemble AppDir
         run: |
-          qmake -config release
-          make -j$(nproc)
-
-      - name: Build basicdemo
-        working-directory: Librador_API/___librador/basicdemo
-        run: |
-          qmake -config release
-          make -j$(nproc)
-
-      - name: Build libdfuprog
-        working-directory: libdfuprog
-        run: |
-          qmake -config release
-          make -j$(nproc)
+          set -euxo pipefail
+          APPDIR=AppDir
+          rm -rf "$APPDIR"
+          mkdir -p "$APPDIR/usr/bin/assets" \
+                   "$APPDIR/usr/lib/udev/rules.d" \
+                   "$APPDIR/usr/share/applications" \
+                   "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
+                   "$APPDIR/apprun-hooks"
+          cp build/linux/labrador "$APPDIR/usr/bin/labrador"
+          # SDL_GetBasePath() resolves /proc/self/exe -> usr/bin, so assets live there.
+          cp -r assets/. "$APPDIR/usr/bin/assets/"
+          mkdir -p "$APPDIR/usr/bin/assets/firmware"
+          cp firmware/*.hex "$APPDIR/usr/bin/assets/firmware/"
+          cp packaging/69-labrador.rules "$APPDIR/usr/lib/udev/rules.d/"
+          cp packaging/espotek-labrador.desktop "$APPDIR/usr/share/applications/"
+          cp packaging/icon256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png"
+          cp packaging/linux/apprun-hooks/udev-helper.sh "$APPDIR/apprun-hooks/"
+          chmod +x "$APPDIR/apprun-hooks/udev-helper.sh"
 
       - name: Build AppImage
-        working-directory: Desktop_Interface
         run: |
-          ./make_appimage
+          set -euxo pipefail
+          LD=linuxdeploy-${{ matrix.ldarch }}.AppImage
+          wget -N -nv "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/${LD}"
+          chmod +x "$LD"
+          export LINUXDEPLOY_OUTPUT_APP_NAME=Labrador
+          export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
+          "./$LD" --appdir=AppDir \
+            --executable=AppDir/usr/bin/labrador \
+            --desktop-file=AppDir/usr/share/applications/espotek-labrador.desktop \
+            --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png \
+            --output=appimage
+          mv Labrador*.AppImage "Labrador_${{ matrix.arch }}.AppImage"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-appimage-${{ matrix.arch }}
-          path: Desktop_Interface/Labrador*.AppImage
+          path: Unified_App/Labrador_${{ matrix.arch }}.AppImage
           compression-level: 0
           if-no-files-found: error
 
@@ -89,55 +103,113 @@ jobs:
         include:
           - os: ubuntu-22.04
             arch: amd64
+            name: x86_64
           - os: ubuntu-22.04-arm
             arch: arm64
+            name: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common
-          sudo apt-get install -y build-essential debhelper libfftw3-dev qtbase5-dev libusb-1.0-0-dev libeigen3-dev
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libusb-1.0-0-dev libgl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
+            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
 
-      - name: Build librador
-        working-directory: Librador_API/___librador/librador
+      - name: Build
         run: |
-          qmake -config release
-          make -j$(nproc)
+          cmake --preset linux
+          cmake --build --preset linux
 
-      - name: Build librademo
-        working-directory: Librador_API/___librador/librademo
+      - name: Build .deb
         run: |
-          qmake -config release
-          make -j$(nproc)
+          set -euxo pipefail
+          VER="2.0.${{ github.run_number }}"
+          PKG=pkgroot
+          rm -rf "$PKG"
+          mkdir -p "$PKG/DEBIAN" \
+                   "$PKG/usr/lib/labrador/assets" \
+                   "$PKG/usr/bin" \
+                   "$PKG/lib/udev/rules.d" \
+                   "$PKG/usr/share/applications" \
+                   "$PKG/usr/share/icons/hicolor/256x256/apps"
+          # Real binary + assets in a private dir; /usr/bin/labrador is a symlink.
+          # SDL_GetBasePath() resolves /proc/self/exe to the real dir, so assets
+          # are found next to the binary at /usr/lib/labrador/assets.
+          install -m 0755 build/linux/labrador "$PKG/usr/lib/labrador/labrador"
+          cp -r assets/. "$PKG/usr/lib/labrador/assets/"
+          mkdir -p "$PKG/usr/lib/labrador/assets/firmware"
+          cp firmware/*.hex "$PKG/usr/lib/labrador/assets/firmware/"
+          ln -s ../lib/labrador/labrador "$PKG/usr/bin/labrador"
+          cp packaging/69-labrador.rules "$PKG/lib/udev/rules.d/"
+          cp packaging/espotek-labrador.desktop "$PKG/usr/share/applications/"
+          cp packaging/icon256.png "$PKG/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png"
 
-      - name: Build basicdemo
-        working-directory: Librador_API/___librador/basicdemo
-        run: |
-          qmake -config release
-          make -j$(nproc)
+          INSTALLED_KB=$(du -sk "$PKG/usr" | cut -f1)
+          cat > "$PKG/DEBIAN/control" <<EOF
+          Package: espotek-labrador
+          Version: ${VER}
+          Section: electronics
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: Chris Esposito <admin@espotek.com>
+          Installed-Size: ${INSTALLED_KB}
+          Depends: libc6, libstdc++6, libusb-1.0-0, libgl1, libx11-6
+          Homepage: https://espotek.com
+          Description: driver and GUI for EspoTek Labrador
+           The EspoTek Labrador is an open-source board that turns your PC, Raspberry
+           Pi, or Android smartphone into a full-featured electronics lab bench,
+           complete with oscilloscope, signal generator, and more.
+           .
+           This package contains the SDL3/ImGui unified GUI plus the firmware images
+           it flashes to the board.
+          EOF
 
-      - name: Build libdfuprog
-        working-directory: libdfuprog
-        run: |
-          qmake -config release
-          make -j$(nproc)
+          cat > "$PKG/DEBIAN/postinst" <<'EOF'
+          #!/bin/sh
+          set -e
+          if command -v udevadm >/dev/null 2>&1; then
+              udevadm control --reload-rules || true
+              udevadm trigger --subsystem-match=usb || true
+          fi
+          EOF
+          chmod 0755 "$PKG/DEBIAN/postinst"
 
-      - name: Build Debian package
-        working-directory: Desktop_Interface
-        run: |
-          DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage -b
-          mv ../espotek-labrador*.deb ../Labrador-$(git rev-parse --short HEAD)-${{ matrix.arch }}.deb
+          dpkg-deb --root-owner-group --build "$PKG" "Labrador_${{ matrix.name }}.deb"
+          dpkg-deb --info "Labrador_${{ matrix.name }}.deb"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: asset-deb-${{ matrix.arch }}
-          path: Labrador*.deb
+          name: asset-deb-${{ matrix.name }}
+          path: Unified_App/Labrador_${{ matrix.name }}.deb
           compression-level: 0
           if-no-files-found: error
+
+  # Not released: validates the Raspberry Pi 3 (GLES 2.0) renderer keeps compiling.
+  build-pi-gles2-check:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libusb-1.0-0-dev libgles2-mesa-dev libgl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
+            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
+      - name: Build
+        run: |
+          cmake --preset pi
+          cmake --build --preset pi
