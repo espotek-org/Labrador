@@ -88,7 +88,17 @@ protected:
     libusb_transfer *isoCtx[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX] = { };
     tcBlock transferCompleted[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
     isoTransferUserData transferUserData[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX];
-    unsigned char dataBuffer[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
+    unsigned char dataBuffer[NUM_ISO_ENDPOINTS][NUM_FUTURE_CTX][USB_XFER_BYTES_PER_CTX];
+#ifdef PLATFORM_MAC
+    // Bulk-transport frame validation: a frame whose checksum fails was
+    // stomped by the ADC/DMA loop mid-flight; substitute the last good
+    // frame rather than pass torn samples to isoDriver.
+    unsigned char lastGoodFrame[ISO_PACKET_SIZE] = { };
+    bool lastGoodFrameValid = false;
+    quint64 bulkFramesOk = 0;
+    quint64 bulkFramesBad = 0;
+    quint64 bulkFramesResync = 0;
+#endif
     worker *isoHandler = nullptr;
     QThread *workerThread = nullptr;
     int cumulativeFramePhaseErrors = 0;
