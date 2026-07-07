@@ -552,16 +552,15 @@ int usbCallHandler::init_libusb(){
         {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = 3}}
     };
     int error = libusb_init_context(&ctx, libusb_options, 2);
-#elif defined(LIBUSB_API_VERSION) && LIBUSB_API_VERSION >= 0x0100010A
-    // libusb >= 1.0.27 (macOS from-source, Windows MSYS2, Ubuntu 24.04, ...)
-    struct libusb_init_option libusb_options[1] = {
-        {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = 3}}
-    };
-    int error = libusb_init_context(&ctx, libusb_options, 1);
 #else
-    // Older system libusb (e.g. 1.0.25 on Ubuntu 22.04 / Debian 11-12 / Pi OS)
-    // lacks libusb_init_context(); the classic init + set_option is equivalent
-    // for the desktop case (we only want to set the log level here).
+    // Desktop: use the classic libusb_init() unconditionally so the binary stays
+    // compatible with the older system libusb shipped by long-lived Linux
+    // distros (e.g. 1.0.24/1.0.25 on Debian 11-12, Ubuntu 20.04/22.04, Raspberry
+    // Pi OS). libusb_init_context() (libusb >= 1.0.27) would only let us pass the
+    // log level as an init option, which libusb_set_option() does identically on
+    // every libusb >= 1.0.22 — so there is nothing to gain and much to lose by
+    // requiring the newer symbol here. (Android still needs the context API for
+    // NO_DEVICE_DISCOVERY with fd-passing; that path is above.)
     int error = libusb_init(&ctx);
     if (!error)
         libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
