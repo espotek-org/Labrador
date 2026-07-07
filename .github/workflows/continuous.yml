@@ -66,6 +66,10 @@ jobs:
         run: |
           set -euxo pipefail
           NOTES=$(cat <<'EOF'
+          > **BETA** — this is a beta release of the new EspoTek Labrador unified
+          > app. It is still under active development; expect rough edges and
+          > please report issues.
+
           Rolling build of the EspoTek Labrador unified app (SDL3/ImGui), built
           from the `unified-app` branch. This is a pre-release; the assets are
           replaced on every push.
@@ -98,7 +102,7 @@ jobs:
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Unified App (continuous)" \
+            --title "Labrador Unified App (Beta)" \
             --notes "$NOTES" \
             --prerelease \
             dist/*
