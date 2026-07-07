@@ -75,18 +75,9 @@ jobs:
           rm -rf "$APP/Contents/Resources/assets/firmware"
           cp -R firmware "$APP/Contents/Resources/assets/firmware"
 
-          # Icon (.icns) generated from the 256px app icon.
-          ICONSET=Labrador.iconset
-          rm -rf "$ICONSET"; mkdir "$ICONSET"
-          SRC=packaging/icon256.png
-          for s in 16 32 128 256; do
-            sips -z $s $s "$SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-          done
-          sips -z 32  32  "$SRC" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
-          sips -z 64  64  "$SRC" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
-          sips -z 256 256 "$SRC" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
-          sips -z 512 512 "$SRC" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
-          iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/iconfile.icns"
+          # Icon: ship the same hand-crafted multi-resolution .icns as the old
+          # Qt app (Info.plist's CFBundleIconFile already points at "iconfile").
+          cp packaging/macos/iconfile.icns "$APP/Contents/Resources/iconfile.icns"
 
           # Info.plist with the CI version stamped in.
           VER="2.0.${{ github.run_number }}"
