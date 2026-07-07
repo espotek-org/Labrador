@@ -32,27 +32,31 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            val storeFilePath = keystoreProperties.getProperty("storeFile")
-                ?: error("Missing storeFile in keystore.properties")
-            val storePasswordValue = keystoreProperties.getProperty("storePassword")
-                ?: error("Missing storePassword in keystore.properties")
-            val keyAliasValue = keystoreProperties.getProperty("keyAlias")
-                ?: error("Missing keyAlias in keystore.properties")
-            val keyPasswordValue = keystoreProperties.getProperty("keyPassword")
-                ?: error("Missing keyPassword in keystore.properties")
+    // Without keystore.properties (e.g. on CI) the release APK is built
+    // unsigned and signed afterwards with apksigner (see android.yml).
+    if (keystorePropertiesFile.exists()) {
+        signingConfigs {
+            create("release") {
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                    ?: error("Missing storeFile in keystore.properties")
+                val storePasswordValue = keystoreProperties.getProperty("storePassword")
+                    ?: error("Missing storePassword in keystore.properties")
+                val keyAliasValue = keystoreProperties.getProperty("keyAlias")
+                    ?: error("Missing keyAlias in keystore.properties")
+                val keyPasswordValue = keystoreProperties.getProperty("keyPassword")
+                    ?: error("Missing keyPassword in keystore.properties")
 
-            storeFile = file(storeFilePath)
-            storePassword = storePasswordValue
-            keyAlias = keyAliasValue
-            keyPassword = keyPasswordValue
+                storeFile = file(storeFilePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
         }
     }
-    
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

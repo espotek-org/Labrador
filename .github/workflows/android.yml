@@ -58,7 +58,7 @@ jobs:
 
       - name: Install certificate and private key
         if: env.ANDROID_PRIVATE_KEY_BASE64 != '' && env.ANDROID_CERTIFICATE_BASE64 != ''
-        working-directory: Desktop_Interface
+        working-directory: Android_App
         run: |
           echo "$ANDROID_CERTIFICATE_BASE64" | base64 --decode > cert.cer
           echo "$ANDROID_PRIVATE_KEY_BASE64" | base64 --decode > cert.p8
