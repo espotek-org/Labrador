@@ -552,11 +552,19 @@ int usbCallHandler::init_libusb(){
         {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = 3}}
     };
     int error = libusb_init_context(&ctx, libusb_options, 2);
-#else
+#elif defined(LIBUSB_API_VERSION) && LIBUSB_API_VERSION >= 0x0100010A
+    // libusb >= 1.0.27 (macOS from-source, Windows MSYS2, Ubuntu 24.04, ...)
     struct libusb_init_option libusb_options[1] = {
         {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = 3}}
     };
     int error = libusb_init_context(&ctx, libusb_options, 1);
+#else
+    // Older system libusb (e.g. 1.0.25 on Ubuntu 22.04 / Debian 11-12 / Pi OS)
+    // lacks libusb_init_context(); the classic init + set_option is equivalent
+    // for the desktop case (we only want to set the log level here).
+    int error = libusb_init(&ctx);
+    if (!error)
+        libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
 #endif
     if(error){
         LIBRADOR_LOG(LOG_WARNING, "libusb_init FAILED\n");
