@@ -115,6 +115,9 @@ int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler
 
 double librador_get_samples_per_second()
 {
+    // 0 = "not streaming yet"; callers already branch on it, and it is also
+    // what the disconnected-but-initialised path returns.
+    if(!internal_librador_object) return 0;
     return internal_librador_object->usb_driver->get_samples_per_second();
 }
 
@@ -460,30 +463,36 @@ static void std_logger(void * userdata, const int level, const char * format, va
 
 void librador_set_trigger_settings(int channel, o1buffer::trigger_settings new_trigger_settings)
 {
+    if(!internal_librador_object) return;
     return internal_librador_object->usb_driver->setTriggerSettings(channel, new_trigger_settings);
 }
 
 void librador_set_virtual_transform_settings(int channel, o1buffer::virtual_transform_settings new_virtual_transform_settings)
 {
+    if(!internal_librador_object) return;
     return internal_librador_object->usb_driver->setVirtualTransformSettings(channel, new_virtual_transform_settings);
 }
  
 char * librador_get_uart_string(int channel, bool* parity_check)
 {
+    if(!internal_librador_object) return nullptr;
     return internal_librador_object->usb_driver->getUart_String(channel, parity_check);
 }
 
 void librador_set_uart_decode_settings(int ch, UartSettings new_settings) {
+    if(!internal_librador_object) return;
     internal_librador_object->usb_driver->setUartDecodeSettings(ch, new_settings);
 }
 
 char * librador_get_i2c_string()
 {
+    if(!internal_librador_object) return nullptr;
     return internal_librador_object->usb_driver->getI2c_String();
 }
 
 void librador_set_i2c_is_decoding(bool new_decode_on)
 {
+    if(!internal_librador_object) return;
     internal_librador_object->usb_driver->setI2cIsDecoding(new_decode_on);
 }
 
@@ -517,6 +526,7 @@ const librador_host_hooks& librador_get_host_hooks()
 
 void librador_initiate_firmware_flash()
 {
+    if(!internal_librador_object) return;
     internal_librador_object->usb_driver->initiateFirmwareFlash();
 }
 
@@ -576,11 +586,13 @@ int librador_hard_reset()
 
 bool librador_iso_thread_is_active()
 {
+    if(!internal_librador_object) return false;
     return internal_librador_object->usb_driver->isoThreadIsActive();
 }
 
 bool librador_poll_daq_status()
 {
+    if(!internal_librador_object) return false;
     return internal_librador_object->usb_driver->poll_daq_status();
 }
 
