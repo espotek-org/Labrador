@@ -1470,6 +1470,273 @@ static void HwReconnectResendsSg2(ImGuiTestContext* ctx)
     ctx->Yield(2);
 }
 
+// ---- Documentation screenshots (docshots) ------------------------------------
+// Not regression tests: each stages a real, board-connected UI state for the
+// user manual and dumps a frame (QaCapture into LABRADOR_QA_CAPTURE_DIR).
+// Opt-in (--qa=docshots), like fuzz/predict. Harness: the hw loopback wiring
+// (SG1->OSC1, SG2->OSC2).
+
+static bool DocShotsReady(ImGuiTestContext* ctx)
+{
+    if (!HwWaitConnected(ctx))
+    {
+        ctx->LogWarning("No Labrador board connected - skipping doc shot");
+        return false;
+    }
+    SetMainRef(ctx);
+    ImGuiTestItemInfo toolbar = ctx->WindowInfo("//Main Window/##toolbar");
+    IM_CHECK_RETV(toolbar.Window != nullptr, false);
+    ctx->ItemClick(ctx->GetID("##toolbar_mode", toolbar.Window->ID));
+    ctx->ItemClick("//##Combo_00/CH1 + CH2 oscilloscope");
+    HwSettle(ctx, 0.5);
+    return true;
+}
+
+// 1 kHz sine on a generator; phase in wave-table samples (25 = 90 degrees).
+static void DocSine(ImGuiTestContext* ctx, int channel, double amp_v, int phase_samples)
+{
+    unsigned char wave[100];
+    for (int i = 0; i < 100; i++)
+        wave[i] = (unsigned char)(127.5
+            + 127.5 * sin(2.0 * IM_PI * (i + phase_samples) / 100.0));
+    IM_CHECK_GE(librador_update_signal_gen_settings(channel, wave, 100, 10.0, amp_v, 0.0), 0);
+}
+
+static void DocShot(ImGuiTestContext* ctx, const char* name)
+{
+    ParkMouse(ctx);
+    ctx->Yield(4);
+    QaCapture(ctx, name, "shot");
+}
+
+static void RegisterDocShotTests(ImGuiTestEngine* e)
+{
+    ImGuiTest* t = IM_REGISTER_TEST(e, "docshots", "scope_hero");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        HwSettle(ctx, 1.5);
+        EnsureSidePanelVisible(ctx);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+        ctx->Yield(4);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        DocShot(ctx, "docs_scope_hero");
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "scope_cursors");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        HwSettle(ctx, 1.5);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        // Cursors spawn stacked at the plot-limits centre; drag them apart so
+        // the "Cursor properties" readout shows a real ∆T/∆V measurement.
+        // Centre of the plot's inner region: the ##plotarea child inset by the
+        // Y-axis labels (left ~70px) and X-axis labels (bottom ~38px).
+        ImGuiTestItemInfo plot_w = ctx->WindowInfo("//Main Window/##plotarea");
+        IM_CHECK(plot_w.Window != nullptr);
+        const ImRect pr = plot_w.Window->Rect();
+        const ImVec2 centre(pr.Min.x + (pr.GetWidth() + 58.0f) * 0.5f,
+            pr.Min.y + (pr.GetHeight() - 28.0f) * 0.5f);
+        const float dx = pr.GetWidth() * 0.22f;
+        const float dy = pr.GetHeight() * 0.10f;
+        ctx->MenuClick("Scope/Cursor 1");
+        ctx->Yield(4);
+        ctx->MouseMoveToPos(centre);
+        ctx->MouseDown(0);
+        ctx->MouseMoveToPos(ImVec2(centre.x - dx, centre.y + dy));
+        ctx->MouseUp(0);
+        ctx->Yield(2);
+        ctx->MenuClick("Scope/Cursor 2");
+        ctx->Yield(4);
+        ctx->MouseMoveToPos(centre);
+        ctx->MouseDown(0);
+        ctx->MouseMoveToPos(ImVec2(centre.x + dx, centre.y + dy));
+        ctx->MouseUp(0);
+        ctx->Yield(4);
+        DocShot(ctx, "docs_scope_cursors");
+        ctx->MenuClick("Scope/Cursor 1");
+        ctx->MenuClick("Scope/Cursor 2");
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "scope_sigprops");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        HwSettle(ctx, 1.5);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        ctx->MenuClick("Scope/Signal Properties");
+        ctx->Yield(6);
+        DocShot(ctx, "docs_scope_sigprops");
+        ctx->MenuClick("Scope/Signal Properties");
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "xy_mode");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        DocSine(ctx, 2, 2.0, 25); // 90 degrees out of phase -> circle
+        HwSettle(ctx, 1.5);
+        ctx->MenuClick("Scope/XY Mode");
+        ctx->Yield(4);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        DocShot(ctx, "docs_xy_mode");
+        ctx->MenuClick("Scope/XY Mode");
+        unsigned char idle[16] = { 0 };
+        librador_update_signal_gen_settings(2, idle, 16, 10.0, 0.0, 0.0);
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "spectrum");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        HwSettle(ctx, 1.5);
+        ctx->MenuClick("Tools/Spectrum Analyser");
+        ctx->Yield(6);
+        ImGuiTestItemInfo analysis_w
+            = ctx->WindowInfo("//Main Window/##sidepanel/Analysis");
+        IM_CHECK(analysis_w.Window != nullptr);
+        // Default Gated mode auto-completes after max_time_s (1.0 s) and then
+        // displays the FFT. The "Start Acquiring" button is ID-only
+        // (##AcquireBtn) behind tab-bar/table override-ID scopes that no test
+        // ref reaches, so click it by position: same table row as the
+        // labelled "Auto Fit" button, in the column that starts at the
+        // panel's left edge.
+        ImGuiTestItemInfo autofit = ctx->ItemInfo("**/Auto Fit##SpectrumAnalyser");
+        IM_CHECK(autofit.ID != 0);
+        const float win_left = analysis_w.Window->Rect().Min.x;
+        ctx->MouseMoveToPos(ImVec2(win_left * 0.6f + autofit.RectFull.Min.x * 0.4f,
+            autofit.RectFull.GetCenter().y));
+        ctx->MouseClick(0);
+        HwSettle(ctx, 3.0); // 1 s gated capture of the live sine + FFT + draw
+        ctx->ItemClick("**/Auto Fit##SpectrumAnalyser");
+        ctx->Yield(4);
+        DocShot(ctx, "docs_spectrum");
+        ctx->MenuClick("Tools/Spectrum Analyser");
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "signals_page");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        EnsureSidePanelVisible(ctx);
+        ctx->MenuClick("View/Side Panel Page/Signals");
+        ctx->Yield(3);
+        ImGuiTestItemInfo signals_w
+            = ctx->WindowInfo("//Main Window/##sidepanel/Signals");
+        IM_CHECK(signals_w.Window != nullptr);
+        for (int sg = 1; sg <= 2; sg++)
+        {
+            char toggle_path[64], header[40];
+            snprintf(toggle_path, sizeof toggle_path,
+                "sg%d/Signal Generator %d (SG%d)_toggle", sg, sg, sg);
+            snprintf(header, sizeof header, "**/Signal Generator %d", sg);
+            ImGuiID toggle_id = ctx->GetID(toggle_path, signals_w.Window->ID);
+            if (ctx->ItemInfo(toggle_id, ImGuiTestOpFlags_NoError).ID == 0)
+            {
+                ctx->ItemClick(header);
+                ctx->Yield(2);
+            }
+            ImGuiTestItemInfo info = ctx->ItemInfo(toggle_id);
+            if (info.ID != 0 && (info.StatusFlags & ImGuiItemStatusFlags_Checked) == 0)
+            {
+                ctx->ItemClick(toggle_id);
+                ctx->Yield(2);
+            }
+        }
+        HwSettle(ctx, 1.5);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        DocShot(ctx, "docs_signals_page");
+    };
+
+    // Panel tour: one shot per remaining side-panel page (SG1/SG2 still on
+    // from signals_page, so the plot behind stays alive).
+    t = IM_REGISTER_TEST(e, "docshots", "panel_pages");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        EnsureSidePanelVisible(ctx);
+        const char* pages[] = { "PSU", "Meter", "Logic", "DAQ", "Analysis" };
+        const char* names[] = { "docs_page_psu", "docs_page_meter",
+            "docs_page_logic", "docs_page_daq", "docs_page_analysis" };
+        for (int i = 0; i < 5; i++)
+        {
+            char path[64];
+            snprintf(path, sizeof path, "View/Side Panel Page/%s", pages[i]);
+            ctx->MenuClick(path);
+            ctx->Yield(6);
+            DocShot(ctx, names[i]);
+        }
+        ctx->MenuClick("View/Side Panel Page/Scope");
+    };
+
+    t = IM_REGISTER_TEST(e, "docshots", "themes_live");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        DocSine(ctx, 1, 2.0, 0);
+        HwSettle(ctx, 1.5);
+        ctx->ItemClick("**/Auto Fit##toolbar");
+        HwSettle(ctx, 1.0);
+        ctx->MenuClick("View/Theme/Phosphor Retro");
+        ParkMouse(ctx);
+        ctx->Yield(10);
+        DocShot(ctx, "docs_theme_phosphor");
+        ctx->MenuClick("View/Theme/Classic Light");
+        ParkMouse(ctx);
+        ctx->Yield(10);
+        DocShot(ctx, "docs_theme_classic_light");
+        ctx->MenuClick("View/Theme/Classic Dark");
+        ParkMouse(ctx);
+        ctx->Yield(10);
+    };
+
+    // Leave the board quiet and the app in its default state.
+    t = IM_REGISTER_TEST(e, "docshots", "zz_cleanup");
+    t->TestFunc = [](ImGuiTestContext* ctx) {
+        if (!DocShotsReady(ctx))
+            return;
+        EnsureSidePanelVisible(ctx);
+        ctx->MenuClick("View/Side Panel Page/Signals");
+        ctx->Yield(3);
+        ImGuiTestItemInfo signals_w
+            = ctx->WindowInfo("//Main Window/##sidepanel/Signals");
+        if (signals_w.Window != nullptr)
+        {
+            for (int sg = 1; sg <= 2; sg++)
+            {
+                char toggle_path[64];
+                snprintf(toggle_path, sizeof toggle_path,
+                    "sg%d/Signal Generator %d (SG%d)_toggle", sg, sg, sg);
+                ImGuiID toggle_id = ctx->GetID(toggle_path, signals_w.Window->ID);
+                ImGuiTestItemInfo info
+                    = ctx->ItemInfo(toggle_id, ImGuiTestOpFlags_NoError);
+                if (info.ID != 0
+                    && (info.StatusFlags & ImGuiItemStatusFlags_Checked) != 0)
+                {
+                    ctx->ItemClick(toggle_id);
+                    ctx->Yield(2);
+                }
+            }
+        }
+        unsigned char idle[16] = { 0 };
+        librador_update_signal_gen_settings(1, idle, 16, 10.0, 0.0, 0.0);
+        librador_update_signal_gen_settings(2, idle, 16, 10.0, 0.0, 0.0);
+        ctx->MenuClick("View/Side Panel Page/Scope");
+        ctx->Yield(2);
+    };
+}
+
 static void RegisterHwTests(ImGuiTestEngine* e)
 {
     ImGuiTest* t = IM_REGISTER_TEST(e, "hw", "loopback_sg1_osc1");
@@ -1506,6 +1773,7 @@ void QaSetup(const char* run_filter)
     RegisterFuzzTests(g_engine);
     RegisterPredictScenarios(g_engine);
     RegisterHwTests(g_engine);
+    RegisterDocShotTests(g_engine);
 
     ImGuiTestEngine_Start(g_engine, ImGui::GetCurrentContext());
     ImGuiTestEngine_InstallDefaultCrashHandler();
