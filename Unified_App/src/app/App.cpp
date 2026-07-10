@@ -33,7 +33,11 @@ void App::StartUp()
     // Console must be installed before librador starts logging from threads
     m_debug_console.install();
 
-    if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
+    // LABRADOR_NO_USB=1 skips all USB init so headless runs (screenshot
+    // sweeps, docs captures) can run on a machine with a board attached
+    // without connecting to it — connecting can auto-flash firmware.
+    m_no_usb = SDL_getenv("LABRADOR_NO_USB") != nullptr;
+    if (!m_no_usb && librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
         throw std::runtime_error("librador_init failed");
 
 #ifndef __ANDROID__
@@ -208,6 +212,8 @@ void App::ensureFrontend()
 
 void App::pollDevice()
 {
+    if (m_no_usb)
+        return; // LABRADOR_NO_USB: never touch the bus, stay "disconnected"
 #ifdef __ANDROID__
     // Connection is driven by MainActivity (USB attach intents + fd injection);
     // just track transitions so post-connect init runs, as in Brent's app.

@@ -131,6 +131,9 @@ class App : public AppBase
     double m_uninit_last_wall_s = -1.0;
 
     // Desktop device polling (Android connects via USB attach intents)
+    // Set from LABRADOR_NO_USB in StartUp: run with USB fully disabled
+    // (headless screenshot sweeps on machines with a board attached).
+    bool m_no_usb = false;
     double m_last_poll_time = 0.0;
     bool m_device_present = false;
     bool m_bootloader_seen = false;
