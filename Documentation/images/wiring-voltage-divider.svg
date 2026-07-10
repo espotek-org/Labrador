@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="580" viewBox="0 0 880 580" font-family="Helvetica, Arial, sans-serif">
+  <rect width="880" height="580" fill="#ffffff"/>
+  <text x="440" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">Voltage divider — measure Vin and Vout at the same time</text>
+
+  <!-- ============ Labrador edge (left side) ============ -->
+  <rect x="60" y="80" width="192" height="440" rx="8" fill="#d9efe3" stroke="#3a3a3a" stroke-width="2.5"/>
+  <text x="156" y="108" text-anchor="middle" font-size="15" font-weight="bold" fill="#557">Labrador</text>
+  <text x="156" y="126" text-anchor="middle" font-size="11" fill="#779">(left edge pins)</text>
+
+  <g fill="#fff" stroke="#3a3a3a" stroke-width="1.6">
+    <rect x="245" y="153" width="14" height="14"/> <!-- SG1 DC -->
+    <rect x="245" y="223" width="14" height="14"/> <!-- OSC2 DC -->
+    <rect x="245" y="293" width="14" height="14"/> <!-- OSC1 DC -->
+    <rect x="245" y="363" width="14" height="14"/> <!-- GND -->
+  </g>
+  <g font-size="13" text-anchor="end">
+    <text x="238" y="164" fill="#c62828" font-weight="bold">SG1 (DC)</text>
+    <text x="238" y="234" fill="#00838f" font-weight="bold">OSC2 (DC)</text>
+    <text x="238" y="304" fill="#1565c0" font-weight="bold">OSC1 (DC)</text>
+    <text x="238" y="374" fill="#424242" font-weight="bold">GND</text>
+  </g>
+  <text x="60" y="548" font-size="12" fill="#666">Pin positions are simplified — see the pinout diagram for</text>
+  <text x="60" y="564" font-size="12" fill="#666">where each pin really sits on the board.</text>
+
+  <!-- ============ schematic (right side) ============ -->
+  <!-- Vin node down to R1 -->
+  <line x1="600" y1="160" x2="600" y2="210" stroke="#222" stroke-width="2.5"/>
+  <!-- R1 -->
+  <rect x="580" y="210" width="40" height="80" fill="#fff" stroke="#222" stroke-width="2.5"/>
+  <text x="632" y="245" font-size="15" fill="#222">R1</text>
+  <text x="632" y="265" font-size="14" fill="#666">6.8 kΩ</text>
+  <!-- middle node -->
+  <line x1="600" y1="290" x2="600" y2="360" stroke="#222" stroke-width="2.5"/>
+  <!-- R2 -->
+  <rect x="580" y="360" width="40" height="80" fill="#fff" stroke="#222" stroke-width="2.5"/>
+  <text x="632" y="395" font-size="15" fill="#222">R2</text>
+  <text x="632" y="415" font-size="14" fill="#666">6.8 kΩ</text>
+  <!-- to ground -->
+  <line x1="600" y1="440" x2="600" y2="490" stroke="#222" stroke-width="2.5"/>
+  <!-- ground symbol -->
+  <line x1="570" y1="490" x2="630" y2="490" stroke="#222" stroke-width="3"/>
+  <line x1="580" y1="500" x2="620" y2="500" stroke="#222" stroke-width="3"/>
+  <line x1="590" y1="510" x2="610" y2="510" stroke="#222" stroke-width="3"/>
+
+  <!-- Vin wire from SG1 -->
+  <path d="M 252 160 L 600 160" fill="none" stroke="#c62828" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="600" cy="160" r="5" fill="#c62828"/>
+  <text x="330" y="150" font-size="14" fill="#c62828" font-weight="bold">Vin — signal in</text>
+
+  <!-- OSC2 tap on Vin -->
+  <path d="M 500 160 C 440 200, 340 230, 252 230" fill="none" stroke="#00838f" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="500" cy="160" r="5" fill="#00838f"/>
+  <text x="290" y="252" font-size="14" fill="#00838f" font-weight="bold">watch Vin on OSC2</text>
+
+  <!-- OSC1 tap on Vout (middle node) -->
+  <path d="M 600 325 C 450 325, 350 300, 252 300" fill="none" stroke="#1565c0" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="600" cy="325" r="6" fill="#1565c0"/>
+  <text x="350" y="345" font-size="14" fill="#1565c0" font-weight="bold">Vout — watch on OSC1</text>
+
+  <!-- GND wire -->
+  <path d="M 600 470 C 430 470, 350 370, 252 370" fill="none" stroke="#424242" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="600" cy="470" r="5" fill="#424242"/>
+  <text x="330" y="490" font-size="14" fill="#424242" font-weight="bold">shared ground</text>
+
+  <!-- formula box -->
+  <rect x="670" y="120" width="196" height="120" rx="6" fill="#f5f5f5" stroke="#bbb" stroke-width="1.5"/>
+  <text x="768" y="150" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">Theory</text>
+  <text x="768" y="180" text-anchor="middle" font-size="14" fill="#222">Vout = Vin · R2 / (R1+R2)</text>
+  <text x="768" y="210" text-anchor="middle" font-size="13" fill="#666">R1 = R2  →  Vout = Vin / 2</text>
+</svg>

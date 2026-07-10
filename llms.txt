@@ -1,0 +1,27 @@
+# EspoTek Labrador
+
+> Open-source USB electronics lab bench: a $29 board plus a cross-platform
+> app (Windows/macOS/Linux/Raspberry Pi/Android) providing a 2-channel
+> oscilloscope (±20 V, 375 kSa/s/ch), 2-channel arbitrary waveform generator
+> (0.15–9 Vpp, 1 Hz–1 MHz), 4.5–11 V power supply, 2-channel logic analyzer
+> with UART/I2C decoding, and a multimeter. This repository contains all
+> hardware designs, firmware, and software.
+
+Start here for AI assistance: the LLM-specific guide is self-contained,
+uses exact UI strings and live app limits, and lists the common
+misconception traps (Vbase semantics, AC vs DC pins, the two-buffer rule).
+
+## Docs
+
+- [LLM guide](Documentation/llm-guide.md): dense, machine-oriented reference — read this first
+- [Getting started](Documentation/getting-started.md): install, first connection, safety
+- [Tutorial](Documentation/tutorial.md): first measurements via SG1→OSC1 loopback, then a voltage divider
+- [User manual](Documentation/user-manual.md): every page and control of the unified app
+- [Pinout reference](Documentation/pinout.md): every pin, electrical limits
+- [Troubleshooting](Documentation/troubleshooting.md): detection issues, firmware recovery
+
+## Optional
+
+- [Repository README](README.md): building from source, licences
+- [Wiki](https://github.com/espotek-org/Labrador/wiki): original documentation
+- [Product page](https://espotek.com/labrador): specifications, purchase

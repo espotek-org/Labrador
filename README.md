@@ -11,6 +11,8 @@ Binary (executable) versions of the software are available for [download](https:
 
 For the documentation, please visit the [wiki](https://github.com/espotek-org/Labrador/wiki).
 
+A full user manual for the board and the unified app — including a beginner tutorial, pinout reference and screenshots — lives in this repo under [`Documentation/`](Documentation/README.md).
+
 ## Building from Source
 If you're looking to build from source but don't know where to start, Qt Creator is the easiest way to get your toes wet!  
 https://www.qt.io/download-open-source/  

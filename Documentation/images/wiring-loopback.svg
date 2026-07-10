@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="540" viewBox="0 0 760 540" font-family="Helvetica, Arial, sans-serif">
+  <rect width="760" height="540" fill="#ffffff"/>
+  <text x="380" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">Tutorial wiring — SG1 looped back to OSC1</text>
+
+  <!-- Board body -->
+  <rect x="250" y="70" width="330" height="330" rx="8" fill="#d9efe3" stroke="#3a3a3a" stroke-width="2.5"/>
+  <text x="415" y="230" text-anchor="middle" font-size="16" fill="#557" font-weight="bold">EspoTek Labrador</text>
+  <text x="415" y="250" text-anchor="middle" font-size="12" fill="#779">(top view, USB at top right)</text>
+
+  <!-- micro USB -->
+  <rect x="520" y="60" width="70" height="34" rx="4" fill="#9aa0a6" stroke="#3a3a3a" stroke-width="2"/>
+  <text x="555" y="82" text-anchor="middle" font-size="12" fill="#fff" font-weight="bold">USB</text>
+  <line x1="590" y1="77" x2="660" y2="77" stroke="#3a3a3a" stroke-width="3"/>
+  <text x="666" y="72" font-size="13" fill="#222">to computer /</text>
+  <text x="666" y="88" font-size="13" fill="#222">Pi / phone</text>
+
+  <!-- Left edge header pins (top to bottom) -->
+  <g font-size="13" fill="#222">
+    <g fill="#fff" stroke="#3a3a3a" stroke-width="1.6">
+      <rect x="243" y="92"  width="14" height="14"/>
+      <rect x="243" y="118" width="14" height="14"/>
+      <rect x="243" y="144" width="14" height="14"/>
+      <rect x="243" y="170" width="14" height="14"/>
+      <rect x="243" y="196" width="14" height="14"/>
+      <rect x="243" y="222" width="14" height="14"/>
+      <rect x="243" y="248" width="14" height="14"/>
+      <rect x="243" y="274" width="14" height="14"/>
+      <rect x="243" y="300" width="14" height="14"/>
+      <rect x="243" y="326" width="14" height="14"/>
+    </g>
+    <g text-anchor="end">
+      <text x="234" y="104">+3V3 Out</text>
+      <text x="234" y="130">GND</text>
+      <text x="234" y="156">Digital Out 4</text>
+      <text x="234" y="182">Digital Out 3</text>
+      <text x="234" y="208">Digital Out 2</text>
+      <text x="234" y="234">Digital Out 1</text>
+      <text x="234" y="260">SG2 (DC)</text>
+      <text x="234" y="286">SG2 (AC)</text>
+      <text x="234" y="312" font-weight="bold" fill="#c62828">SG1 (DC)</text>
+      <text x="234" y="338">SG1 (AC)</text>
+    </g>
+  </g>
+
+  <!-- Bottom OSC1 header, 56 px pitch -->
+  <g fill="#fff" stroke="#3a3a3a" stroke-width="1.6">
+    <rect x="330" y="393" width="14" height="14"/>
+    <rect x="386" y="393" width="14" height="14"/>
+    <rect x="442" y="393" width="14" height="14"/>
+    <rect x="498" y="393" width="14" height="14"/>
+  </g>
+  <g font-size="13" fill="#222">
+    <text x="337" y="428" text-anchor="middle" font-weight="bold" fill="#1565c0">OSC1</text>
+    <text x="337" y="444" text-anchor="middle" font-weight="bold" fill="#1565c0">(DC)</text>
+    <text x="393" y="428" text-anchor="middle">OSC1</text>
+    <text x="393" y="444" text-anchor="middle">(AC)</text>
+    <text x="449" y="428" text-anchor="middle">OSC1</text>
+    <text x="449" y="444" text-anchor="middle">(DC)*</text>
+    <text x="505" y="428" text-anchor="middle">OSC1</text>
+    <text x="505" y="444" text-anchor="middle">(DC)*</text>
+  </g>
+  <text x="330" y="478" font-size="12" fill="#666">* duplicate pins — used by the multimeter; same signal as OSC1 (DC)</text>
+
+  <!-- The jumper wire: SG1 (DC) around the bottom-left corner to OSC1 (DC) -->
+  <path d="M 250 307 C 205 335, 172 365, 165 405 C 155 470, 235 500, 337 500 L 337 407"
+        fill="none" stroke="#c62828" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="250" cy="307" r="5" fill="#c62828"/>
+  <circle cx="337" cy="407" r="5" fill="#c62828"/>
+  <text x="24" y="440" font-size="14" fill="#c62828" font-weight="bold">one jumper wire</text>
+  <text x="24" y="458" font-size="13" fill="#c62828">SG1 (DC) → OSC1 (DC)</text>
+</svg>
