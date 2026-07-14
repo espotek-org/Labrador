@@ -472,7 +472,20 @@ void genericUsbDriver::checkConnection(){
 
         if (! connected) {
 
-            bool isGobindar = !(usbInit(BOARD_VID, GOBINDAR_PID));
+            unsigned char gobindarReturnValue = usbInit(BOARD_VID, GOBINDAR_PID);
+
+            if(E_UNEXPECTED_FIRMWARE == gobindarReturnValue) {
+                //The gobindarised board answered the pre-claim probe with
+                //old firmware and is already on its way to the bootloader.
+                qDebug() << "Gobindar board sent to bootloader pre-claim; reflashing!!";
+                int flashRet = flashFirmware();
+                qDebug("flashRet: %d", flashRet);
+                connected = false;
+                connectTimer->start();
+                return;
+            }
+
+            bool isGobindar = !(gobindarReturnValue);
             if (isGobindar)
             {
                 deGobindarise();

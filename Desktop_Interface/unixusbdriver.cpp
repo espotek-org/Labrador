@@ -135,36 +135,36 @@ unsigned char unixUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
     //include a full-speed isochronous endpoint (any pre-AIO firmware)
     //NULL-dereferences in IOUSBHostFamily and panics the kernel — the claim
     //alone is enough, so old firmware must be detected and sent to the
-    //bootloader without ever claiming.  EP0 vendor requests need no claim.
-    if(PIDin == BOARD_PID){
-        unsigned short probedVersion = 0;
-        unsigned char probedVariant = 0;
-        int versionResult = libusb_control_transfer(handle, 0xc0, 0xa8, 0, 0, (unsigned char *)&probedVersion, 2, 4000);
-        int variantResult = libusb_control_transfer(handle, 0xc0, 0xa9, 0, 0, &probedVariant, 1, 4000);
-        if((versionResult == LIBUSB_ERROR_NO_DEVICE) || (variantResult == LIBUSB_ERROR_NO_DEVICE)){
-            qDebug() << "Device vanished during pre-claim firmware probe";
-            libusb_close(handle);
-            handle = NULL;
-            return 1;
-        }
-        //A stall or short read means the firmware is too old to answer the
-        //version request; treat that as a mismatch and reflash it too.
-        bool firmwareValid = (versionResult == 2) && (variantResult == 1)
-                          && (probedVersion == EXPECTED_FIRMWARE_VERSION)
-                          && (probedVariant == DEFINED_EXPECTED_VARIANT);
-        if(!firmwareValid){
-            qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx (want 0x%04hx variant 0x%02hhx); jumping to bootloader without claiming",
-                   probedVersion, probedVariant, (unsigned short)EXPECTED_FIRMWARE_VERSION, (unsigned char)DEFINED_EXPECTED_VARIANT);
-            //NO_DEVICE/PIPE here is expected: the board resets into the
-            //bootloader before completing the status stage.
-            error = libusb_control_transfer(handle, 0x40, 0xa7, 1, 0, NULL, 0, 4000);
-            qDebug() << "Bootloader jump sent, result" << error;
-            libusb_close(handle);
-            handle = NULL;
-            return E_UNEXPECTED_FIRMWARE;
-        }
-        qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx OK", probedVersion, probedVariant);
+    //bootloader without ever claiming.  EP0 vendor requests need no claim,
+    //and every firmware (including a gobindarised board's) answers
+    //0xa8/0xa9, so this covers both PIDs.
+    unsigned short probedVersion = 0;
+    unsigned char probedVariant = 0;
+    int versionResult = libusb_control_transfer(handle, 0xc0, 0xa8, 0, 0, (unsigned char *)&probedVersion, 2, 4000);
+    int variantResult = libusb_control_transfer(handle, 0xc0, 0xa9, 0, 0, &probedVariant, 1, 4000);
+    if((versionResult == LIBUSB_ERROR_NO_DEVICE) || (variantResult == LIBUSB_ERROR_NO_DEVICE)){
+        qDebug() << "Device vanished during pre-claim firmware probe";
+        libusb_close(handle);
+        handle = NULL;
+        return 1;
     }
+    //A stall or short read means the firmware is too old to answer the
+    //version request; treat that as a mismatch and reflash it too.
+    bool firmwareValid = (versionResult == 2) && (variantResult == 1)
+                      && (probedVersion == EXPECTED_FIRMWARE_VERSION)
+                      && (probedVariant == DEFINED_EXPECTED_VARIANT);
+    if(!firmwareValid){
+        qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx (want 0x%04hx variant 0x%02hhx); jumping to bootloader without claiming",
+               probedVersion, probedVariant, (unsigned short)EXPECTED_FIRMWARE_VERSION, (unsigned char)DEFINED_EXPECTED_VARIANT);
+        //NO_DEVICE/PIPE here is expected: the board resets into the
+        //bootloader before completing the status stage.
+        error = libusb_control_transfer(handle, 0x40, 0xa7, 1, 0, NULL, 0, 4000);
+        qDebug() << "Bootloader jump sent, result" << error;
+        libusb_close(handle);
+        handle = NULL;
+        return E_UNEXPECTED_FIRMWARE;
+    }
+    qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx OK", probedVersion, probedVariant);
 #endif
 
     qDebug() << (libusb_kernel_driver_active(handle, 0) ? "KERNEL DRIVER ACTIVE" : "KERNEL DRIVER INACTIVE");
