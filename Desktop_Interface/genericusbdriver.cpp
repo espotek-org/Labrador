@@ -459,6 +459,17 @@ void genericUsbDriver::checkConnection(){
             return;
         }
 
+        if(E_UNEXPECTED_FIRMWARE == initReturnValue) {
+            //usbInit probed the firmware over EP0 before claiming and has
+            //already sent the board to the bootloader; flash it now.
+            qDebug() << "Old firmware detected pre-claim; reflashing!!";
+            int flashRet = flashFirmware();
+            qDebug("flashRet: %d", flashRet);
+            connected = false;
+            connectTimer->start();
+            return;
+        }
+
         if (! connected) {
 
             bool isGobindar = !(usbInit(BOARD_VID, GOBINDAR_PID));

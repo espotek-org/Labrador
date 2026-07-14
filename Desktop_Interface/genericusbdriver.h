@@ -79,6 +79,9 @@
 #define GOBINDAR_PID 0xa000
 
 #define E_BOARD_IN_BOOTLOADER static_cast<unsigned char>(-65)
+//usbInit detected wrong firmware before claiming any interface and has
+//already sent the board to the bootloader; caller must run flashFirmware().
+#define E_UNEXPECTED_FIRMWARE static_cast<unsigned char>(-66)
 
 //genericUsbDriver handles the parts of the USB stack that are not platform-dependent.
 //It exists as a superclass for winUsbDriver (on Windows) or unixUsbDriver (on Linux)

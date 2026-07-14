@@ -129,6 +129,44 @@ unsigned char unixUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
         qDebug() << "Device found!!";
     }
 
+#ifdef PLATFORM_MAC
+    //Probe the firmware version over EP0 BEFORE claiming any interface.
+    //On macOS Tahoe, libusb_claim_interface() on a device whose descriptors
+    //include a full-speed isochronous endpoint (any pre-AIO firmware)
+    //NULL-dereferences in IOUSBHostFamily and panics the kernel — the claim
+    //alone is enough, so old firmware must be detected and sent to the
+    //bootloader without ever claiming.  EP0 vendor requests need no claim.
+    if(PIDin == BOARD_PID){
+        unsigned short probedVersion = 0;
+        unsigned char probedVariant = 0;
+        int versionResult = libusb_control_transfer(handle, 0xc0, 0xa8, 0, 0, (unsigned char *)&probedVersion, 2, 4000);
+        int variantResult = libusb_control_transfer(handle, 0xc0, 0xa9, 0, 0, &probedVariant, 1, 4000);
+        if((versionResult == LIBUSB_ERROR_NO_DEVICE) || (variantResult == LIBUSB_ERROR_NO_DEVICE)){
+            qDebug() << "Device vanished during pre-claim firmware probe";
+            libusb_close(handle);
+            handle = NULL;
+            return 1;
+        }
+        //A stall or short read means the firmware is too old to answer the
+        //version request; treat that as a mismatch and reflash it too.
+        bool firmwareValid = (versionResult == 2) && (variantResult == 1)
+                          && (probedVersion == EXPECTED_FIRMWARE_VERSION)
+                          && (probedVariant == DEFINED_EXPECTED_VARIANT);
+        if(!firmwareValid){
+            qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx (want 0x%04hx variant 0x%02hhx); jumping to bootloader without claiming",
+                   probedVersion, probedVariant, (unsigned short)EXPECTED_FIRMWARE_VERSION, (unsigned char)DEFINED_EXPECTED_VARIANT);
+            //NO_DEVICE/PIPE here is expected: the board resets into the
+            //bootloader before completing the status stage.
+            error = libusb_control_transfer(handle, 0x40, 0xa7, 1, 0, NULL, 0, 4000);
+            qDebug() << "Bootloader jump sent, result" << error;
+            libusb_close(handle);
+            handle = NULL;
+            return E_UNEXPECTED_FIRMWARE;
+        }
+        qDebug("Pre-claim probe: firmware 0x%04hx variant 0x%02hhx OK", probedVersion, probedVariant);
+    }
+#endif
+
     qDebug() << (libusb_kernel_driver_active(handle, 0) ? "KERNEL DRIVER ACTIVE" : "KERNEL DRIVER INACTIVE");
     if(libusb_kernel_driver_active(handle, 0)){
         libusb_detach_kernel_driver(handle, 0);
@@ -148,9 +186,9 @@ unsigned char unixUsbDriver::usbInit(unsigned long VIDin, unsigned long PIDin){
     if(error){
         qDebug() << "libusb_claim_interface(bulk) FAILED";
         qDebug() << "ERROR" << error << libusb_error_name(error);
-        //Not fatal here: an old (pre-AIO) firmware has only one interface.
-        //The firmware version check will trigger a reflash, after which we
-        //reconnect from scratch.
+        //Unexpected: the pre-claim probe already verified AIO firmware, so
+        //the bulk interface should exist.  The post-claim firmware check in
+        //checkConnection remains as the fallback reflash path.
     } else qDebug() << "Bulk interface claimed!";
 #endif
 
@@ -161,8 +199,13 @@ void unixUsbDriver::usbSendControl(uint8_t RequestType, uint8_t Request, uint16_
     //qDebug("Sending Control packet! 0x%x,\t0x%x,\t%u,\t%u,\t%d,\t%u", RequestType, Request, Value, Index, LDATA, Length);
     unsigned char *controlBuffer;
 
-    if(!connected){
-        qDebug() << "Control packet requested before device has connected!";
+    //EP0 control transfers only need an open handle, not a claimed interface
+    //(the firmware-version probe and bootloader jump must run pre-claim on
+    //macOS Tahoe, where claiming an interface with an iso endpoint panics
+    //the kernel).  A NULL handle would segfault inside libusb, so that is
+    //the guard.
+    if(handle == NULL){
+        qDebug() << "Control packet requested before device has been opened!";
         return;
     }
 
@@ -642,13 +685,17 @@ int unixUsbDriver::flashFirmware(void){
         QApplication::processEvents();
     } while (exit_code);
 
+    //handle is already NULL when usbInit jumped to the bootloader pre-claim
+    //(E_UNEXPECTED_FIRMWARE); libusb functions crash on a NULL handle.
+    if(handle != NULL){
 #ifdef PLATFORM_MAC
-    libusb_release_interface(handle, AIO_BULK_IFACE);
+        libusb_release_interface(handle, AIO_BULK_IFACE);
 #endif
-    libusb_release_interface(handle, 0);
-    qDebug() << "Interface released";
-    libusb_close(handle);
-    qDebug() << "Device Closed";
+        libusb_release_interface(handle, 0);
+        qDebug() << "Interface released";
+        libusb_close(handle);
+        qDebug() << "Device Closed";
+    }
     libusb_exit(ctx);
     qDebug() << "Libusb exited";
     connected = false;
