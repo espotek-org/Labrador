@@ -23,7 +23,11 @@
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "LABRADOR_GLES2": "ON" }
     },
-    { "name": "windows", "inherits": "base" },
+    {
+      "name": "windows",
+      "inherits": "base",
+      "cacheVariables": { "LABRADOR_STATIC_LIBUSB": "ON" }
+    },
     {
       "name": "debug",
       "inherits": "base",

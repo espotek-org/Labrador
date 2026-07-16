@@ -12,8 +12,10 @@ endif()
 option(LABRADOR_GLES2 "Target OpenGL ES 2.0 (Raspberry Pi builds)" OFF)
 
 # Self-contained release builds: link libusb from its static archive instead
-# of a bundled shared library (macOS .app, Linux AppImage).  Windows doesn't
-# need it: MinGW's -static below already resolves libusb-1.0.a.
+# of a bundled shared library (macOS .app, Linux AppImage, Windows exe).
+# Needed even under MinGW's -static: pkg-config's imported target resolves
+# libusb to the absolute path of the .dll.a, which bypasses -static's
+# archive preference.
 option(LABRADOR_STATIC_LIBUSB "Link libusb statically" OFF)
 
 # AppImage builds: bake the C++ runtime into the binary so the AppImage runs
