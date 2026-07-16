@@ -1,7 +1,6 @@
 #include "paths.h"
 
 #include <SDL3/SDL.h>
-#include <filesystem>
 #include <stdexcept>
 
 std::string getResourcePath(const std::string& relative)
@@ -13,7 +12,9 @@ std::string getResourcePath(const std::string& relative)
         throw std::runtime_error(std::string("SDL_GetBasePath failed: ") + SDL_GetError());
 
     std::string path = std::string(base) + "assets/" + relative;
-    if (!std::filesystem::exists(path))
+    // SDL_GetPathInfo == "does it exist" (std::filesystem needs macOS 10.15+,
+    // above our 10.13 floor).
+    if (!SDL_GetPathInfo(path.c_str(), nullptr))
         throw std::runtime_error("Missing bundled asset: " + path);
     return path;
 }

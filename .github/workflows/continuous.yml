@@ -76,8 +76,9 @@ jobs:
 
           ## macOS
 
-          `Labrador-for-macOS.dmg` — signed + notarized universal build (Apple
-          Silicon and Intel). Drag Labrador into `/Applications`.
+          `Labrador-for-macOS.dmg` — signed + notarized universal build.
+          Needs macOS 10.13 High Sierra or newer on Intel, macOS 11 Big Sur
+          or newer on Apple Silicon. Drag Labrador into `/Applications`.
 
           ## Windows
 

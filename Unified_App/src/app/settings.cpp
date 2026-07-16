@@ -2,9 +2,10 @@
 
 #include "platform/paths.h"
 
+#include <SDL3/SDL.h>
+
 #include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -69,12 +70,13 @@ void Settings::save()
             return;
         }
     }
-    std::error_code ec;
-    std::filesystem::rename(tmp, m_path, ec);
-    if (ec)
+    // SDL_RenamePath replaces the destination on every platform (POSIX
+    // rename(), MoveFileEx+REPLACE_EXISTING on Windows).  std::filesystem is
+    // off-limits: its libc++ symbols need macOS 10.15+, above our 10.13 floor.
+    if (!SDL_RenamePath(tmp.c_str(), m_path.c_str()))
     {
         std::cerr << "Settings: FAILED to rename " << tmp << " to " << m_path << ": "
-                  << ec.message() << std::endl;
+                  << SDL_GetError() << std::endl;
         return;
     }
     m_dirty = false;

@@ -1,6 +1,8 @@
 # Build + package the Unified_App (SDL3/ImGui) macOS app: a signed + notarized
-# universal (arm64 + x86_64) .app inside a DMG. Reusable (called by
-# continuous.yml) and directly dispatchable. Uploads asset-dmg.
+# universal (arm64 + x86_64) .app inside a DMG. Floors: macOS 10.13 on Intel
+# (SDL3's minimum and the oldest target current Xcode accepts), 11.0 on Apple
+# Silicon. Reusable (called by continuous.yml) and directly dispatchable.
+# Uploads asset-dmg.
 name: Build macOS
 
 permissions:
@@ -44,7 +46,7 @@ jobs:
           tar xjf libusb.tar.bz2
           cd libusb-1.0.29
           ./configure --prefix="$PWD/../libusb-univ" --enable-static --disable-shared \
-            CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=11.0" \
+            CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=10.13" \
             LDFLAGS="-arch arm64 -arch x86_64"
           make -j$(sysctl -n hw.ncpu)
           make install
@@ -55,11 +57,16 @@ jobs:
           # pkg_check_modules() reads PKG_CONFIG_PATH from the environment, so
           # point it at the universal libusb we just built.
           export PKG_CONFIG_PATH="$PWD/libusb-univ/lib/pkgconfig"
+          # 10.13 = SDL3's macOS floor and the oldest target current Xcode
+          # accepts; the arm64 slice is clamped to 11.0 automatically (first
+          # Apple Silicon macOS).  Keep std::filesystem out of the app - its
+          # libc++ symbols need 10.15+ (settings.cpp/paths.cpp use SDL
+          # filesystem calls instead).
           cmake -S . -B build/macos -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLABRADOR_STATIC_LIBUSB=ON \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
 
       - name: Build
         run: cmake --build build/macos -j$(sysctl -n hw.ncpu)
@@ -93,6 +100,11 @@ jobs:
             echo "ERROR: unexpected non-system dynamic dependency" >&2
             exit 1
           fi
+          # Deployment floors: x86_64 slice 10.13 (High Sierra), arm64 11.0.
+          otool -arch x86_64 -l "$APP/Contents/MacOS/labrador" \
+            | grep -E "minos 10.13|version 10.13"
+          otool -arch arm64 -l "$APP/Contents/MacOS/labrador" \
+            | grep -E "minos 11.0|version 11.0" | head -1
 
       - name: Import code signing certificate
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
