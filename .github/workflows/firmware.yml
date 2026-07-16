@@ -1,0 +1,60 @@
+name: Build firmware
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        type: string
+        description: 'variant: 01, 02, or leave the field blank to build both variants'
+        required: false
+
+  push:
+    branches:
+      - master
+      - main
+
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build-hex:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name : Checkout repository
+        uses: actions/checkout@v4
+       
+      - name : make 01
+        if: ((github.event_name == 'push') || (github.event_name == 'pull_request') || ((github.event_name == 'workflow_dispatch') && ((inputs.variant == '') || (inputs.variant == '01'))))
+        uses: bazhenov/action-avr-make@v1.1
+        with:
+          dir: AVR_Code/USB_BULK_TEST
+          target: '01'
+
+      - name : make mostlyclean
+        if: ((github.event_name == 'push') || (github.event_name == 'pull_request') || ((github.event_name == 'workflow_dispatch') && (inputs.variant == '')))
+        uses: bazhenov/action-avr-make@v1.1
+        with:
+          dir: AVR_Code/USB_BULK_TEST
+          target: mostlyclean
+
+      - name : make 02
+        if: ((github.event_name == 'push') || (github.event_name == 'pull_request') || ((github.event_name == 'workflow_dispatch') && ((inputs.variant == '') || (inputs.variant == '02'))))
+        uses: bazhenov/action-avr-make@v1.1
+        with:
+          dir: AVR_Code/USB_BULK_TEST
+          target: '02'
+
+      - name: Upload hex artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-hex
+          path: AVR_Code/USB_BULK_TEST/labrafirm*.hex
+          compression-level: 0
+          if-no-files-found: error
