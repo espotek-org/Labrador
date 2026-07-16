@@ -23,6 +23,8 @@ on:
 
 defaults:
   run:
+    # Container jobs default to dash, which rejects `set -o pipefail`.
+    shell: bash
     working-directory: Unified_App
 
 jobs:

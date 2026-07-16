@@ -54,6 +54,11 @@ else()
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
 endif()
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+# SDL's HIDAPI joystick backend wants a SHARED libusb it can dlopen; the
+# release builds provide only a static archive (configure hard-errors on a
+# static-only prefix) and the app has no HIDAPI devices.  The native HIDAPI
+# drivers (IOKit/hidraw/Windows HID) are unaffected.
+set(SDL_HIDAPI_LIBUSB OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/SDL EXCLUDE_FROM_ALL)
 if(ANDROID)
     set(SDL_LIB SDL3::SDL3-shared)
