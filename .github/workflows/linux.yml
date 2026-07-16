@@ -51,12 +51,23 @@ jobs:
         working-directory: /
         run: |
           apt-get -o Acquire::Retries=3 update
-          apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget bzip2 file \
-            pkg-config python3-pip \
-            libgl1-mesa-dev libegl1-mesa-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev
+          # ports.ubuntu.com has partial outages; retry the whole install
+          # (fetched .debs stay cached, retries only pull the stragglers).
+          ok=""
+          for i in 1 2 3; do
+            if apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget bzip2 file \
+              pkg-config python3-pip \
+              libgl1-mesa-dev libegl1-mesa-dev \
+              libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+              libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+              libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev; then
+              ok=1; break
+            fi
+            echo "apt-get install failed (attempt $i); retrying"
+            sleep 20
+            apt-get -o Acquire::Retries=3 update || true
+          done
+          test -n "$ok"
           # 20.04's cmake (3.16) and meson (0.53) are too old; ninja to match.
           pip3 install "cmake>=3.22,<4" ninja meson
 
@@ -181,12 +192,23 @@ jobs:
         working-directory: /
         run: |
           apt-get -o Acquire::Retries=3 update
-          apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget \
-            pkg-config python3-pip \
-            libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev
+          # ports.ubuntu.com has partial outages; retry the whole install
+          # (fetched .debs stay cached, retries only pull the stragglers).
+          ok=""
+          for i in 1 2 3; do
+            if apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget \
+              pkg-config python3-pip \
+              libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
+              libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+              libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+              libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev; then
+              ok=1; break
+            fi
+            echo "apt-get install failed (attempt $i); retrying"
+            sleep 20
+            apt-get -o Acquire::Retries=3 update || true
+          done
+          test -n "$ok"
           pip3 install "cmake>=3.22,<4" ninja meson
 
       - name: Checkout repository

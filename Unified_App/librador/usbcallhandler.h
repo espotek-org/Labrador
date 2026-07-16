@@ -344,9 +344,13 @@ private:
     int claim_and_prepare();           // detach kernel driver + claim interface 0
     int check_firmware_and_start_iso();// version/variant check, then iso stream or flash request
 
-    friend void isoCallback(struct libusb_transfer * transfer);
-    friend void metaIsoCallback(struct libusb_transfer * transfer);
-    friend void bulkCallback(struct libusb_transfer * transfer);
+    // LIBUSB_CALL matters: it is __stdcall on 32-bit Windows, so without it
+    // these friends declare different (cdecl) functions than the callback
+    // definitions - a mismatch invisible everywhere else, where the calling
+    // conventions coincide.
+    friend void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer);
+    friend void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer);
+    friend void LIBUSB_CALL bulkCallback(struct libusb_transfer * transfer);
     int deviceMode = 0;
 
     // Transport plumbing (all called on the event-loop thread unless noted)
