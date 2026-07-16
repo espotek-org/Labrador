@@ -50,8 +50,8 @@ jobs:
       - name: Install dependencies
         working-directory: /
         run: |
-          apt-get update
-          apt-get install -y build-essential git ca-certificates wget bzip2 file \
+          apt-get -o Acquire::Retries=3 update
+          apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget bzip2 file \
             pkg-config python3-pip \
             libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
@@ -180,8 +180,8 @@ jobs:
       - name: Install dependencies
         working-directory: /
         run: |
-          apt-get update
-          apt-get install -y build-essential git ca-certificates wget \
+          apt-get -o Acquire::Retries=3 update
+          apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget \
             pkg-config python3-pip \
             libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \

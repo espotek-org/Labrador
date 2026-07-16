@@ -1,9 +1,10 @@
-# Build + package the Unified_App (SDL3/ImGui) Windows installer. Builds with
-# MSYS2 MINGW64 (x64) and MINGW32 (x86 - the Qt app always shipped 32-bit;
-# don't regress old lab machines) and wraps both in ONE Inno Setup 6
-# installer that installs the exe matching the host (FOSS; replaces the old
-# proprietary Advanced Installer pipeline). Both exes are fully static
-# (MinGW runtime + libusb baked in; only OS DLLs remain dynamic); the
+# Build + package the Unified_App (SDL3/ImGui) Windows installer. The x64 exe
+# builds with MSYS2 MINGW64; the x86 exe is cross-compiled from Linux with
+# Ubuntu's mingw-w64 (MSYS2 dropped its i686 repo — and the Qt app always
+# shipped 32-bit, so 32-bit Windows must not regress). One Inno Setup 6
+# installer wraps both and installs the exe matching the host (FOSS; replaces
+# the old proprietary Advanced Installer pipeline). Both exes are fully
+# static (MinGW runtime + libusb baked in; only OS DLLs remain dynamic); the
 # installer bundles them with the assets + firmware and the USB driver
 # installers (whose dpinst32/x86 libusbK.sys already covered 32-bit).
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
@@ -23,7 +24,65 @@ defaults:
     working-directory: Unified_App
 
 jobs:
+  # 32-bit exe, cross-compiled from Linux (g++-mingw-w64-i686-posix: msvcrt
+  # CRT like MSYS2's MINGW64, and the cross cc1plus is a 64-bit process, so
+  # exprtk's template instantiations don't hit a 32-bit compiler ceiling).
+  build-win32:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -o Acquire::Retries=3 install -y \
+            g++-mingw-w64-i686-posix ninja-build pkg-config wget make
+
+      - name: Build static libusb (i686 Windows)
+        run: |
+          set -euxo pipefail
+          wget -nv https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
+          tar xjf libusb-1.0.29.tar.bz2
+          cd libusb-1.0.29
+          ./configure --host=i686-w64-mingw32 --prefix="$PWD/../libusb-win32" \
+            --enable-static --disable-shared \
+            CC=i686-w64-mingw32-gcc-posix
+          make -j"$(nproc)"
+          make install
+
+      - name: Build
+        run: |
+          # PKG_CONFIG_LIBDIR (not _PATH) so host-Linux .pc files can't leak
+          # into the cross build; LABRADOR_WIN32_ROOT makes the libusb prefix
+          # a find root (see mingw32-cross.cmake).
+          export PKG_CONFIG_LIBDIR="$PWD/libusb-win32/lib/pkgconfig"
+          export LABRADOR_WIN32_ROOT="$PWD/libusb-win32"
+          cmake --preset windows32
+          cmake --build --preset windows32
+
+      - name: Verify static link
+        run: |
+          set -euxo pipefail
+          EXE=build/windows32/labrador.exe
+          i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name"
+          if i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+            echo "ERROR: unexpected non-system DLL import in $EXE" >&2
+            exit 1
+          fi
+          i686-w64-mingw32-objdump -f "$EXE" | grep "pei-i386"
+
+      - name: Upload x86 exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: win32-exe
+          path: Unified_App/build/windows32/labrador.exe
+          if-no-files-found: error
+
   build-windows:
+    needs: build-win32
     runs-on: windows-latest
     defaults:
       run:
@@ -45,44 +104,30 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-libusb
-            mingw-w64-i686-toolchain
-            mingw-w64-i686-cmake
-            mingw-w64-i686-ninja
-            mingw-w64-i686-pkgconf
-            mingw-w64-i686-libusb
+
+      - name: Download x86 exe
+        uses: actions/download-artifact@v4
+        with:
+          name: win32-exe
+          path: Unified_App/win32-exe
 
       - name: Build x64
         run: |
           cmake --preset windows
           cmake --build --preset windows
 
-      # Same shell, 32-bit toolchain: MSYSTEM switches the environment.
-      - name: Build x86
-        env:
-          MSYSTEM: MINGW32
-        run: |
-          cmake --preset windows32
-          cmake --build --preset windows32
-
       - name: Verify static link
         run: |
           set -euxo pipefail
-          # Both exes link -static: the import table must hold only Windows
-          # system DLLs - no MinGW runtime, no libusb.  (objdump, not ldd:
-          # msys2's ldd spawns the target and can't inspect the 32-bit exe
-          # from a 64-bit shell.)
-          for EXE in build/windows/labrador.exe build/windows32/labrador.exe; do
-            echo "== $EXE"
-            objdump -x "$EXE" | grep "DLL Name"
-            if objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
-              echo "ERROR: unexpected non-system DLL import in $EXE" >&2
-              exit 1
-            fi
-          done
-          objdump -f build/windows/labrador.exe   | grep "pei-x86-64"
-          objdump -f build/windows32/labrador.exe | grep "pei-i386"
-          # Loader-level check (resolves every import); 64-bit exe only, the
-          # msys2 shell can't debug a 32-bit process.
+          # Import table must hold only Windows system DLLs - no MinGW
+          # runtime, no libusb.
+          objdump -x build/windows/labrador.exe | grep "DLL Name"
+          if objdump -x build/windows/labrador.exe | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+            echo "ERROR: unexpected non-system DLL import" >&2
+            exit 1
+          fi
+          objdump -f build/windows/labrador.exe | grep "pei-x86-64"
+          # Loader-level check (resolves every import).
           ldd build/windows/labrador.exe
 
       - name: Assemble staging tree
@@ -93,7 +138,7 @@ jobs:
           # Both arch exes; the .iss installs the one matching the host as
           # labrador.exe.
           cp build/windows/labrador.exe "$STAGE/labrador64.exe"
-          cp build/windows32/labrador.exe "$STAGE/labrador32.exe"
+          cp win32-exe/labrador.exe "$STAGE/labrador32.exe"
           # Assets (+ firmware) next to the exe; SDL_GetBasePath() = exe dir.
           cp -r assets/. "$STAGE/assets/"
           mkdir -p "$STAGE/assets/firmware"

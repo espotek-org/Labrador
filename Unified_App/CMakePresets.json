@@ -30,7 +30,8 @@
     },
     {
       "name": "windows32",
-      "inherits": "windows"
+      "inherits": "windows",
+      "toolchainFile": "${sourceDir}/packaging/windows/mingw32-cross.cmake"
     },
     {
       "name": "debug",
