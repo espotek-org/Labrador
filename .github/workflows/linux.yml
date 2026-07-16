@@ -75,7 +75,7 @@ jobs:
           wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
           tar xzf libdecor-0.2.2.tar.gz
           cd libdecor-0.2.2
-          meson setup build --prefix=/usr --buildtype=release -Ddemo=false
+          meson setup build --prefix=/usr --buildtype=release -Ddemo=false -Dgtk=disabled
           ninja -C build install
 
       # Static libusb for the self-contained AppImage binary. --disable-udev:
@@ -203,7 +203,7 @@ jobs:
           wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
           tar xzf libdecor-0.2.2.tar.gz
           cd libdecor-0.2.2
-          meson setup build --prefix=/usr --buildtype=release -Ddemo=false
+          meson setup build --prefix=/usr --buildtype=release -Ddemo=false -Dgtk=disabled
           ninja -C build install
 
       - name: Build
