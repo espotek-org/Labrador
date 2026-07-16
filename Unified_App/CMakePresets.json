@@ -11,6 +11,14 @@
     { "name": "macos", "inherits": "base" },
     { "name": "linux", "inherits": "base" },
     {
+      "name": "appimage",
+      "inherits": "base",
+      "cacheVariables": {
+        "LABRADOR_STATIC_LIBUSB": "ON",
+        "LABRADOR_STATIC_RUNTIME": "ON"
+      }
+    },
+    {
       "name": "pi",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "LABRADOR_GLES2": "ON" }
@@ -25,6 +33,7 @@
   "buildPresets": [
     { "name": "macos", "configurePreset": "macos" },
     { "name": "linux", "configurePreset": "linux" },
+    { "name": "appimage", "configurePreset": "appimage" },
     { "name": "pi", "configurePreset": "pi" },
     { "name": "windows", "configurePreset": "windows" },
     { "name": "debug", "configurePreset": "debug" }

@@ -90,6 +90,9 @@ jobs:
             the file, then run it. Installs the udev rules on first launch.
           - `Labrador_x86_64.deb` / `Labrador_arm64.deb` — `sudo dpkg -i <file>`.
 
+          Needs a distro of Ubuntu 20.04 / Debian 11 / Pi OS bullseye vintage
+          or newer (glibc 2.31+).
+
           ## Android
 
           `Labrador-for-Android.apk` — sideload on Android 7.1 "Nougat" or later

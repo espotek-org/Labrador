@@ -1,6 +1,14 @@
 # Build + package the Unified_App (SDL3/ImGui) Linux artifacts: AppImage and
 # .deb for x86_64 and arm64 (Raspberry Pi), each carrying the firmware hex, udev
 # rules, icon and .desktop entry. Also a Raspberry-Pi GLES2 compile check.
+#
+# Both package jobs build inside an ubuntu:20.04 container so the binaries'
+# glibc floor is 2.31 (Ubuntu 20.04+ / Debian 11+ / Pi OS bullseye+).  20.04
+# ships wayland 1.18, SDL3's minimum, so the Wayland backend stays enabled --
+# libdecor (not packaged on 20.04) is built from source, and SDL dlopens it at
+# runtime like the rest of the Wayland stack.  The AppImage binary statically
+# links libstdc++/libgcc (so the host's C++ runtime version is irrelevant) and
+# libusb; the .deb stays fully dynamic and lets dpkg manage its dependencies.
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
 # asset-appimage-<arch> and asset-deb-<arch>.
 name: Build Linux
@@ -30,27 +38,82 @@ jobs:
             arch: arm64
             ldarch: aarch64
     runs-on: ${{ matrix.os }}
+    container: ubuntu:20.04
     env:
       APPIMAGE_EXTRACT_AND_RUN: 1
+      DEBIAN_FRONTEND: noninteractive
     steps:
+      # Ordered before checkout: actions/checkout needs git inside the
+      # container (and the default working-directory only exists after it).
+      - name: Install dependencies
+        working-directory: /
+        run: |
+          apt-get update
+          apt-get install -y build-essential git ca-certificates wget bzip2 file \
+            pkg-config python3-pip \
+            libgl1-mesa-dev libegl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev
+          # 20.04's cmake (3.16) and meson (0.53) are too old; ninja to match.
+          pip3 install "cmake>=3.22,<4" ninja meson
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install dependencies
+      # Not packaged on 20.04.  SDL compiles Wayland CSD support against these
+      # headers and dlopens libdecor-0.so.0 from the host at runtime, so the
+      # build products themselves never link it.
+      - name: Build libdecor
+        working-directory: /
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config wget \
-            libusb-1.0-0-dev libgl1-mesa-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
-            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
+          set -euxo pipefail
+          wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
+          tar xzf libdecor-0.2.2.tar.gz
+          cd libdecor-0.2.2
+          meson setup build --prefix=/usr --buildtype=release -Ddemo=false
+          ninja -C build install
+
+      # Static libusb for the self-contained AppImage binary. --disable-udev:
+      # hotplug via netlink and sysfs enumeration, no libudev dependency.
+      - name: Build static libusb
+        run: |
+          set -euxo pipefail
+          wget -nv https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
+          tar xjf libusb-1.0.29.tar.bz2
+          cd libusb-1.0.29
+          ./configure --prefix="$PWD/../libusb-static" --disable-udev \
+            --enable-static --disable-shared
+          make -j"$(nproc)"
+          make install
 
       - name: Build
         run: |
-          cmake --preset linux
-          cmake --build --preset linux
+          export PKG_CONFIG_PATH="$PWD/libusb-static/lib/pkgconfig"
+          cmake --preset appimage
+          cmake --build --preset appimage
+
+      - name: Verify portability
+        run: |
+          set -euxo pipefail
+          BIN=build/appimage/labrador
+          # glibc floor must stay at the container's 2.31.
+          objdump -p "$BIN" | grep NEEDED
+          MAX=$(objdump -T "$BIN" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -Vu | tail -1)
+          echo "max glibc symbol: $MAX"
+          test "$(printf '%s\nGLIBC_2.31\n' "$MAX" | sort -V | tail -1)" = "GLIBC_2.31"
+          # C++ runtime and libusb are baked in, not dynamic dependencies.
+          if objdump -p "$BIN" | grep -E 'NEEDED.*(libstdc\+\+|libgcc_s|libusb)'; then
+            echo "ERROR: unexpected dynamic dependency" >&2
+            exit 1
+          fi
+          # Both video backends (and libdecor CSD support) must be compiled in.
+          CFG=$(find build/appimage -name SDL_build_config.h | head -1)
+          grep -q "#define SDL_VIDEO_DRIVER_WAYLAND 1" "$CFG"
+          grep -q "#define SDL_VIDEO_DRIVER_X11 1" "$CFG"
+          grep -q "#define HAVE_LIBDECOR_H 1" "$CFG"
 
       - name: Assemble AppDir
         run: |
@@ -62,7 +125,7 @@ jobs:
                    "$APPDIR/usr/share/applications" \
                    "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
                    "$APPDIR/apprun-hooks"
-          cp build/linux/labrador "$APPDIR/usr/bin/labrador"
+          cp build/appimage/labrador "$APPDIR/usr/bin/labrador"
           # SDL_GetBasePath() resolves /proc/self/exe -> usr/bin, so assets live there.
           cp -r assets/. "$APPDIR/usr/bin/assets/"
           mkdir -p "$APPDIR/usr/bin/assets/firmware"
@@ -108,20 +171,38 @@ jobs:
             arch: arm64
             name: arm64
     runs-on: ${{ matrix.os }}
+    container: ubuntu:20.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+      - name: Install dependencies
+        working-directory: /
+        run: |
+          apt-get update
+          apt-get install -y build-essential git ca-certificates wget \
+            pkg-config python3-pip \
+            libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev
+          pip3 install "cmake>=3.22,<4" ninja meson
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install dependencies
+      # Same source-built libdecor as the AppImage job: SDL needs the headers
+      # to compile Wayland CSD support, then dlopens it from the host.
+      - name: Build libdecor
+        working-directory: /
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            libusb-1.0-0-dev libgl1-mesa-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev \
-            libdecor-0-dev libpipewire-0.3-dev libdbus-1-dev
+          set -euxo pipefail
+          wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
+          tar xzf libdecor-0.2.2.tar.gz
+          cd libdecor-0.2.2
+          meson setup build --prefix=/usr --buildtype=release -Ddemo=false
+          ninja -C build install
 
       - name: Build
         run: |

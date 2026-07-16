@@ -16,6 +16,16 @@ option(LABRADOR_GLES2 "Target OpenGL ES 2.0 (Raspberry Pi builds)" OFF)
 # need it: MinGW's -static below already resolves libusb-1.0.a.
 option(LABRADOR_STATIC_LIBUSB "Link libusb statically" OFF)
 
+# AppImage builds: bake the C++ runtime into the binary so the AppImage runs
+# on hosts with an older libstdc++ than the build machine's (this replaces
+# the old Qt-era AppRun libstdc++ version-check hack).  --exclude-libs keeps
+# the static runtime's symbols out of the dynamic symbol table so the host's
+# dlopen'd Mesa drivers can't bind to them.
+option(LABRADOR_STATIC_RUNTIME "Statically link libstdc++/libgcc" OFF)
+if(LABRADOR_STATIC_RUNTIME)
+    add_link_options(-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL)
+endif()
+
 # Windows ships a single self-contained exe: libgcc/libstdc++/winpthread and
 # libusb all come from MSYS2's static archives (system DLLs stay dynamic).
 if(MINGW)
