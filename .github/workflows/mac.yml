@@ -33,8 +33,9 @@ jobs:
       - name: Dependencies
         run: brew install ninja pkg-config create-dmg
 
-      # Homebrew libusb is single-arch; build a universal libusb from source so
-      # the app can be a real universal (arm64 + x86_64) binary.
+      # Homebrew libusb is single-arch; build a universal static libusb from
+      # source so the app is one self-contained universal (arm64 + x86_64)
+      # binary with libusb baked in.
       - name: Build universal libusb
         run: |
           set -euxo pipefail
@@ -42,12 +43,12 @@ jobs:
             https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
           tar xjf libusb.tar.bz2
           cd libusb-1.0.29
-          ./configure --prefix="$PWD/../libusb-univ" --enable-shared --disable-static \
+          ./configure --prefix="$PWD/../libusb-univ" --enable-static --disable-shared \
             CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=11.0" \
             LDFLAGS="-arch arm64 -arch x86_64"
           make -j$(sysctl -n hw.ncpu)
           make install
-          lipo -info ../libusb-univ/lib/libusb-1.0.0.dylib
+          lipo -info ../libusb-univ/lib/libusb-1.0.a
 
       - name: Configure
         run: |
@@ -56,6 +57,7 @@ jobs:
           export PKG_CONFIG_PATH="$PWD/libusb-univ/lib/pkgconfig"
           cmake -S . -B build/macos -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DLABRADOR_STATIC_LIBUSB=ON \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
@@ -67,7 +69,7 @@ jobs:
           set -euxo pipefail
           APP=Labrador.app
           rm -rf "$APP"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
           # Binary + resources (bundle the firmware hex the librador flashes).
           cp build/macos/labrador "$APP/Contents/MacOS/labrador"
@@ -84,16 +86,13 @@ jobs:
           sed -e "s/__SHORT_VERSION__/2.0/" -e "s/__BUNDLE_VERSION__/${VER}/" \
             packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 
-          # Bundle libusb and repoint the binary at it (@executable_path/../Frameworks).
-          cp libusb-univ/lib/libusb-1.0.0.dylib "$APP/Contents/Frameworks/"
-          chmod u+w "$APP/Contents/Frameworks/libusb-1.0.0.dylib"
-          OLD=$(otool -L "$APP/Contents/MacOS/labrador" | awk '/libusb-1.0.0.dylib/ {print $1; exit}')
-          echo "Rewriting libusb path: $OLD"
-          install_name_tool -change "$OLD" "@executable_path/../Frameworks/libusb-1.0.0.dylib" \
-            "$APP/Contents/MacOS/labrador"
-          install_name_tool -id "@executable_path/../Frameworks/libusb-1.0.0.dylib" \
-            "$APP/Contents/Frameworks/libusb-1.0.0.dylib"
-          otool -L "$APP/Contents/MacOS/labrador" | grep -i usb
+          # libusb is statically linked; the only load commands left should be
+          # Apple system libraries and frameworks.
+          otool -L "$APP/Contents/MacOS/labrador"
+          if otool -L "$APP/Contents/MacOS/labrador" | grep -v "^Labrador" | grep -vE "/usr/lib/|/System/Library/"; then
+            echo "ERROR: unexpected non-system dynamic dependency" >&2
+            exit 1
+          fi
 
       - name: Import code signing certificate
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
@@ -114,8 +113,6 @@ jobs:
         run: |
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
           echo "Using signing identity: $IDENTITY"
-          codesign --force --timestamp --options runtime --sign "$IDENTITY" \
-            Labrador.app/Contents/Frameworks/libusb-1.0.0.dylib
           codesign --force --deep --timestamp --options runtime --sign "$IDENTITY" Labrador.app
           codesign -vv --deep --strict Labrador.app
           echo "App bundle signed successfully"

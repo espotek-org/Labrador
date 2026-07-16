@@ -1,7 +1,8 @@
 # Build + package the Unified_App (SDL3/ImGui) Windows installer. Builds with
 # MSYS2 MINGW64 (x64) and wraps it with Inno Setup 6 (FOSS; replaces the old
-# proprietary Advanced Installer pipeline). The installer bundles the app, its
-# assets + firmware, the MinGW runtime DLLs, and the USB driver installers.
+# proprietary Advanced Installer pipeline). The exe is fully static (MinGW
+# runtime + libusb baked in; only OS DLLs remain dynamic); the installer
+# bundles it with the assets + firmware and the USB driver installers.
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
 # asset-windows-installer.
 name: Build Windows
@@ -48,6 +49,17 @@ jobs:
       - name: Build
         run: cmake --build --preset windows
 
+      - name: Verify static link
+        run: |
+          set -euxo pipefail
+          # The exe links -static: no MinGW runtime or libusb DLLs allowed,
+          # only Windows system DLLs.
+          ldd build/windows/labrador.exe
+          if ldd build/windows/labrador.exe | grep -i mingw64; then
+            echo "ERROR: unexpected MinGW DLL dependency" >&2
+            exit 1
+          fi
+
       - name: Assemble staging tree
         run: |
           set -euxo pipefail
@@ -58,8 +70,6 @@ jobs:
           cp -r assets/. "$STAGE/assets/"
           mkdir -p "$STAGE/assets/firmware"
           cp firmware/*.hex "$STAGE/assets/firmware/"
-          # MinGW runtime DLLs (libusb, libstdc++, winpthread, libgcc, ...).
-          ldd build/windows/labrador.exe | awk '/mingw64/ {print $3}' | xargs -r cp -t "$STAGE/"
           # USB driver installers (shared with the Qt build; hardware-generic).
           cp ../Desktop_Interface/build_win/driver/*.exe "$STAGE/driver/"
           # Installer icon next to the .iss (ISCC resolves SetupIconFile relatively).

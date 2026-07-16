@@ -35,7 +35,25 @@ else()
     # Desktop: system libusb; dfuprog manages its own context and discovery.
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(DFUPROG_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
-    target_link_libraries(libdfuprog PUBLIC PkgConfig::DFUPROG_LIBUSB)
+    # LABRADOR_STATIC_LIBUSB is set by the parent Unified_App build for
+    # self-contained bundles (macOS .app, Linux AppImage).  Link the archive
+    # by absolute path (a plain -lusb-1.0 would prefer a .dylib/.so sitting
+    # next to it), then append Libs.private via STATIC_LDFLAGS_OTHER plus any
+    # extra -l deps (e.g. objc).
+    if(LABRADOR_STATIC_LIBUSB)
+        find_library(DFUPROG_LIBUSB_STATIC_ARCHIVE NAMES libusb-1.0.a
+                     HINTS ${DFUPROG_LIBUSB_STATIC_LIBRARY_DIRS} ${DFUPROG_LIBUSB_LIBRARY_DIRS})
+        if(NOT DFUPROG_LIBUSB_STATIC_ARCHIVE)
+            message(FATAL_ERROR "LABRADOR_STATIC_LIBUSB=ON but libusb-1.0.a was not found")
+        endif()
+        set(DFUPROG_LIBUSB_STATIC_DEPS ${DFUPROG_LIBUSB_STATIC_LIBRARIES})
+        list(REMOVE_ITEM DFUPROG_LIBUSB_STATIC_DEPS usb-1.0)
+        target_include_directories(libdfuprog PUBLIC ${DFUPROG_LIBUSB_STATIC_INCLUDE_DIRS})
+        target_link_libraries(libdfuprog PUBLIC ${DFUPROG_LIBUSB_STATIC_ARCHIVE}
+            ${DFUPROG_LIBUSB_STATIC_DEPS} ${DFUPROG_LIBUSB_STATIC_LDFLAGS_OTHER})
+    else()
+        target_link_libraries(libdfuprog PUBLIC PkgConfig::DFUPROG_LIBUSB)
+    endif()
     target_compile_definitions(libdfuprog PRIVATE HAVE_CONFIG_H)
 endif()
 

@@ -11,6 +11,17 @@ endif()
 # Renderer floor: desktop = GL3, Android = GLES3, Raspberry Pi = GLES2 (Pi 3 and up)
 option(LABRADOR_GLES2 "Target OpenGL ES 2.0 (Raspberry Pi builds)" OFF)
 
+# Self-contained release builds: link libusb from its static archive instead
+# of a bundled shared library (macOS .app, Linux AppImage).  Windows doesn't
+# need it: MinGW's -static below already resolves libusb-1.0.a.
+option(LABRADOR_STATIC_LIBUSB "Link libusb statically" OFF)
+
+# Windows ships a single self-contained exe: libgcc/libstdc++/winpthread and
+# libusb all come from MSYS2's static archives (system DLLs stay dynamic).
+if(MINGW)
+    add_link_options(-static)
+endif()
+
 # Labrador hardware sends signed chars; some ARM ABIs default to unsigned char
 # (espotek-org/Labrador#231)
 if(NOT MSVC)
@@ -94,7 +105,23 @@ if(ANDROID)
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
-    target_link_libraries(librador PUBLIC PkgConfig::LIBUSB)
+    if(LABRADOR_STATIC_LIBUSB)
+        # Link the archive by absolute path (a plain -lusb-1.0 would prefer a
+        # .dylib/.so sitting next to it), then append Libs.private: frameworks
+        # via STATIC_LDFLAGS_OTHER plus any extra -l deps (e.g. objc).
+        find_library(LIBUSB_STATIC_ARCHIVE NAMES libusb-1.0.a
+                     HINTS ${LIBUSB_STATIC_LIBRARY_DIRS} ${LIBUSB_LIBRARY_DIRS})
+        if(NOT LIBUSB_STATIC_ARCHIVE)
+            message(FATAL_ERROR "LABRADOR_STATIC_LIBUSB=ON but libusb-1.0.a was not found")
+        endif()
+        set(LIBUSB_STATIC_DEPS ${LIBUSB_STATIC_LIBRARIES})
+        list(REMOVE_ITEM LIBUSB_STATIC_DEPS usb-1.0)
+        target_include_directories(librador PUBLIC ${LIBUSB_STATIC_INCLUDE_DIRS})
+        target_link_libraries(librador PUBLIC ${LIBUSB_STATIC_ARCHIVE}
+            ${LIBUSB_STATIC_DEPS} ${LIBUSB_STATIC_LDFLAGS_OTHER})
+    else()
+        target_link_libraries(librador PUBLIC PkgConfig::LIBUSB)
+    endif()
 endif()
 
 # --- Application ---

@@ -1,13 +1,14 @@
 ; Inno Setup script for the EspoTek Labrador Unified App (Windows installer).
 ;
 ; FOSS replacement for the old Advanced Installer (.aip) pipeline. Produces a
-; single self-contained "Labrador-for-Windows.exe" that installs the app, its
-; bundled assets + firmware hex, the MinGW runtime DLLs, and the USB driver
-; installers, and offers to run the primary driver installer at the end.
+; single self-contained "Labrador-for-Windows.exe" that installs the app (a
+; fully static exe: MinGW runtime + libusb baked in), its bundled assets +
+; firmware hex, and the USB driver installers, and offers to run the primary
+; driver installer at the end.
 ;
 ; Built in CI with:
 ;   ISCC.exe /DMyAppVersion=... /DStagingDir=... /DOutputDir=... labrador.iss
-; The staging dir must contain: labrador.exe, *.dll, assets\, driver\.
+; The staging dir must contain: labrador.exe, assets\, driver\.
 ; appicon.ico must sit next to this script (the workflow copies it in).
 
 #ifndef MyAppVersion
@@ -54,9 +55,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; Earlier installers shipped the MinGW runtime + libusb as DLLs next to the
+; exe; the exe is fully static now, so clear them out on upgrade.
+Type: files; Name: "{app}\*.dll"
+
 [Files]
 Source: "{#StagingDir}\labrador.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#StagingDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StagingDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion recursesubdirs createallsubdirs
 
