@@ -644,12 +644,18 @@ int usbCallHandler::resolve_transport(){
     if(t == LABRADOR_TRANSPORT_AUTO){
 #if defined(__APPLE__)
         t = LABRADOR_TRANSPORT_BULK;
-#elif defined(_WIN64)
-        t = LABRADOR_TRANSPORT_ISO6;
-#elif defined(_WIN32)
+#elif defined(__ANDROID__)
+        // Phone USB stacks haven't been exercised with six concurrent iso
+        // pipes; hold Android at the single-endpoint transport until iso6
+        // is validated on-device.
         t = LABRADOR_TRANSPORT_ISO1;
 #else
-        t = LABRADOR_TRANSPORT_ISO1;   // linux (all), android, pi
+        // Windows (64- and 32-bit) and Linux/Pi: iso6.  Cross-endpoint
+        // arrival order stopped mattering when frames became per-endpoint
+        // queues assembled in lockstep and validated against the meta
+        // stream's seq+checksum (the ordering problem that once forced the
+        // Qt app onto libusbK.dll on Windows).
+        t = LABRADOR_TRANSPORT_ISO6;
 #endif
     }
 #if defined(__APPLE__) && !defined(LIBRADOR_MACOS_ALLOW_ISO)
