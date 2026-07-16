@@ -82,8 +82,12 @@ jobs:
 
           ## Windows
 
-          `Labrador-for-Windows.exe` — installer bundling the app, firmware, and
+          `Labrador-for-Windows.exe` — installer bundling the app (64-bit and
+          32-bit; it installs the one matching your Windows), firmware, and
           USB driver. Run it and accept the driver-install prompt at the end.
+          Tested on Windows 10 and 11; Windows 7 SP1 and 8.1 should work (the
+          app has no newer OS dependencies) but are untested — reports
+          welcome.
 
           ## Linux (including Raspberry Pi)
 

@@ -1,8 +1,11 @@
 # Build + package the Unified_App (SDL3/ImGui) Windows installer. Builds with
-# MSYS2 MINGW64 (x64) and wraps it with Inno Setup 6 (FOSS; replaces the old
-# proprietary Advanced Installer pipeline). The exe is fully static (MinGW
-# runtime + libusb baked in; only OS DLLs remain dynamic); the installer
-# bundles it with the assets + firmware and the USB driver installers.
+# MSYS2 MINGW64 (x64) and MINGW32 (x86 - the Qt app always shipped 32-bit;
+# don't regress old lab machines) and wraps both in ONE Inno Setup 6
+# installer that installs the exe matching the host (FOSS; replaces the old
+# proprietary Advanced Installer pipeline). Both exes are fully static
+# (MinGW runtime + libusb baked in; only OS DLLs remain dynamic); the
+# installer bundles them with the assets + firmware and the USB driver
+# installers (whose dpinst32/x86 libusbK.sys already covered 32-bit).
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
 # asset-windows-installer.
 name: Build Windows
@@ -42,30 +45,55 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-libusb
+            mingw-w64-i686-toolchain
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            mingw-w64-i686-pkgconf
+            mingw-w64-i686-libusb
 
-      - name: Configure
-        run: cmake --preset windows
+      - name: Build x64
+        run: |
+          cmake --preset windows
+          cmake --build --preset windows
 
-      - name: Build
-        run: cmake --build --preset windows
+      # Same shell, 32-bit toolchain: MSYSTEM switches the environment.
+      - name: Build x86
+        env:
+          MSYSTEM: MINGW32
+        run: |
+          cmake --preset windows32
+          cmake --build --preset windows32
 
       - name: Verify static link
         run: |
           set -euxo pipefail
-          # The exe links -static: no MinGW runtime or libusb DLLs allowed,
-          # only Windows system DLLs.
+          # Both exes link -static: the import table must hold only Windows
+          # system DLLs - no MinGW runtime, no libusb.  (objdump, not ldd:
+          # msys2's ldd spawns the target and can't inspect the 32-bit exe
+          # from a 64-bit shell.)
+          for EXE in build/windows/labrador.exe build/windows32/labrador.exe; do
+            echo "== $EXE"
+            objdump -x "$EXE" | grep "DLL Name"
+            if objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+              echo "ERROR: unexpected non-system DLL import in $EXE" >&2
+              exit 1
+            fi
+          done
+          objdump -f build/windows/labrador.exe   | grep "pei-x86-64"
+          objdump -f build/windows32/labrador.exe | grep "pei-i386"
+          # Loader-level check (resolves every import); 64-bit exe only, the
+          # msys2 shell can't debug a 32-bit process.
           ldd build/windows/labrador.exe
-          if ldd build/windows/labrador.exe | grep -i mingw64; then
-            echo "ERROR: unexpected MinGW DLL dependency" >&2
-            exit 1
-          fi
 
       - name: Assemble staging tree
         run: |
           set -euxo pipefail
           STAGE=packaging/windows/staging
           rm -rf "$STAGE"; mkdir -p "$STAGE/assets" "$STAGE/driver"
-          cp build/windows/labrador.exe "$STAGE/"
+          # Both arch exes; the .iss installs the one matching the host as
+          # labrador.exe.
+          cp build/windows/labrador.exe "$STAGE/labrador64.exe"
+          cp build/windows32/labrador.exe "$STAGE/labrador32.exe"
           # Assets (+ firmware) next to the exe; SDL_GetBasePath() = exe dir.
           cp -r assets/. "$STAGE/assets/"
           mkdir -p "$STAGE/assets/firmware"

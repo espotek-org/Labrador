@@ -29,6 +29,10 @@
       "cacheVariables": { "LABRADOR_STATIC_LIBUSB": "ON" }
     },
     {
+      "name": "windows32",
+      "inherits": "windows"
+    },
+    {
       "name": "debug",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
@@ -40,6 +44,7 @@
     { "name": "appimage", "configurePreset": "appimage" },
     { "name": "pi", "configurePreset": "pi" },
     { "name": "windows", "configurePreset": "windows" },
+    { "name": "windows32", "configurePreset": "windows32" },
     { "name": "debug", "configurePreset": "debug" }
   ]
 }

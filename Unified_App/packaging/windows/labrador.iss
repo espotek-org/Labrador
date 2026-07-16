@@ -2,14 +2,16 @@
 ;
 ; FOSS replacement for the old Advanced Installer (.aip) pipeline. Produces a
 ; single self-contained "Labrador-for-Windows.exe" that installs the app (a
-; fully static exe: MinGW runtime + libusb baked in), its bundled assets +
-; firmware hex, and the USB driver installers, and offers to run the primary
-; driver installer at the end.
+; fully static exe: MinGW runtime + libusb baked in; the x64 or x86 build
+; matching the host - the Qt app always shipped 32-bit, so 32-bit Windows
+; stays supported), its bundled assets + firmware hex, and the USB driver
+; installers, and offers to run the primary driver installer at the end.
 ;
 ; Built in CI with:
 ;   ISCC.exe /DMyAppVersion=... /DStagingDir=... /DOutputDir=... labrador.iss
-; The staging dir must contain: labrador.exe, assets\, driver\.
-; appicon.ico must sit next to this script (the workflow copies it in).
+; The staging dir must contain: labrador64.exe, labrador32.exe, assets\,
+; driver\.  appicon.ico must sit next to this script (the workflow copies it
+; in).
 
 #ifndef MyAppVersion
   #define MyAppVersion "2.0.0"
@@ -45,8 +47,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=appicon.ico
-; The unified app is 64-bit only (MSYS2 MINGW64 build).
-ArchitecturesAllowed=x64compatible
+; x64-capable hosts (including ARM64 via emulation) install in 64-bit mode
+; and get the x64 exe; 32-bit x86 hosts install the x86 exe.
 ArchitecturesInstallIn64BitMode=x64compatible
 
 [Languages]
@@ -61,7 +63,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: files; Name: "{app}\*.dll"
 
 [Files]
-Source: "{#StagingDir}\labrador.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#StagingDir}\labrador64.exe"; DestDir: "{app}"; DestName: "labrador.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "{#StagingDir}\labrador32.exe"; DestDir: "{app}"; DestName: "labrador.exe"; Flags: ignoreversion solidbreak; Check: not Is64BitInstallMode
 Source: "{#StagingDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion recursesubdirs createallsubdirs
 
