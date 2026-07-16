@@ -56,7 +56,7 @@ jobs:
             libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev
+            libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev
           # 20.04's cmake (3.16) and meson (0.53) are too old; ninja to match.
           pip3 install "cmake>=3.22,<4" ninja meson
 
@@ -186,7 +186,7 @@ jobs:
             libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev
+            libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev
           pip3 install "cmake>=3.22,<4" ninja meson
 
       - name: Checkout repository
