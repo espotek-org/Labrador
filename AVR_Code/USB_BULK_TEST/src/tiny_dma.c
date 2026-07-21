@@ -328,7 +328,7 @@ void tiny_dma_set_mode_2(void){
 	DMA.CH3.DESTADDR2 = 0x00;
 	
 	//Must enable last for REPCNT won't work!
-	DMA.CH3.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
+// 	DMA.CH3.CTRLA |= DMA_CH_ENABLE_bm;  //Enable!
 	
 	DMA.CH0.CTRLA = 0x00;
 	DMA.CH0.CTRLA = DMA_CH_RESET_bm;
@@ -351,7 +351,7 @@ void tiny_dma_set_mode_2(void){
 	DMA.CH1.CTRLA = DMA_STANDARD_CTRLA;
 	DMA.CH1.CTRLB = DMA_STANDARD_INTERRUPT;
 	DMA.CH1.ADDRCTRL = DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_DESTRELOAD_BLOCK_gc;   //Source reloads after each burst, with byte incrementing.  Dest does not reload, but does increment address.
-	DMA.CH1.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc;	//Triggered from ADCA channel 0
+	DMA.CH1.TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH2_gc;	//Triggered from ADCA channel 2
 	DMA.CH1.TRFCNT = DMA_STANDARD_TRANSFER_LENGTH;
 				
 	DMA.CH1.SRCADDR0 = (( (uint16_t) &ADCA.CH2.RESL) >> 0) & 0xFF; //Source address is ADC
