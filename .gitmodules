@@ -9,10 +9,9 @@
 	path = Android_App/app/src/main/cpp/deps/imgui
 	url = https://github.com/brentfpage/imgui.git
 	branch = for_labrador_android_app
-[submodule "Android_App/app/src/main/cpp/deps/SDL"]
-	path = Android_App/app/src/main/cpp/deps/SDL
-	url = https://github.com/brentfpage/SDL.git
-	branch = for_labrador_app
 [submodule "Unified_App/deps/SDL"]
 	path = Unified_App/deps/SDL
+	url = https://github.com/libsdl-org/SDL
+[submodule "Android_App/app/src/main/cpp/deps/SDL"]
+	path = Android_App/app/src/main/cpp/deps/SDL
 	url = https://github.com/libsdl-org/SDL
