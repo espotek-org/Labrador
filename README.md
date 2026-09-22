@@ -72,9 +72,11 @@ services.udev.extraRules = ''
 On other distros, copy `Desktop_Interface/build_linux/69-labrador.rules` to `/etc/udev/rules.d/` and run `sudo udevadm control --reload-rules`. Unplug and replug the device after applying rules.
 
 # Extras
-There are community contributed 3D printable cases available at Thingiverse, courtesy of SpaceBex and Bostwickenator:
+There are community contributed 3D printable cases available at Thingiverse, courtesy of SpaceBex, Bostwickenator and carterw:
 * https://www.thingiverse.com/thing:3188243
 * https://www.thingiverse.com/thing:4705392
+* https://www.thingiverse.com/thing:7400465
+
 
 Dave Messink has designed [a case that can be laser cut from 3mm plywood](https://github.com/espotek-org/Labrador/files/13813693/Re__Labrador_Case.1.zip).  The [binding posts](https://www.amazon.com/dp/B07YKYP8MN) and [cables](https://www.amazon.com/dp/B08KZGPTLM) he used are from Amazon.  
 ![Top view](https://github.com/espotek-org/Labrador/assets/22040436/7245c645-ce89-41ae-a505-a47f29ab8875)
