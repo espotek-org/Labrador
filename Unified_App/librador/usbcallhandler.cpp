@@ -328,11 +328,11 @@ void usbCallHandler::ingest_thread_function(){
 // ---------------------------------------------------------------------------
 
 void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
-    if(!is_iso_thread_shutdown_requested()){
+    if(!iso_thread_shutdown_requested){
         int error = libusb_submit_transfer(transfer);
         if(error){
             LIBRADOR_LOG(LOG_WARNING, "Error re-arming the endpoint!\n");
-            begin_iso_thread_shutdown();
+            iso_thread_shutdown_requested = true;
             decrement_remaining_transfers();
             LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers);
         }
@@ -395,21 +395,6 @@ void LIBUSB_CALL bulkCallback(struct libusb_transfer * transfer){
 }
 
 const char* usbCallHandler::daq_unit_labels[] = {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
-
-int usbCallHandler::begin_iso_thread_shutdown(){
-    iso_thread_shutdown_mutex.lock();
-    iso_thread_shutdown_requested = true;
-    iso_thread_shutdown_mutex.unlock();
-    return 0;
-}
-
-bool usbCallHandler::is_iso_thread_shutdown_requested(){
-    bool tempReturn;
-    iso_thread_shutdown_mutex.lock();
-    tempReturn = iso_thread_shutdown_requested;
-    iso_thread_shutdown_mutex.unlock();
-    return tempReturn;
-}
 
 int usbCallHandler::decrement_remaining_transfers(){
     iso_thread_shutdown_mutex.lock();
@@ -487,7 +472,7 @@ usbCallHandler::~usbCallHandler(){
 
     if(iso_polling_thread)
     {
-        begin_iso_thread_shutdown();
+        iso_thread_shutdown_requested = true;
         LIBRADOR_LOG(LOG_DEBUG, "Shutting down USB polling thread...\n");
         iso_polling_thread->join();
         LIBRADOR_LOG(LOG_DEBUG, "USB polling thread stopped.\n");
@@ -1618,7 +1603,7 @@ void usbCallHandler::teardown_connection(){
             active_transport);
     }
     if(iso_polling_thread) {
-        begin_iso_thread_shutdown();
+        iso_thread_shutdown_requested = true;
         if(iso_polling_thread->joinable())
             iso_polling_thread->join();
         delete iso_polling_thread;
