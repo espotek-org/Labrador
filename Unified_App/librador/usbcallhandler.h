@@ -371,21 +371,16 @@ private:
     o1buffer *internal_o1_buffer_375_CHB;
     o1buffer *internal_o1_buffer_750;
 
-    int begin_iso_thread_shutdown();
-    bool is_iso_thread_shutdown_requested();
-    int decrement_remaining_transfers();
     void free_transfers();
     void rearm_or_retire(struct libusb_transfer *transfer);
     void iso_polling_function(libusb_context *ctx);
-    bool safe_to_exit_thread();
 
 
     std::atomic<bool> iso_thread_shutdown_requested = false;
-    int iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
+    std::atomic<int> iso_thread_shutdown_remaining_transfers = NUM_FUTURE_CTX;
     std::atomic<bool> iso_thread_active = false;
     std::atomic<bool> daq_thread_active = false;
 
-    std::mutex iso_thread_shutdown_mutex;
     std::mutex buffer_read_write_mutex;
     // Serialises teardown_connection: during a firmware flash the worker
     // thread and the main thread's disconnect detection can both reach it.

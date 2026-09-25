@@ -333,12 +333,12 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
         if(error){
             LIBRADOR_LOG(LOG_WARNING, "Error re-arming the endpoint!\n");
             iso_thread_shutdown_requested = true;
-            decrement_remaining_transfers();
-            LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers);
+            iso_thread_shutdown_remaining_transfers--;
+            LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
         }
     } else {
-        decrement_remaining_transfers();
-        LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers);
+        iso_thread_shutdown_remaining_transfers--;
+        LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
     }
 }
 
@@ -396,22 +396,6 @@ void LIBUSB_CALL bulkCallback(struct libusb_transfer * transfer){
 
 const char* usbCallHandler::daq_unit_labels[] = {"Volts", "ADC", "Bits", "None"};// TODO: allow DAQ of decoded chars
 
-int usbCallHandler::decrement_remaining_transfers(){
-    iso_thread_shutdown_mutex.lock();
-    iso_thread_shutdown_remaining_transfers--;
-    iso_thread_shutdown_mutex.unlock();
-    return 0;
-}
-
-bool usbCallHandler::safe_to_exit_thread(){
-    bool tempReturn;
-    iso_thread_shutdown_mutex.lock();
-    tempReturn = (iso_thread_shutdown_remaining_transfers == 0);
-    iso_thread_shutdown_mutex.unlock();
-    return tempReturn;
-}
-
-
 // it makes sense to call this iso_polling_function because we only use libusb's asynchronous API for isochronous transfers
 std::atomic<uint32_t> g_ctrl_req_counts[256];
 
@@ -421,7 +405,7 @@ void usbCallHandler::iso_polling_function(libusb_context *ctx){
     tv.tv_sec = 1;
     tv.tv_usec = 0;//ISO_PACKETS_PER_CTX*4000;
     auto last_stats = std::chrono::steady_clock::now();
-    while(!safe_to_exit_thread()){
+    while(iso_thread_shutdown_remaining_transfers != 0){
         //printf("iso_polling_function begin loop\n");
         if(libusb_event_handling_ok(ctx)){
             libusb_handle_events_timeout(ctx, &tv);
