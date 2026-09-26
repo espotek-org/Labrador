@@ -35,7 +35,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       # Secrets are the base64 PEM bodies (between the BEGIN/END lines):
       #   -----BEGIN CERTIFICATE-----      (X.509 certificate)  -> cert.cer
