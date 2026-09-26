@@ -1770,9 +1770,13 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
         teardown_connection();
     }
 
-    // Wait for the board to enumerate in bootloader mode
+    // Wait for the board to enumerate in bootloader mode.  libusb only lists
+    // the device once the OS has configured it, and on Windows that means
+    // after PnP has bound libusb0.sys to the freshly appeared 03EB:2FE4
+    // device - several seconds the first time a machine sees it - so allow
+    // well beyond the ~1 s the board itself needs (#450).
     bool bootloader = false;
-    for(int attempt = 0; attempt < 50; attempt++){
+    for(int attempt = 0; attempt < 200; attempt++){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         if(desktop_device_present(&bootloader) && bootloader)
             break;

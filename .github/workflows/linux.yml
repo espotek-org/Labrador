@@ -108,6 +108,14 @@ jobs:
           cmake --preset appimage
           cmake --build --preset appimage
 
+      # Unit test for the in-app flasher's command splitting (#450); links the
+      # static libusb built above.
+      - name: Test libdfuprog
+        working-directory: libdfuprog/tests
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/Unified_App/libusb-static/lib/pkgconfig
+        run: make test
+
       - name: Verify portability
         run: |
           set -euxo pipefail
@@ -148,10 +156,6 @@ jobs:
           cp packaging/icon256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png"
           cp packaging/linux/apprun-hooks/udev-helper.sh "$APPDIR/apprun-hooks/"
           chmod +x "$APPDIR/apprun-hooks/udev-helper.sh"
-
-      - name: Test libdfuprog
-        working-directory: libdfuprog/tests
-        run: make test
 
       - name: Build AppImage
         run: |

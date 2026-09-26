@@ -49,6 +49,15 @@ Corollary: if you deliberately put the board in bootloader mode for other
 tools (e.g. `dfu-programmer`), close the Labrador app first, or it will
 helpfully "rescue" your board out of it.
 
+**Windows:** the bootloader is a separate USB device (`03EB:2FE4`) and needs
+its own driver (libusb-win32, installed by `driver\Bootloader_Install.exe`
+in the app folder; the installer offers it at the end of setup). Without it
+the app reports *"Board never appeared in bootloader mode"* and the update
+fails; the board comes back as normal after an unplug/replug. Run the
+driver installer with the board unplugged, then retry the update. The driver
+is the same one earlier (Qt) installers set up, so an existing install does
+not need to change anything. Do **not** use Zadig to swap drivers.
+
 ## "Sorry to Interrupt!" — the misconfigured-board dialog
 
 If the app detects a board with corrupted/incompatible firmware
@@ -109,6 +118,14 @@ dfu-programmer atxmega32a4u flash labrafirm_000C_03.hex
 The `.hex` files live in the app's resources (`firmware/` next to the
 executable, `labrafirm_<version>_<variant>.hex`). The microcontroller is an
 ATxmega32A4U.
+
+On Windows the hex is at `assets\firmware\labrafirm_000C_03.hex` inside the
+install folder (default `C:\Program Files\EspoTek Labrador`). This app does
+not ship a standalone `dfu-programmer.exe`; use the one from the original Qt
+app's `firmware` folder or a build of
+[dfu-programmer](https://github.com/dfu-programmer/dfu-programmer) that links
+libusb-win32/libusb-1.0, and quote the hex path because of the space in
+`Program Files`.
 
 ## Still stuck?
 

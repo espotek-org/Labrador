@@ -5,7 +5,7 @@
 ; fully static exe: MinGW runtime + libusb baked in; the x64 or x86 build
 ; matching the host - the Qt app always shipped 32-bit, so 32-bit Windows
 ; stays supported), its bundled assets + firmware hex, and the USB driver
-; installers, and offers to run the primary driver installer at the end.
+; installers, and offers to run the three driver installers at the end.
 ;
 ; Built in CI with:
 ;   ISCC.exe /DMyAppVersion=... /DStagingDir=... /DOutputDir=... labrador.iss
@@ -74,7 +74,17 @@ Name: "{group}\Uninstall EspoTek Labrador"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\EspoTek Labrador"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; Install the USB driver so Windows recognises the board. The board must be
-; unplugged during driver installation; the installer's own UI guides the user.
+; Install the USB drivers so Windows recognises the board. The board must be
+; unplugged during driver installation; each installer's own UI (dpinst)
+; guides the user. Same three driver packages the Qt installer installed as
+; prerequisites, so existing installs keep the drivers they already have:
+;   Driver_Install.exe     libusbK      for the running board  (03EB:BA94)
+;   Bootloader_Install.exe libusb-win32 for the DFU bootloader (03EB:2FE4) -
+;                          without it the in-app firmware update cannot see
+;                          the board once it has jumped to the bootloader (#450)
+;   Gobindar_Install.exe   libusbK      for the misconfigured-board state
+;                          (03EB:A000) the recovery dialog repairs
 Filename: "{app}\driver\Driver_Install.exe"; Description: "Install the EspoTek Labrador USB driver (required for the board to work)"; Flags: postinstall skipifsilent
+Filename: "{app}\driver\Bootloader_Install.exe"; Description: "Install the firmware-update (bootloader) USB driver (required for firmware updates)"; Flags: postinstall skipifsilent
+Filename: "{app}\driver\Gobindar_Install.exe"; Description: "Install the board-recovery USB driver (repairs misconfigured boards)"; Flags: postinstall skipifsilent
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,EspoTek Labrador}"; Flags: postinstall skipifsilent nowait
