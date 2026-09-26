@@ -1,6 +1,7 @@
 [submodule "libdfuprog/dfu-programmer"]
 	path = libdfuprog/dfu-programmer
-	url = https://github.com/dfu-programmer/dfu-programmer
+	url = https://github.com/espotek-org/dfu-programmer
+	branch = labrador-winusb
 [submodule "Android_App/app/src/main/cpp/deps/implot"]
 	path = Android_App/app/src/main/cpp/deps/implot
 	url = https://github.com/brentfpage/implot.git

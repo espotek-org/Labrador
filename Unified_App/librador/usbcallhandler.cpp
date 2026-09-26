@@ -1,5 +1,6 @@
 #include "usbcallhandler.h"
 //#include <stdio.h>
+#include <cstring>
 
 #include <math.h>
 #include "logging_internal.h"
@@ -1769,9 +1770,13 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
         teardown_connection();
     }
 
-    // Wait for the board to enumerate in bootloader mode
+    // Wait for the board to enumerate in bootloader mode.  libusb only lists
+    // the device once the OS has configured it, and on Windows that means
+    // after PnP has bound libusb0.sys to the freshly appeared 03EB:2FE4
+    // device - several seconds the first time a machine sees it - so allow
+    // well beyond the ~1 s the board itself needs (#450).
     bool bootloader = false;
-    for(int attempt = 0; attempt < 50; attempt++){
+    for(int attempt = 0; attempt < 200; attempt++){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         if(desktop_device_present(&bootloader) && bootloader)
             break;
@@ -1781,13 +1786,22 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
         return -1;
     }
 
-    char command[512];
     int exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u erase --force --debug 300");
     if(exit_code)
         LIBRADOR_LOG(LOG_WARNING, "ERROR ERASING FIRMWARE (%d)\n", exit_code);
 
-    snprintf(command, sizeof command, "dfu-programmer atxmega32a4u flash %s --debug 300", hex_path);
-    exit_code = dfuprog_virtual_cmd(command);
+    // The flash command goes through dfuprog_virtual_main as argv directly:
+    // dfuprog_virtual_cmd tokenises its command string on spaces, which would
+    // split hex_path (e.g. the default Windows install directory
+    // "C:\Program Files\EspoTek Labrador\...").
+    char argv_prog[] = "dfu-programmer";
+    char argv_target[] = "atxmega32a4u";
+    char argv_flash[] = "flash";
+    std::vector<char> argv_hex(hex_path, hex_path + strlen(hex_path) + 1);
+    char argv_debug[] = "--debug";
+    char argv_level[] = "300";
+    char *flash_argv[] = { argv_prog, argv_target, argv_flash, argv_hex.data(), argv_debug, argv_level };
+    exit_code = dfuprog_virtual_main(6, flash_argv);
     if(exit_code){
         LIBRADOR_LOG(LOG_ERROR, "ERROR WRITING NEW FIRMWARE TO DEVICE (%d)\n", exit_code);
         return -2;
