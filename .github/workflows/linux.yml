@@ -149,6 +149,10 @@ jobs:
           cp packaging/linux/apprun-hooks/udev-helper.sh "$APPDIR/apprun-hooks/"
           chmod +x "$APPDIR/apprun-hooks/udev-helper.sh"
 
+      - name: Test libdfuprog
+        working-directory: libdfuprog/tests
+        run: make test
+
       - name: Build AppImage
         run: |
           set -euxo pipefail
