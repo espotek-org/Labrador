@@ -69,6 +69,10 @@ jobs:
           qmake -config release
           make -j$(nproc)
 
+      - name: Test libdfuprog
+        working-directory: libdfuprog/tests
+        run: make test
+
       - name: Build AppImage
         working-directory: Desktop_Interface
         run: |
