@@ -56,6 +56,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 #if defined(PLATFORM_WINDOWS)
     ui->controller_iso->setDriver(new winUsbDriver());
+    //Set before any modal dialog (e.g. the calibration prompt in readSettingsFile) can
+    //spin the event loop and let checkConnection() connect without the reset/reinit.
+    ui->controller_iso->driver->killOnConnect = true;
 #else
     ui->controller_iso->setDriver(new unixUsbDriver());
 #endif
@@ -121,7 +124,7 @@ MainWindow::MainWindow(QWidget *parent) :
     #ifdef PLATFORM_WINDOWS
         //ui->controller_iso->driver->usbSendControl(0x40, 0xa7, 0, 0, 0, NULL);
         //reinitUsb();
-        ui->controller_iso->driver->killOnConnect = true;
+        //killOnConnect is set right after the driver is created, above.
     #endif
     #ifdef PLATFORM_LINUX
         reinitUsb();
