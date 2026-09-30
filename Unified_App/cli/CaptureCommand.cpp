@@ -271,6 +271,6 @@ int CaptureCommand::run(const std::vector<std::string>& args)
         std::cerr << "warning: " << result.frames_bad_checksum
                   << " bad-checksum and " << result.frames_dropped
                   << " dropped USB frames while waiting; the window may contain "
-                     "repeated samples\n";
+                     "corrupt or repeated samples\n";
     return EXIT_SUCCESS;
 }

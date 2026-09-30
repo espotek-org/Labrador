@@ -139,7 +139,11 @@ struct librador_capture_result {
     int pre_samples = 0;            // trigger sample is ch1[pre_samples]
     std::vector<double> ch1;        // volts, chronological
     std::vector<double> ch2;        // empty unless CH2 streams in the current mode
-    uint64_t frames_bad_checksum = 0;   // during the capture; such frames were replaced by a repeat of the last good one
+    // Counted over the whole wait, so they cannot say whether a bad frame fell inside the
+    // window. A dropped frame is filled with a repeat of the last good one; on the iso
+    // transports a bad-checksum frame is only detected after its samples were stored,
+    // so it stays as received.
+    uint64_t frames_bad_checksum = 0;
     uint64_t frames_dropped = 0;
 };
 // Blocks until the trigger fires and the post-trigger samples have arrived,
