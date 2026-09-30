@@ -31,6 +31,16 @@ if(ANDROID)
         HAVE_CONFIG_H
         PLATFORM_ANDROID
     )
+elseif(WIN32)
+    # Windows: dfu-programmer's libusb-0.1 code path (config.h leaves
+    # HAVE_LIBUSB_1_0 undefined), served by libusb0.dll loaded at run time.
+    # libusb-1.0 is unreliable on the libusb-win32 kernel driver the Atmel
+    # bootloader is bound to (bogus control-transfer lengths, #450), and
+    # run-time loading keeps the exe free of a libusb0.dll import.  win32/
+    # supplies <usb.h> and the forwarders.
+    target_sources(libdfuprog PRIVATE win32/libusb0_dyn.c win32/libusb0_dyn.h win32/usb.h)
+    target_include_directories(libdfuprog BEFORE PRIVATE win32)
+    target_compile_definitions(libdfuprog PRIVATE HAVE_CONFIG_H)
 else()
     # Desktop: system libusb; dfuprog manages its own context and discovery.
     find_package(PkgConfig REQUIRED)
