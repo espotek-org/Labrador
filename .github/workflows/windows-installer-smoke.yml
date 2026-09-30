@@ -73,7 +73,8 @@ jobs:
           Check (Test-Path "$group\EspoTek Labrador Unified App (Beta).lnk") "Start menu shortcut"
           Check (Test-Path "$group\Uninstall EspoTek Labrador Unified App (Beta).lnk") "Start menu uninstall shortcut"
           $reg = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7F3B2C10-9E4D-4A6B-B1E2-4C7A9D0F5E31}_is1' -ErrorAction SilentlyContinue
-          Check ($reg.DisplayName -eq 'EspoTek Labrador Unified App (Beta)') "Add/Remove Programs entry: '$($reg.DisplayName)' $($reg.DisplayVersion)"
+          # Inno appends " version X.Y.Z" to the display name.
+          Check ($reg.DisplayName -like 'EspoTek Labrador Unified App (Beta)*') "Add/Remove Programs entry: '$($reg.DisplayName)'"
 
           $drivers = (pnputil /enum-drivers) -join "`n"
           foreach ($inf in 'atxmega32a4u.inf','labrador.inf','usbgobindar_dummy_device.inf') {
