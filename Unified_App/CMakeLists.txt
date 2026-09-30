@@ -147,6 +147,17 @@ if(ANDROID)
     add_library(labrador SHARED ${APP_SOURCES})
 else()
     add_executable(labrador ${APP_SOURCES})
+    if(WIN32)
+        # GUI subsystem: no console window behind the app (SDL_main.h supplies
+        # WinMain; main.cpp re-attaches to a parent terminal when there is one
+        # so --qa/--smoke output still prints).  The resource embeds the app
+        # icon (Explorer, taskbar, Start menu shortcuts) and version info.
+        set_target_properties(labrador PROPERTIES WIN32_EXECUTABLE ON)
+        enable_language(RC)
+        set(LABRADOR_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../Desktop_Interface/build_win/appicon.ico")
+        configure_file(packaging/windows/labrador.rc.in "${CMAKE_CURRENT_BINARY_DIR}/labrador.rc" @ONLY)
+        target_sources(labrador PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/labrador.rc")
+    endif()
 endif()
 target_include_directories(labrador PRIVATE src deps)
 target_link_libraries(labrador PRIVATE imgui librador)

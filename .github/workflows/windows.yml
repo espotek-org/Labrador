@@ -5,8 +5,9 @@
 # installer wraps both and installs the exe matching the host (FOSS; replaces
 # the old proprietary Advanced Installer pipeline). Both exes are fully
 # static (MinGW runtime + libusb baked in; only OS DLLs remain dynamic); the
-# installer bundles them with the assets + firmware and the USB driver
-# installers (whose dpinst32/x86 libusbK.sys already covered 32-bit).
+# installer bundles them with the assets + firmware and the unpacked USB
+# driver packages (whose dpinst32/x86 libusbK.sys already covered 32-bit),
+# installed silently during setup.
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
 # asset-windows-installer.
 name: Build Windows
@@ -143,8 +144,16 @@ jobs:
           cp -r assets/. "$STAGE/assets/"
           mkdir -p "$STAGE/assets/firmware"
           cp firmware/*.hex "$STAGE/assets/firmware/"
-          # USB driver installers (shared with the Qt build; hardware-generic).
-          cp ../Desktop_Interface/build_win/driver/*.exe "$STAGE/driver/"
+          # USB driver packages (shared with the Qt build; hardware-generic).
+          # They ship as 7-Zip SFX wrappers around dpinst packages; unpack them
+          # so the installer can run dpscat/dpinst itself, silently.
+          SEVENZIP="/c/Program Files/7-Zip/7z.exe"
+          for pkg in Driver_Install Bootloader_Install Gobindar_Install; do
+            "$SEVENZIP" x -y -o"$STAGE/driver/$pkg" "../Desktop_Interface/build_win/driver/$pkg.exe" >/dev/null
+            test -f "$STAGE/driver/$pkg/dpinst64.exe"
+            test -f "$STAGE/driver/$pkg/dpinst32.exe"
+            test -f "$STAGE/driver/$pkg/dpscat.exe"
+          done
           # Installer icon next to the .iss (ISCC resolves SetupIconFile relatively).
           cp ../Desktop_Interface/build_win/appicon.ico packaging/windows/appicon.ico
           ls -R "$STAGE" | head -60

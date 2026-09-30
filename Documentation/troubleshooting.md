@@ -50,8 +50,9 @@ tools (e.g. `dfu-programmer`), close the Labrador app first, or it will
 helpfully "rescue" your board out of it.
 
 **Windows:** the bootloader is a separate USB device (`03EB:2FE4`) and needs
-its own driver (libusb-win32, installed by `driver\Bootloader_Install.exe`
-in the app folder; the installer offers it at the end of setup). Without it
+its own driver (libusb-win32; the installer sets it up silently). To
+reinstall it by hand, run `driver\Bootloader_Install\dpinst64.exe` in the
+app folder as administrator (`dpinst32.exe` on 32-bit Windows). Without it
 the app reports *"Board never appeared in bootloader mode"* and the update
 fails; the board comes back as normal after an unplug/replug. Run the
 driver installer with the board unplugged, then retry the update. The driver

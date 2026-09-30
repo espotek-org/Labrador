@@ -4,13 +4,13 @@
 ; single self-contained "Labrador-for-Windows.exe" that installs the app (a
 ; fully static exe: MinGW runtime + libusb baked in; the x64 or x86 build
 ; matching the host - the Qt app always shipped 32-bit, so 32-bit Windows
-; stays supported), its bundled assets + firmware hex, and the USB driver
-; installers, and offers to run the three driver installers at the end.
+; stays supported), its bundled assets + firmware hex, and the three unpacked
+; USB driver packages, which it installs silently during setup.
 ;
 ; Built in CI with:
 ;   ISCC.exe /DMyAppVersion=... /DStagingDir=... /DOutputDir=... labrador.iss
 ; The staging dir must contain: labrador64.exe, labrador32.exe, assets\,
-; driver\.  appicon.ico must sit next to this script (the workflow copies it
+; driver\<package>\ (unpacked dpinst packages).  appicon.ico must sit next to this script (the workflow copies it
 ; in).
 
 #ifndef MyAppVersion
@@ -23,7 +23,7 @@
   #define OutputDir "installer"
 #endif
 
-#define MyAppName "EspoTek Labrador"
+#define MyAppName "EspoTek Labrador Unified App (Beta)"
 #define MyAppPublisher "EspoTek"
 #define MyAppURL "https://espotek.com"
 #define MyAppExeName "labrador.exe"
@@ -38,7 +38,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 DefaultDirName={autopf}\EspoTek Labrador
-DefaultGroupName=EspoTek Labrador
+DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputDir={#OutputDir}
@@ -69,26 +69,28 @@ Source: "{#StagingDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion 
 Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\EspoTek Labrador"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Uninstall EspoTek Labrador"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\EspoTek Labrador"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; Install the USB drivers so Windows recognises the board. The board must be
-; unplugged during driver installation; each installer's own UI (dpinst)
-; guides the user. Same three driver packages the Qt installer installed as
-; prerequisites, so existing installs keep the drivers they already have.
-; runascurrentuser: postinstall entries otherwise run as the original
-; (unelevated) user, and dpinst demands elevation - CreateProcess failed
-; with error 740 - so the driver never installed. The app launch entry
-; below keeps the default (runs as the user, not as admin).
-;   Driver_Install.exe     libusbK      for the running board  (03EB:BA94)
-;   Bootloader_Install.exe libusb-win32 for the DFU bootloader (03EB:2FE4) -
-;                          without it the in-app firmware update cannot see
-;                          the board once it has jumped to the bootloader (#450)
-;   Gobindar_Install.exe   libusbK      for the misconfigured-board state
-;                          (03EB:A000) the recovery dialog repairs
-Filename: "{app}\driver\Driver_Install.exe"; Description: "Install the EspoTek Labrador USB driver (required for the board to work)"; Flags: postinstall skipifsilent runascurrentuser
-Filename: "{app}\driver\Bootloader_Install.exe"; Description: "Install the firmware-update (bootloader) USB driver (required for firmware updates)"; Flags: postinstall skipifsilent runascurrentuser
-Filename: "{app}\driver\Gobindar_Install.exe"; Description: "Install the board-recovery USB driver (repairs misconfigured boards)"; Flags: postinstall skipifsilent runascurrentuser
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,EspoTek Labrador}"; Flags: postinstall skipifsilent nowait
+; USB drivers, installed silently while Setup runs (Setup is elevated, so no
+; extra prompts).  The staging step unpacks the three driver packages the Qt
+; installer's prerequisites installed, so existing installs keep the drivers
+; they already have (nothing moves to WinUSB):
+;   Driver_Install      libusbK      running board          03EB:BA94
+;   Bootloader_Install  libusb-win32 DFU bootloader         03EB:2FE4 (firmware updates, #450)
+;   Gobindar_Install    libusbK      misconfigured board    03EB:A000 (recovery dialog)
+; Each package: dpscat.exe self-signs the .cat and trusts the certificate,
+; then dpinst pre-stages the package (/SW no wizard, /SA no Add/Remove entry).
+; The board may be plugged in or not; Windows binds the driver on enumeration.
+Filename: "{app}\driver\Driver_Install\dpscat.exe"; WorkingDir: "{app}\driver\Driver_Install"; StatusMsg: "Installing USB driver: Labrador board..."; Flags: runhidden waituntilterminated
+Filename: "{app}\driver\Driver_Install\dpinst64.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Driver_Install"; StatusMsg: "Installing USB driver: Labrador board..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
+Filename: "{app}\driver\Driver_Install\dpinst32.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Driver_Install"; StatusMsg: "Installing USB driver: Labrador board..."; Flags: runhidden waituntilterminated; Check: not Is64BitInstallMode
+Filename: "{app}\driver\Bootloader_Install\dpscat.exe"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated
+Filename: "{app}\driver\Bootloader_Install\dpinst64.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
+Filename: "{app}\driver\Bootloader_Install\dpinst32.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated; Check: not Is64BitInstallMode
+Filename: "{app}\driver\Gobindar_Install\dpscat.exe"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated
+Filename: "{app}\driver\Gobindar_Install\dpinst64.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
+Filename: "{app}\driver\Gobindar_Install\dpinst32.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated; Check: not Is64BitInstallMode
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: postinstall skipifsilent nowait
