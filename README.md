@@ -15,6 +15,7 @@ For the documentation, please visit the [wiki](https://github.com/espotek-org/La
 If you're looking to build from source but don't know where to start, Qt Creator is the easiest way to get your toes wet!  
 https://www.qt.io/download-open-source/  
 When installing, make sure you tick the box to install Qt 5.15 or later.
+On Windows, use the MSVC2019 versions - later releases can introduce compatibility issues.
 
 Once it's installed, open `Desktop_Interface/Labrador.pro`, then Clean All -> Run `qmake` -> Build All.
 
