@@ -59,6 +59,11 @@ driver installer with the board unplugged, then retry the update. The driver
 is the same one earlier (Qt) installers set up, so an existing install does
 not need to change anything. Do **not** use Zadig to swap drivers.
 
+Older Windows builds could also fail *mid*-update (a libusb bug with the
+libusb-win32 driver made successful transfers look failed), leaving the
+board in bootloader mode with its firmware erased. Current builds recover
+such a board automatically on the next launch.
+
 ## "Sorry to Interrupt!" — the misconfigured-board dialog
 
 If the app detects a board with corrupted/incompatible firmware
