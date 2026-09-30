@@ -169,6 +169,11 @@ if(NOT ANDROID)
     # counters.  Expected on firmware 0x000C: 100.00% pass, 0 dropped.
     add_executable(librador_bulk_test tools/librador_bulk_test.cpp)
     target_link_libraries(librador_bulk_test PRIVATE librador)
+
+    # Headless triggered capture of the full-rate scope buffers to CSV.
+    add_executable(labrador_capture tools/labrador_capture.cpp)
+    set_target_properties(labrador_capture PROPERTIES OUTPUT_NAME labrador-capture)
+    target_link_libraries(labrador_capture PRIVATE librador)
 endif()
 
 if(APPLE AND NOT ANDROID)
