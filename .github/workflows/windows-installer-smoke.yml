@@ -1,0 +1,103 @@
+# Smoke test of the Unified_App Windows installer on a GitHub-hosted runner:
+# build it (reusing windows.yml), install it silently, check what a user
+# would get (app exe as a GUI-subsystem binary with icon + version info,
+# firmware hex, Start menu entry, the three USB driver packages staged in
+# the Windows driver store), launch the app headlessly for a few frames,
+# then uninstall.  No board is attached, so "driver staged in the store" is
+# as far as the driver check can go - Windows binds a staged driver when
+# the device enumerates.  Dispatch-only; not part of the release pipeline.
+name: Windows installer smoke test
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/windows.yml
+    secrets: inherit
+
+  smoke:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: asset-windows-installer
+          path: installer
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem installer -Recurse -Filter Labrador-for-Windows.exe | Select-Object -First 1
+          "installer: $($exe.FullName) ($($exe.Length) bytes)"
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$PWD\install.log" -Wait -PassThru
+          "installer exit code: $($p.ExitCode)"
+          "--- install.log (driver + error lines) ---"
+          Get-Content install.log | Select-String -Pattern 'dpscat|dpinst|Exception|failed|error|Run entry' | ForEach-Object { $_.Line }
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Verify installed app, shortcuts and driver store
+        shell: pwsh
+        run: |
+          $app = "C:\Program Files\EspoTek Labrador"
+          $exe = "$app\labrador.exe"
+          $script:fail = 0
+          function Check($ok, $msg) { if ($ok) { "PASS: $msg" } else { "FAIL: $msg"; $script:fail++ } }
+
+          Check (Test-Path $exe) "labrador.exe installed"
+          Check (Test-Path "$app\assets\firmware\labrafirm_000C_03.hex") "firmware hex installed next to the app"
+          foreach ($pkg in 'Driver_Install','Bootloader_Install','Gobindar_Install') {
+            Check ((Test-Path "$app\driver\$pkg\dpinst64.exe") -and (Test-Path "$app\driver\$pkg\dpscat.exe")) "driver package unpacked: $pkg"
+          }
+
+          $pe = [System.Reflection.PortableExecutable.PEReader]::new([IO.File]::OpenRead($exe))
+          $subsystem = $pe.PEHeaders.PEHeader.Subsystem
+          $rsrc = $pe.PEHeaders.SectionHeaders | Where-Object { $_.Name -eq '.rsrc' }
+          $pe.Dispose()
+          Check ($subsystem -eq 'WindowsGui') "GUI subsystem, no console window (subsystem = $subsystem)"
+          Check ($null -ne $rsrc) "resource section present (icon + version info)"
+          $vi = (Get-Item $exe).VersionInfo
+          Check ($vi.FileDescription -eq 'EspoTek Labrador Unified App (Beta)') "version resource: '$($vi.FileDescription)' v$($vi.FileVersion) by $($vi.CompanyName)"
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          Check (($null -ne $icon) -and ($icon.Width -gt 0)) "icon extracted from exe ($($icon.Width)x$($icon.Height))"
+
+          $group = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\EspoTek Labrador Unified App (Beta)"
+          Check (Test-Path "$group\EspoTek Labrador Unified App (Beta).lnk") "Start menu shortcut"
+          Check (Test-Path "$group\Uninstall EspoTek Labrador Unified App (Beta).lnk") "Start menu uninstall shortcut"
+          $reg = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7F3B2C10-9E4D-4A6B-B1E2-4C7A9D0F5E31}_is1' -ErrorAction SilentlyContinue
+          Check ($reg.DisplayName -eq 'EspoTek Labrador Unified App (Beta)') "Add/Remove Programs entry: '$($reg.DisplayName)' $($reg.DisplayVersion)"
+
+          $drivers = (pnputil /enum-drivers) -join "`n"
+          foreach ($inf in 'atxmega32a4u.inf','labrador.inf','usbgobindar_dummy_device.inf') {
+            Check ($drivers -match [regex]::Escape($inf)) "driver store has $inf"
+          }
+          "--- staged driver packages (pnputil) ---"
+          ($drivers -split "`n") | Select-String -Pattern 'Original Name|Provider Name|Class Name|Driver Version' | ForEach-Object { $_.Line.Trim() }
+          "--- TrustedPublisher certificates (dpscat) ---"
+          Get-ChildItem Cert:\LocalMachine\TrustedPublisher | ForEach-Object { "  $($_.Subject)" }
+
+          if ($script:fail) { "$($script:fail) CHECK(S) FAILED"; exit 1 } else { "all installer checks passed" }
+
+      - name: Launch smoke (60 frames, USB disabled)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $env:LABRADOR_NO_USB = '1'
+          $p = Start-Process -FilePath "C:\Program Files\EspoTek Labrador\labrador.exe" -ArgumentList '--smoke' -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); "TIMEOUT: labrador.exe --smoke did not exit"; exit 1 }
+          "labrador.exe --smoke exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Uninstall silently
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "C:\Program Files\EspoTek Labrador\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          "uninstaller exit code: $($p.ExitCode)"
+          Start-Sleep -Seconds 5
+          if (Test-Path "C:\Program Files\EspoTek Labrador\labrador.exe") { "FAIL: labrador.exe still present after uninstall"; exit 1 }
+          "PASS: uninstalled cleanly"
