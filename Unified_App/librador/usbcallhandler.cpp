@@ -1787,8 +1787,16 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
     }
 
     int exit_code = dfuprog_virtual_cmd("dfu-programmer atxmega32a4u erase --force --debug 300");
-    if(exit_code)
-        LIBRADOR_LOG(LOG_WARNING, "ERROR ERASING FIRMWARE (%d)\n", exit_code);
+    if(exit_code){
+        // Never program a bootloader that would not erase: the link to it is
+        // not working, and pressing on is how a board ends up blank (#450).
+        // The old firmware is normally still intact, so hand control back to
+        // it and report the failure.
+        LIBRADOR_LOG(LOG_ERROR, "ERROR ERASING FIRMWARE (%d); not flashing\n", exit_code);
+        dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
+        set_bootloader_mode_allowed(false);
+        return -3;
+    }
 
     // The flash command goes through dfuprog_virtual_main as argv directly:
     // dfuprog_virtual_cmd tokenises its command string on spaces, which would
