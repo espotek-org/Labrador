@@ -77,14 +77,18 @@ Name: "{autodesktop}\EspoTek Labrador"; Filename: "{app}\{#MyAppExeName}"; Tasks
 ; Install the USB drivers so Windows recognises the board. The board must be
 ; unplugged during driver installation; each installer's own UI (dpinst)
 ; guides the user. Same three driver packages the Qt installer installed as
-; prerequisites, so existing installs keep the drivers they already have:
+; prerequisites, so existing installs keep the drivers they already have.
+; runascurrentuser: postinstall entries otherwise run as the original
+; (unelevated) user, and dpinst demands elevation - CreateProcess failed
+; with error 740 - so the driver never installed. The app launch entry
+; below keeps the default (runs as the user, not as admin).
 ;   Driver_Install.exe     libusbK      for the running board  (03EB:BA94)
 ;   Bootloader_Install.exe libusb-win32 for the DFU bootloader (03EB:2FE4) -
 ;                          without it the in-app firmware update cannot see
 ;                          the board once it has jumped to the bootloader (#450)
 ;   Gobindar_Install.exe   libusbK      for the misconfigured-board state
 ;                          (03EB:A000) the recovery dialog repairs
-Filename: "{app}\driver\Driver_Install.exe"; Description: "Install the EspoTek Labrador USB driver (required for the board to work)"; Flags: postinstall skipifsilent
-Filename: "{app}\driver\Bootloader_Install.exe"; Description: "Install the firmware-update (bootloader) USB driver (required for firmware updates)"; Flags: postinstall skipifsilent
-Filename: "{app}\driver\Gobindar_Install.exe"; Description: "Install the board-recovery USB driver (repairs misconfigured boards)"; Flags: postinstall skipifsilent
+Filename: "{app}\driver\Driver_Install.exe"; Description: "Install the EspoTek Labrador USB driver (required for the board to work)"; Flags: postinstall skipifsilent runascurrentuser
+Filename: "{app}\driver\Bootloader_Install.exe"; Description: "Install the firmware-update (bootloader) USB driver (required for firmware updates)"; Flags: postinstall skipifsilent runascurrentuser
+Filename: "{app}\driver\Gobindar_Install.exe"; Description: "Install the board-recovery USB driver (repairs misconfigured boards)"; Flags: postinstall skipifsilent runascurrentuser
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,EspoTek Labrador}"; Flags: postinstall skipifsilent nowait
