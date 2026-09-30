@@ -8,8 +8,11 @@
 # the device enumerates.  Dispatch-only; not part of the release pipeline.
 name: Windows installer smoke test
 
+# Must cover what the reusable windows.yml declares (a caller's permissions
+# have to be a superset of the called workflow's).
 permissions:
   contents: read
+  pull-requests: write
 
 on:
   workflow_dispatch:
