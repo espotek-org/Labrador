@@ -171,6 +171,13 @@ public:
     int load_calibration_from_device(double *vref_ch1, double *gain_scale_ch1,
         double *vref_ch2, double *gain_scale_ch2, double *psu_offset);
     double get_scope_gain();
+    // Absolute-indexed access to the live scope buffers (channel 1 or 2).
+    // Index 0 is the first sample since the last device-mode change.
+    // get_analog_sample_count: 0 ok, -1 channel not a scope stream in this mode.
+    // get_analog_window: volts for samples [start, start+num); 0 ok, -1 bad
+    // channel, -2 range overwritten or not yet received.
+    int get_analog_sample_count(int channel, uint64_t *count);
+    int get_analog_window(int channel, uint64_t start, int num, double *volts_out);
     int set_digital_state(uint8_t digState);
     int reset_device(bool goToBootloader);
     uint16_t get_firmware_version();

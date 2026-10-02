@@ -455,32 +455,14 @@ usbCallHandler::~usbCallHandler(){
     //Kill off iso_polling_thread.  Maybe join then get it to detect its own timeout condition.
     LIBRADOR_LOG(LOG_DEBUG, "Calling destructor for librador USB call handler\n");
 
-    if(iso_polling_thread)
-    {
-        iso_thread_shutdown_requested = true;
-        LIBRADOR_LOG(LOG_DEBUG, "Shutting down USB polling thread...\n");
-        iso_polling_thread->join();
-        LIBRADOR_LOG(LOG_DEBUG, "USB polling thread stopped.\n");
-        delete iso_polling_thread;
-
-        free_transfers();
-    }
+    // Also stops streaming (alt setting 0); without it the board keeps its ISO
+    // alt setting selected after exit and the next session degrades or fails to connect.
+    teardown_connection();
 
     if(daq_thread && daq_thread->joinable()){
         daq_thread->join();
     }
 
-    if(handle){
-        if(claimed_iface > 0){
-            libusb_release_interface(handle, claimed_iface);
-        }
-        if(iface0_claimed){
-            libusb_release_interface(handle, 0);
-        }
-        LIBRADOR_LOG(LOG_DEBUG, "Interface released\n");
-        libusb_close(handle);
-        LIBRADOR_LOG(LOG_DEBUG, "Device Closed\n");
-    }
     if(ctx){
         libusb_exit(ctx);
         LIBRADOR_LOG(LOG_DEBUG, "Libusb exited\n");
@@ -1207,6 +1189,37 @@ int usbCallHandler::load_calibration_from_device(double *vref_ch1, double *gain_
 
 double usbCallHandler::get_scope_gain(){
     return current_scope_gain;
+}
+
+// Caller must hold buffer_read_write_mutex.
+static o1buffer* scope_buffer_for_channel(int channel, int mode, o1buffer* cha, o1buffer* chb, o1buffer* b750){
+    if(channel == 1){
+        if(mode == 6) return b750;
+        if(mode == 0 || mode == 1 || mode == 2) return cha;
+    } else if(channel == 2 && mode == 2){
+        return chb;
+    }
+    return nullptr;
+}
+
+int usbCallHandler::get_analog_sample_count(int channel, uint64_t *count){
+    std::lock_guard<std::mutex> lock(buffer_read_write_mutex);
+    o1buffer *buf = scope_buffer_for_channel(channel, deviceMode, internal_o1_buffer_375_CHA, internal_o1_buffer_375_CHB, internal_o1_buffer_750);
+    if(!buf) return -1;
+    *count = buf->total_samples_added;
+    return 0;
+}
+
+int usbCallHandler::get_analog_window(int channel, uint64_t start, int num, double *volts_out){
+    std::vector<int> raw(num > 0 ? num : 0);
+    std::lock_guard<std::mutex> lock(buffer_read_write_mutex);
+    o1buffer *buf = scope_buffer_for_channel(channel, deviceMode, internal_o1_buffer_375_CHA, internal_o1_buffer_375_CHB, internal_o1_buffer_750);
+    if(!buf) return -1;
+    if(!buf->copyWindow(start, num, raw.data())) return -2;
+    for(int i = 0; i < num; i++){
+        volts_out[i] = buf->toVolts(raw[i], current_scope_gain);
+    }
+    return 0;
 }
 
 int usbCallHandler::set_gain(double newGain){
