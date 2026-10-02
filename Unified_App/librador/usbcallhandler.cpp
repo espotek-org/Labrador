@@ -455,32 +455,14 @@ usbCallHandler::~usbCallHandler(){
     //Kill off iso_polling_thread.  Maybe join then get it to detect its own timeout condition.
     LIBRADOR_LOG(LOG_DEBUG, "Calling destructor for librador USB call handler\n");
 
-    if(iso_polling_thread)
-    {
-        iso_thread_shutdown_requested = true;
-        LIBRADOR_LOG(LOG_DEBUG, "Shutting down USB polling thread...\n");
-        iso_polling_thread->join();
-        LIBRADOR_LOG(LOG_DEBUG, "USB polling thread stopped.\n");
-        delete iso_polling_thread;
-
-        free_transfers();
-    }
+    // Also stops streaming (alt setting 0); without it the board keeps its ISO
+    // alt setting selected after exit and the next session degrades or fails to connect.
+    teardown_connection();
 
     if(daq_thread && daq_thread->joinable()){
         daq_thread->join();
     }
 
-    if(handle){
-        if(claimed_iface > 0){
-            libusb_release_interface(handle, claimed_iface);
-        }
-        if(iface0_claimed){
-            libusb_release_interface(handle, 0);
-        }
-        LIBRADOR_LOG(LOG_DEBUG, "Interface released\n");
-        libusb_close(handle);
-        LIBRADOR_LOG(LOG_DEBUG, "Device Closed\n");
-    }
     if(ctx){
         libusb_exit(ctx);
         LIBRADOR_LOG(LOG_DEBUG, "Libusb exited\n");

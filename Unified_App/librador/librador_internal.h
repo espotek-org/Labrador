@@ -20,6 +20,7 @@ class Librador
 
 public:
     Librador();
+    ~Librador();
     usbCallHandler *usb_driver = nullptr;
 };
 

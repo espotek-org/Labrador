@@ -32,6 +32,12 @@ Librador::Librador()
     usb_driver = new usbCallHandler(LABRADOR_VID, LABRADOR_PID);
 }
 
+// Without this the board keeps its streaming alt setting after librador_exit.
+Librador::~Librador()
+{
+    delete usb_driver;
+}
+
 int librador_init(int transport_type){
     if(internal_librador_object){
         //Object already initialised; still honour a transport change ahead
