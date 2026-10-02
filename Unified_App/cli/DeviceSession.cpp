@@ -28,11 +28,14 @@ void logToStderr(void* userdata, const int level, const char* format, va_list ar
 }
 } // namespace
 
-DeviceSession::DeviceSession(bool verbose) : m_verbose(verbose)
+DeviceSession::DeviceSession(bool verbose, UsbTransport transport) : m_verbose(verbose)
 {
     librador_logger_set(&m_verbose, logToStderr);
 
-    if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
+    const int librador_transport = transport == UsbTransport::Iso6   ? LABRADOR_TRANSPORT_ISO6
+                                   : transport == UsbTransport::Iso1 ? LABRADOR_TRANSPORT_ISO1
+                                                                     : LABRADOR_TRANSPORT_AUTO;
+    if (librador_init(librador_transport) < 0)
     {
         librador_logger_set(nullptr, nullptr);
         throw CommandError("could not initialise librador");

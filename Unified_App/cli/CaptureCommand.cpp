@@ -19,6 +19,8 @@ struct Options
     ScopeMode mode = ScopeMode::Ch1Ch2;
     double gain = 4;
     double settle_s = 0.5;
+    // ISO1 validates every frame; ISO6 pairs checksums approximately and reports false alarms.
+    UsbTransport transport = UsbTransport::Iso1;
     bool verbose = false;
     librador_capture_request request; // trigger, hysteresis, pre/post, timeout
 };
@@ -45,6 +47,17 @@ ScopeMode parseMode(const std::string& text)
     if (text == "scope2")
         return ScopeMode::Ch1Ch2;
     throw UsageError("option '--mode' must be scope1 or scope2, got '" + text + "'");
+}
+
+UsbTransport parseTransport(const std::string& text)
+{
+    if (text == "auto")
+        return UsbTransport::Auto;
+    if (text == "iso6")
+        return UsbTransport::Iso6;
+    if (text == "iso1")
+        return UsbTransport::Iso1;
+    throw UsageError("option '--transport' must be auto, iso6 or iso1, got '" + text + "'");
 }
 
 void parseTrigger(const std::string& spec, librador_capture_request& request)
@@ -117,6 +130,9 @@ OptionParser makeParser(Options& options)
                          formatNumber(defaults.settle_s),
                      [&](const std::string& v)
                      { options.settle_s = parseSeconds("--settle", v); });
+    parser.addOption("--transport", "T",
+                     "USB transport: iso1, iso6 or auto (the platform default); default iso1",
+                     [&](const std::string& v) { options.transport = parseTransport(v); });
     parser.addFlag("--verbose", "also show librador's debug messages on stderr",
                    [&]() { options.verbose = true; });
     return parser;
@@ -243,7 +259,7 @@ int CaptureCommand::run(const std::vector<std::string>& args)
     if (!csv)
         throw CommandError("cannot open '" + options.out + "' for writing");
 
-    DeviceSession session(options.verbose);
+    DeviceSession session(options.verbose, options.transport);
     session.configureScope(options.mode, options.gain, options.settle_s);
 
     std::cerr << "armed: ch" << options.request.trigger_channel << ' '
