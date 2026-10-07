@@ -1191,6 +1191,37 @@ double usbCallHandler::get_scope_gain(){
     return current_scope_gain;
 }
 
+// Caller must hold buffer_read_write_mutex.
+static o1buffer* scope_buffer_for_channel(int channel, int mode, o1buffer* cha, o1buffer* chb, o1buffer* b750){
+    if(channel == 1){
+        if(mode == 6) return b750;
+        if(mode == 0 || mode == 1 || mode == 2) return cha;
+    } else if(channel == 2 && mode == 2){
+        return chb;
+    }
+    return nullptr;
+}
+
+int usbCallHandler::get_analog_sample_count(int channel, uint64_t *count){
+    std::lock_guard<std::mutex> lock(buffer_read_write_mutex);
+    o1buffer *buf = scope_buffer_for_channel(channel, deviceMode, internal_o1_buffer_375_CHA, internal_o1_buffer_375_CHB, internal_o1_buffer_750);
+    if(!buf) return -1;
+    *count = buf->total_samples_added;
+    return 0;
+}
+
+int usbCallHandler::get_analog_window(int channel, uint64_t start, int num, double *volts_out){
+    std::vector<int> raw(num > 0 ? num : 0);
+    std::lock_guard<std::mutex> lock(buffer_read_write_mutex);
+    o1buffer *buf = scope_buffer_for_channel(channel, deviceMode, internal_o1_buffer_375_CHA, internal_o1_buffer_375_CHB, internal_o1_buffer_750);
+    if(!buf) return -1;
+    if(!buf->copyWindow(start, num, raw.data())) return -2;
+    for(int i = 0; i < num; i++){
+        volts_out[i] = buf->toVolts(raw[i], current_scope_gain);
+    }
+    return 0;
+}
+
 int usbCallHandler::set_gain(double newGain){
     LIBRADOR_LOG(LOG_DEBUG, "set_gain(%f) -> 0xa5 DMA rebuild\n", newGain);
     //See XMEGA_AU Manual, page 359.  ADC.CTRL.GAIN.
