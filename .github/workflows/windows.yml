@@ -40,27 +40,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -o Acquire::Retries=3 install -y \
-            g++-mingw-w64-i686-posix ninja-build pkg-config wget make
+            g++-mingw-w64-i686-posix ninja-build pkg-config
 
-      - name: Build static libusb (i686 Windows)
-        run: |
-          set -euxo pipefail
-          wget -nv https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
-          tar xjf libusb-1.0.29.tar.bz2
-          cd libusb-1.0.29
-          ./configure --host=i686-w64-mingw32 --prefix="$PWD/../libusb-win32" \
-            --enable-static --disable-shared \
-            CC=i686-w64-mingw32-gcc-posix
-          make -j"$(nproc)"
-          make install
-
+      # libusb is fetched, patched and built by CMake (cmake/BundledLibusb.cmake).
       - name: Build
         run: |
-          # PKG_CONFIG_LIBDIR (not _PATH) so host-Linux .pc files can't leak
-          # into the cross build; LABRADOR_WIN32_ROOT makes the libusb prefix
-          # a find root (see mingw32-cross.cmake).
-          export PKG_CONFIG_LIBDIR="$PWD/libusb-win32/lib/pkgconfig"
-          export LABRADOR_WIN32_ROOT="$PWD/libusb-win32"
           cmake --preset windows32
           cmake --build --preset windows32
 
@@ -104,7 +88,6 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-libusb
 
       - name: Download x86 exe
         uses: actions/download-artifact@v4
