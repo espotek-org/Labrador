@@ -1,0 +1,53 @@
+--- a/libusb/os/windows_common.c	2026-05-15 08:32:27
++++ b/libusb/os/windows_common.c	2026-10-07 15:54:01
+@@ -305,6 +305,35 @@
+ 
+ 	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p, length %lu", transfer, ULONG_CAST(size));
+ 
++	// A backend calls this when the driver DLL returned success instead of
++	// ERROR_IO_PENDING. That happens in two different ways:
++	//
++	// 1. The DLL satisfied the request without issuing kernel I/O on our
++	//    OVERLAPPED (the HID descriptor emulation, the SET_CONFIGURATION
++	//    shortcut, libusbK >= 3.0.8 driving libusb0.sys). Nothing will reach
++	//    the completion port for this transfer, so post a completion
++	//    ourselves carrying the byte count the DLL reported.
++	//
++	// 2. The DLL issued the I/O on our OVERLAPPED and the driver completed
++	//    it before DeviceIoControl() returned (libusb0.sys does this for every
++	//    control request; libusbK.dll 3.0.7 passes our OVERLAPPED straight
++	//    through to it). The kernel has already stored the final status and
++	//    byte count in the OVERLAPPED and queued a completion packet for it,
++	//    exactly as for an asynchronous completion. Posting a second packet
++	//    would resurface for whatever transfer next reuses this OVERLAPPED,
++	//    and overwriting the byte count is wrong: libusbK 3.0.7 never fills
++	//    LengthTransferred on this path, so what the caller passes here is
++	//    an uninitialized value, which used to reach the application as an
++	//    actual_length of 0 or garbage.
++	//
++	// windows_submit_transfer() set Internal to STATUS_PENDING before the
++	// backend ran and only the kernel changes it, so it tells the two apart.
++	if (overlapped->Internal != STATUS_PENDING) {
++		usbi_dbg(TRANSFER_CTX(transfer), "transfer %p was completed by the kernel, length %lu (DLL reported %lu)",
++			 transfer, ULONG_CAST(overlapped->InternalHigh), ULONG_CAST(size));
++		return;
++	}
++
+ 	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
+ 	overlapped->InternalHigh = (ULONG_PTR)size;
+ 
+@@ -814,6 +843,14 @@
+ 	usbi_mutex_lock(&dev_handle->lock);
+ 	list_add_tail(&transfer_priv->list, &handle_priv->active_transfers);
+ 	usbi_mutex_unlock(&dev_handle->lock);
++
++	// Mark the OVERLAPPED as pending before the backend touches it. The kernel
++	// replaces Internal with the final NTSTATUS when it completes an I/O issued
++	// on this OVERLAPPED, including one that completes before DeviceIoControl()
++	// returns, which is how windows_force_sync_completion() recognizes a
++	// completion that is already on its way through the completion port.
++	transfer_priv->overlapped.Internal = STATUS_PENDING;
++	transfer_priv->overlapped.InternalHigh = 0;
+ 
+ 	r = priv->backend->submit_transfer(itransfer);
+ 	if (r != LIBUSB_SUCCESS) {
