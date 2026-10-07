@@ -102,11 +102,11 @@ if(LABRADOR_QA)
 endif()
 
 # --- librador (canonical merged copy) + libdfuprog (firmware flashing) ---
-# Windows: libusb is built from source with a transfer-length fix for the
+# Windows: libusb is built from the in-tree copy, which carries a fix for the
 # libusb-win32 bootloader driver (cmake/BundledLibusb.cmake).  Must come
 # before libdfuprog, which links the same target when it exists.
 if(WIN32 AND NOT ANDROID)
-    option(LABRADOR_BUNDLED_LIBUSB "Build patched libusb from source (Windows)" ON)
+    option(LABRADOR_BUNDLED_LIBUSB "Build the in-tree patched libusb (Windows)" ON)
 endif()
 if(LABRADOR_BUNDLED_LIBUSB AND WIN32 AND NOT ANDROID)
     include(cmake/BundledLibusb.cmake)

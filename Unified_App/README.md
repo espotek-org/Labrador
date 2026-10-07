@@ -55,11 +55,11 @@ make windows
 build\windows\labrador.exe
 ```
 
-libusb is not needed from the system on Windows: CMake downloads libusb
-1.0.30 and builds it with a fix for the libusb-win32 bootloader driver
-(`cmake/BundledLibusb.cmake`), without which in-app firmware updates fail.
-For offline builds, set `FETCHCONTENT_SOURCE_DIR_LABRADOR_LIBUSB` to an
-extracted libusb-1.0.30 tree.
+libusb is not needed from the system on Windows: a copy of libusb 1.0.30
+lives in `deps/libusb` with a fix for the libusb-win32 bootloader driver
+already applied (provenance, patch and update procedure in
+`deps/libusb/README.md`), and `cmake/BundledLibusb.cmake` builds it into the
+exe. Without that fix in-app firmware updates fail part-way.
 
 ### Android
 
