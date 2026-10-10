@@ -8,10 +8,6 @@
 
 #include <cstring>
 
-ImVec2 center_text2(float col_width, float text_width, ImGuiStyle& style) {
-    return ImGui::GetCursorScreenPos() + ImVec2((col_width - text_width)/2. - style.CellPadding.x, 0.0); // for centered text
-}
-
 float logicDecodeUI::draw_grabber(float grabber_height, const char * label, float* backlog, int ch, bool parity_check, bool for_uart)
 {
     ImGui::PushID(ch);
@@ -245,12 +241,12 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
         for(const char * protocol_label : {"UART","I2C"})
         {
             ImGui::TableNextColumn();
-            ImGui::SetCursorScreenPos(center_text2(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize(protocol_label).x,style));
+            ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize(protocol_label).x,style));
             ImGui::Text("%s", protocol_label);
         }
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        ImGui::SetCursorScreenPos(center_text2(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize("CH 1CH 2").x + style.ItemSpacing.x + 4 * style.FramePadding.x, style));
+        ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize("CH 1CH 2").x + style.ItemSpacing.x + 4 * style.FramePadding.x, style));
         for (int ch: {1,2})
         {
             ImGui::BeginDisabled(!logic_enable[ch-1] || !(protocol_sel==Protocol::UART));
@@ -282,7 +278,7 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
         }
         ImGui::TableNextColumn();
         
-        ImGui::SetCursorScreenPos(center_text2(ImGui::GetColumnWidth() + 2*style.CellPadding.x, CHECKBOX_SIZE, style));
+        ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, CHECKBOX_SIZE, style));
 
 //                     ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("I2C").x + style.ItemInnerSpacing.x + CHECKBOX_SIZE)/2., style.FramePadding.y ));
         ImGui::BeginDisabled(!i2c_allowed);
