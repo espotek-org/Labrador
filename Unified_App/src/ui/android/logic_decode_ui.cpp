@@ -280,7 +280,6 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
         
         ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, CHECKBOX_SIZE, style));
 
-//                     ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("I2C").x + style.ItemInnerSpacing.x + CHECKBOX_SIZE)/2., style.FramePadding.y ));
         ImGui::BeginDisabled(!i2c_allowed);
         if(ImGui::custom_Checkbox("##I2C", (bool *) &protocol_sel)) {
             i2c_changed = true;
@@ -289,10 +288,6 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
         ImGui::EndTable();
     }
 
-//     ImGui::EndGroup();
-//     ImVec2 p0 = ImGui::GetItemRectMin();
-//     ImVec2 p1 = ImGui::GetItemRectMax() + ImVec2(0.f,style.FramePadding.y);
-//     draw_list->AddRect(p0, p1, IM_COL32(90, 90, 120, 255));
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f,style.FramePadding.y - style.ItemSpacing.y));
     ImGui::Dummy({0.f,0.f}); // prevents issue with this draw() command affecting the vertical alignment of whatever ui element comes after it
     ImGui::EndGroup();
