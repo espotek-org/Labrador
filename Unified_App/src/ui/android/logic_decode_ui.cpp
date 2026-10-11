@@ -8,7 +8,7 @@
 
 #include <cstring>
 
-float logicDecodeUI::draw_grabber(float grabber_height, const char * label, float* backlog, int ch, bool parity_check)
+float logicDecodeUI::draw_grabber(float grabber_height, const char * label, float* backlog, int ch, bool parity_check, bool for_uart)
 {
     ImGui::PushID(ch);
     char chAB[2] = {'1', '2'}; // canonical CH1/CH2 naming
@@ -40,67 +40,69 @@ float logicDecodeUI::draw_grabber(float grabber_height, const char * label, floa
     }
 
     // uart settings
-    uart_settings* curr_ch_uart_settings = &both_ch_uart_settings[ch-1];
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetColorU32(ImGuiCol_ChildBg,0));
-    bool uart_changed = false;
-    ImGui::SetCursorScreenPos(init_pos);
-    ImVec2 positions[2] = {init_pos, end_pos + ImVec2(-ImGui::CalcTextSize("Even").x - 2 * style.FramePadding.x, 0.f)};
-    const char ** uart_options_sublabels[2] = {baud_rate_labels, parity_labels};
-    int sublabels_counts[2] = {IM_COUNTOF(baud_rate_labels), IM_COUNTOF(parity_labels)};
-    int * curr_options_sel[2] = {&curr_ch_uart_settings->baud_idx_sel, &curr_ch_uart_settings->parity_idx_sel};
-    ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
-    for(int k: {0,1})
-    {
-        ImGui::PushID(k);
-        ImGui::SetCursorScreenPos(positions[k]);
-        if(k==0) {
-            ImGui::PushItemWidth(ImGui::CalcTextSize(" A ").x + 2*style.FramePadding.x);
-            ImGui::LabelText("##console_ch_label"," %c ",chAB[ch-1]);
+    if(for_uart) {
+        uart_settings* curr_ch_uart_settings = &both_ch_uart_settings[ch-1];
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetColorU32(ImGuiCol_ChildBg,0));
+        bool uart_changed = false;
+        ImGui::SetCursorScreenPos(init_pos);
+        ImVec2 positions[2] = {init_pos, end_pos + ImVec2(-ImGui::CalcTextSize("Even").x - 2 * style.FramePadding.x, 0.f)};
+        const char ** uart_options_sublabels[2] = {baud_rate_labels, parity_labels};
+        int sublabels_counts[2] = {IM_COUNTOF(baud_rate_labels), IM_COUNTOF(parity_labels)};
+        int * curr_options_sel[2] = {&curr_ch_uart_settings->baud_idx_sel, &curr_ch_uart_settings->parity_idx_sel};
+        ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha,1.0);
+        for(int k: {0,1})
+        {
+            ImGui::PushID(k);
+            ImGui::SetCursorScreenPos(positions[k]);
+            if(k==0) {
+                ImGui::PushItemWidth(ImGui::CalcTextSize(" A ").x + 2*style.FramePadding.x);
+                ImGui::LabelText("##console_ch_label"," %c ",chAB[ch-1]);
+                p0 = ImGui::GetItemRectMin() + style.FramePadding;
+                p1 = ImGui::GetItemRectMax() - style.FramePadding;
+                draw_list = ImGui::GetWindowDrawList();
+                draw_list->AddRect(p0, p1, IM_COL32(255, 255, 255, 255));
+                ImGui::SameLine();
+            }
+
+            ImGui::PushItemWidth(ImGui::CalcTextSize(uart_options_sublabels[k][*curr_options_sel[k]]).x + 2 * style.FramePadding.x);
+#define POP_COLOR if(need_pop) {ImGui::PopStyleColor(); need_pop = false;}
+            
+            ImU32 label_col = IM_COL32(255,255,255,255);
+
+            bool need_pop = false;
+            if(k==1 && !parity_check) {
+                label_col = IM_COL32(255,0,0,255);
+                ImGui::PushStyleColor(ImGuiCol_Text, label_col);
+                need_pop = true;
+            }
+            if(ImGui::BeginCombo("##uart_option_combo", uart_options_sublabels[k][*curr_options_sel[k]], ImGuiComboFlags_NoArrowButton)) {
+                POP_COLOR
+                ImGui::Selectable(uart_options_headers[k], false, ImGuiSelectableFlags_Disabled);
+                for(int n=0; n < sublabels_counts[k]; n++) {
+                    if(ImGui::Selectable(uart_options_sublabels[k][n], *curr_options_sel[k]==n)) {
+                        uart_changed = true;
+                        *curr_options_sel[k]=n;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            POP_COLOR
             p0 = ImGui::GetItemRectMin() + style.FramePadding;
             p1 = ImGui::GetItemRectMax() - style.FramePadding;
             draw_list = ImGui::GetWindowDrawList();
-            draw_list->AddRect(p0, p1, IM_COL32(255, 255, 255, 255));
+            draw_list->AddLine(ImVec2(p0.x,p1.y), p1, label_col);
+            ImGui::PopID();
             ImGui::SameLine();
         }
+        ImGui::PopStyleVar();
+        ImGui::NewLine();
+        ImGui::PopStyleColor();
 
-        ImGui::PushItemWidth(ImGui::CalcTextSize(uart_options_sublabels[k][*curr_options_sel[k]]).x + 2 * style.FramePadding.x);
-#define POP_COLOR if(need_pop) {ImGui::PopStyleColor(); need_pop = false;}
-        
-        ImU32 label_col = IM_COL32(255,255,255,255);
-
-        bool need_pop = false;
-        if(k==1 && !parity_check) {
-            label_col = IM_COL32(255,0,0,255);
-            ImGui::PushStyleColor(ImGuiCol_Text, label_col);
-            need_pop = true;
-        }
-        if(ImGui::BeginCombo("##uart_option_combo", uart_options_sublabels[k][*curr_options_sel[k]], ImGuiComboFlags_NoArrowButton)) {
-            POP_COLOR
-            ImGui::Selectable(uart_options_headers[k], false, ImGuiSelectableFlags_Disabled);
-            for(int n=0; n < sublabels_counts[k]; n++) {
-                if(ImGui::Selectable(uart_options_sublabels[k][n], *curr_options_sel[k]==n)) {
-                    uart_changed = true;
-                    *curr_options_sel[k]=n;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        POP_COLOR
-        p0 = ImGui::GetItemRectMin() + style.FramePadding;
-        p1 = ImGui::GetItemRectMax() - style.FramePadding;
-        draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddLine(ImVec2(p0.x,p1.y), p1, label_col);
-        ImGui::PopID();
-        ImGui::SameLine();
+        if(uart_changed)
+            librador_set_uart_decode_settings(ch, 
+                    (UartSettings)
+                    {.decode_on=curr_ch_uart_settings->decode_on, .baudRate=static_cast<double>(baud_rates[curr_ch_uart_settings->baud_idx_sel]), .parity=parities[curr_ch_uart_settings->parity_idx_sel]});
     }
-    ImGui::PopStyleVar();
-    ImGui::NewLine();
-    ImGui::PopStyleColor();
-
-    if(uart_changed)
-        librador_set_uart_decode_settings(ch, 
-                (UartSettings)
-                {.decode_on=curr_ch_uart_settings->decode_on, .baudRate=static_cast<double>(baud_rates[curr_ch_uart_settings->baud_idx_sel]), .parity=parities[curr_ch_uart_settings->parity_idx_sel]});
 
     ImGui::PopID(); //ch
     return return_val;
@@ -163,7 +165,7 @@ void logicDecodeUI::draw_console(float window_content_width)
         float next_ch1_height = ch_console_height[1];
         if(both_ch_uart_settings[0].decode_on && both_ch_uart_settings[1].decode_on)
         {
-            float console_sep_delta = draw_grabber(grabber_height, "chA_chB_splitter", &grabber1_backlog, 1, parity_check);
+            float console_sep_delta = draw_grabber(grabber_height, "chA_chB_splitter", &grabber1_backlog, 1, parity_check, true);
             float clamped_console_sep_delta = fmin(console_sep_delta, (ch_console_height[1] - 2 * grabber_height));
             clamped_console_sep_delta = fmax(clamped_console_sep_delta, -(ch_console_height[0] - 2 * grabber_height));
             next_ch1_height -= clamped_console_sep_delta;
@@ -183,7 +185,7 @@ void logicDecodeUI::draw_console(float window_content_width)
         ch_console_height[0] = clamped_console_height;
         print_stream(3, librador_get_i2c_string(), &i2c_console_at_bottom, window_content_width, ch_console_height[0]);
     }
-    float console_height_delta = draw_grabber(grabber_height, "plot_console_splitter", &grabber2_backlog, both_ch_uart_settings[1].decode_on ? 2 : 1, parity_check);
+    float console_height_delta = draw_grabber(grabber_height, "plot_console_splitter", &grabber2_backlog, both_ch_uart_settings[1].decode_on ? 2 : 1, parity_check, protocol_sel == Protocol::UART);
     if(both_ch_uart_settings[1].decode_on) {
         ch_console_height[1] += console_height_delta;
     } else if (both_ch_uart_settings[0].decode_on || (protocol_sel == Protocol::I2C)) {
@@ -228,67 +230,75 @@ void logicDecodeUI::draw(float width_pixels, inputsUI* inputs_ui)
     bool open_ch_serial_settings = false;
     char chAB[2] = {'1', '2'}; // canonical CH1/CH2 naming
 
-    ImGui::BeginGroup(); // for bounding rect
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{0.f,0.f});
     ImGui::Dummy(ImVec2(width_pixels,0.f));
     ImGui::PopStyleVar();
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2((width_pixels - ImGui::CalcTextSize("UART").x)/2.,style.FramePadding.y));
-    ImGui::Text("UART");
-    ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("CH 1CH 2").x - style.ItemSpacing.x - 4 * style.FramePadding.x)/2., 0.f ));
-    for (int ch: {1,2})
+    if(ImGui::BeginTable("logic_decode_table", 2, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_RowBg, ImVec2(width_pixels,0.f)))
     {
-        ImGui::BeginDisabled(!logic_enable[ch-1] || !(protocol_sel==Protocol::UART));
-        char buf[20];
-        sprintf(buf,"CH %c##serial_decode",chAB[ch-1]);
-        bool need_pop = false;
-        if(both_ch_uart_settings[ch-1].decode_on) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
-            need_pop = true;
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 0.75f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 0.25f);
+        ImGui::TableNextRow();
+        for(const char * protocol_label : {"UART","I2C"})
+        {
+            ImGui::TableNextColumn();
+            ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize(protocol_label).x,style));
+            ImGui::Text("%s", protocol_label);
         }
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetColorU32(ImGuiCol_Button));
-        if(ImGui::Button(buf)) {
-            both_ch_uart_settings[ch-1].decode_on = !both_ch_uart_settings[ch-1].decode_on;
-            if (both_ch_uart_settings[ch-1].decode_on) {
-                ch_console_height[ch-1] = init_console_height_per_ch - grabber_height;
-            } else {
-                ch_console_height[ch-1] = 0.f;
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, ImGui::CalcTextSize("CH 1CH 2").x + style.ItemSpacing.x + 4 * style.FramePadding.x, style));
+        for (int ch: {1,2})
+        {
+            ImGui::BeginDisabled(!logic_enable[ch-1] || !(protocol_sel==Protocol::UART));
+            char buf[20];
+            sprintf(buf,"CH %c##serial_decode",chAB[ch-1]);
+            bool need_pop = false;
+            if(both_ch_uart_settings[ch-1].decode_on) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
+                need_pop = true;
             }
-            librador_set_uart_decode_settings(ch, 
-                    (UartSettings)
-                    {.decode_on=both_ch_uart_settings[ch-1].decode_on, .baudRate=static_cast<double>(baud_rates[both_ch_uart_settings[ch-1].baud_idx_sel]), .parity=parities[both_ch_uart_settings[ch-1].parity_idx_sel]});
-        }
-        ImGui::PopStyleColor();
-        if(need_pop) {
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetColorU32(ImGuiCol_Button));
+            if(ImGui::Button(buf)) {
+                both_ch_uart_settings[ch-1].decode_on = !both_ch_uart_settings[ch-1].decode_on;
+                if (both_ch_uart_settings[ch-1].decode_on) {
+                    ch_console_height[ch-1] = init_console_height_per_ch - grabber_height;
+                } else {
+                    ch_console_height[ch-1] = 0.f;
+                }
+                librador_set_uart_decode_settings(ch, 
+                        (UartSettings)
+                        {.decode_on=both_ch_uart_settings[ch-1].decode_on, .baudRate=static_cast<double>(baud_rates[both_ch_uart_settings[ch-1].baud_idx_sel]), .parity=parities[both_ch_uart_settings[ch-1].parity_idx_sel]});
+            }
             ImGui::PopStyleColor();
+            if(need_pop) {
+                ImGui::PopStyleColor();
+            }
+            ImGui::EndDisabled(); 
+            ImGui::SameLine();
         }
-        ImGui::EndDisabled(); 
-        ImGui::SameLine();
-    }
-//     draw_list->AddLine(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(width_pixels,0.f), IM_COL32(90, 90, 120, 255));
-//     
-//     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2( (width_pixels - ImGui::CalcTextSize("I2C").x - style.ItemInnerSpacing.x - CHECKBOX_SIZE)/2., style.FramePadding.y ));
-//     ImGui::BeginDisabled(!i2c_allowed);
-//     if(ImGui::Checkbox("I2C", (bool *) &protocol_sel)) {
-//         i2c_changed = true;
-//     }
-//     ImGui::EndDisabled();
+        ImGui::TableNextColumn();
+        
+        ImGui::SetCursorScreenPos(center_text(ImGui::GetColumnWidth() + 2*style.CellPadding.x, CHECKBOX_SIZE, style));
 
-    ImGui::EndGroup();
-    ImVec2 p0 = ImGui::GetItemRectMin();
-    ImVec2 p1 = ImGui::GetItemRectMax() + ImVec2(0.f,style.FramePadding.y);
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddRect(p0, p1, IM_COL32(90, 90, 120, 255));
+        ImGui::BeginDisabled(!i2c_allowed);
+        if(ImGui::custom_Checkbox("##I2C", (bool *) &protocol_sel)) {
+            i2c_changed = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::EndTable();
+    }
+
     ImGui::SetCursorScreenPos(ImGui::GetCursorScreenPos() + ImVec2(0.f,style.FramePadding.y - style.ItemSpacing.y));
     ImGui::Dummy({0.f,0.f}); // prevents issue with this draw() command affecting the vertical alignment of whatever ui element comes after it
     ImGui::EndGroup();
 
     ImGui::EndDisabled(); //!logic_enable[0] && !logic_enable[1]);
-//     if(i2c_changed)
-//     {
-//         librador_set_i2c_is_decoding(protocol_sel == Protocol::I2C);
-//         if(protocol_sel == Protocol::I2C)
-//             ch_console_height[0] = init_console_height_per_ch - grabber_height;
-//     }
+    if(i2c_changed)
+    {
+        librador_set_i2c_is_decoding(protocol_sel == Protocol::I2C);
+        if(protocol_sel == Protocol::I2C)
+            ch_console_height[0] = init_console_height_per_ch - grabber_height;
+    }
 }
 
 void logicDecodeUI::update(inputsUI* inputs)

@@ -1,6 +1,7 @@
 #ifndef UITILE_H
 #define UITILE_H
 class inputsUI;
+#include "imgui.h"
 
 class UI_tile
 {
@@ -19,5 +20,6 @@ class UI_tile
         bool is_expanded = true;
         bool next_is_expanded = true; // to prevent expansion/contraction of tiles mid-frame
         bool is_visible = true;
+        ImVec2 center_text(float col_width, float text_width, ImGuiStyle& style);
 };
 #endif
