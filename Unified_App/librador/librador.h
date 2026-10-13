@@ -202,6 +202,11 @@ LIBRADORSHARED_EXPORT bool librador_device_present(bool* bootloader_mode);
 // *bootloader_mode / *gobindar_mode flag the two needs-recovery states.
 // librador_device_present() is unchanged and never reports Gobindar boards.
 LIBRADORSHARED_EXPORT bool librador_device_present_ex(bool* bootloader_mode, bool* gobindar_mode);
+// Opens the board and starts streaming.  Returns 0 when streaming, a negative
+// value when no board could be opened, and 1 when the board is open but runs
+// a firmware other than EXPECTED_FIRMWARE_VERSION/DEFINED_EXPECTED_VARIANT: no
+// stream is started, librador_is_connected() is true (the handle stays open so
+// a host can flash), and the request_firmware_flash host hook is invoked if set.
 LIBRADORSHARED_EXPORT int librador_connect();
 LIBRADORSHARED_EXPORT int librador_disconnect();
 // Blocking, takes several seconds — call from a worker thread.

@@ -30,10 +30,11 @@ void logToStderr(void* userdata, const int level, const char* format, va_list ar
 
 DeviceSession::DeviceSession(bool verbose, UsbTransport transport) : m_verbose(verbose)
 {
-    librador_logger_set(&m_verbose, logToStderr);
+    routeLogsToStderr(&m_verbose);
 
     const int librador_transport = transport == UsbTransport::Iso6   ? LABRADOR_TRANSPORT_ISO6
                                    : transport == UsbTransport::Iso1 ? LABRADOR_TRANSPORT_ISO1
+                                   : transport == UsbTransport::Bulk ? LABRADOR_TRANSPORT_BULK
                                                                      : LABRADOR_TRANSPORT_AUTO;
     if (librador_init(librador_transport) < 0)
     {
@@ -48,6 +49,22 @@ DeviceSession::DeviceSession(bool verbose, UsbTransport transport) : m_verbose(v
         throw CommandError("could not connect to a Labrador board (code " +
                            std::to_string(rc) +
                            "); is it plugged in and not open in another program?");
+    }
+    if (rc > 0)
+    {
+        // The board is open but on a firmware librador will not stream from. The
+        // GUI handles this through its flash hook; the CLI has none, so it must stop
+        // here or wait forever on an empty sample buffer.
+        char message[160];
+        std::snprintf(message, sizeof message,
+                      "the board is running firmware 0x%04x variant %u but this build "
+                      "needs 0x%04x variant %u; run 'labrador-cli update-firmware' first",
+                      librador_get_device_firmware_version(),
+                      librador_get_device_firmware_variant(), EXPECTED_FIRMWARE_VERSION,
+                      DEFINED_EXPECTED_VARIANT);
+        librador_exit();
+        librador_logger_set(nullptr, nullptr);
+        throw CommandError(message);
     }
 }
 
@@ -69,4 +86,14 @@ void DeviceSession::configureScope(ScopeMode mode, double gain, double settle_s)
 bool DeviceSession::isValidScopeGain(double gain)
 {
     return std::find(SCOPE_GAINS.begin(), SCOPE_GAINS.end(), gain) != SCOPE_GAINS.end();
+}
+
+void DeviceSession::routeLogsToStderr(const bool* verbose)
+{
+    librador_logger_set(const_cast<bool*>(verbose), logToStderr);
+}
+
+void DeviceSession::resetLogs()
+{
+    librador_logger_set(nullptr, nullptr);
 }

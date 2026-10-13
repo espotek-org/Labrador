@@ -11,9 +11,10 @@ enum class ScopeMode
 // How USB frames reach the host; see librador's LABRADOR_TRANSPORT_* values.
 enum class UsbTransport
 {
-    Auto, // librador's per-platform choice (six isochronous endpoints on Windows/Linux)
+    Auto, // librador's per-platform choice: iso6 on Windows/Linux, bulk on macOS
     Iso6, // six isochronous endpoints of 125 bytes per frame
-    Iso1  // one isochronous endpoint of 750 bytes per frame
+    Iso1, // one isochronous endpoint of 750 bytes per frame
+    Bulk  // one bulk endpoint; the only transport librador allows on macOS
 };
 
 // RAII connection to the Labrador board: connects on construction, disconnects on
@@ -36,6 +37,11 @@ class DeviceSession
 
     // Gains the hardware supports: 0.5, 1, 2, 4, 8, 16, 32, 64.
     static bool isValidScopeGain(double gain);
+
+    // Route librador's log to stderr (debug lines only while *verbose is true);
+    // resetLogs() detaches it. `verbose` must outlive the routing.
+    static void routeLogsToStderr(const bool* verbose);
+    static void resetLogs();
 
   private:
     bool m_verbose; // read by the log sink through librador's userdata pointer

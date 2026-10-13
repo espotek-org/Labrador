@@ -1,6 +1,8 @@
 #include "CaptureCommand.h"
 #include "Command.h"
+#include "UpdateFirmwareCommand.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -21,9 +23,12 @@ void printUsage(std::ostream& out, const CommandList& commands)
         << "  " << PROGRAM << " <command> [options]\n"
         << "  " << PROGRAM << " help [command]\n\n"
         << "Commands:\n";
+    size_t width = 0;
     for (const auto& command : commands)
-        out << "  " << std::left << std::setw(10) << command->name()
-            << command->summary() << '\n';
+        width = std::max(width, command->name().size());
+    for (const auto& command : commands)
+        out << "  " << std::left << std::setw(static_cast<int>(width) + 2)
+            << command->name() << command->summary() << '\n';
     out << "\nRun '" << PROGRAM << " <command> --help' for a command's options.\n"
         << "Only one program can use the board at a time: close the Labrador app first.\n"
         << "Exit status: 0 success, " << EXIT_RUNTIME_ERROR
@@ -44,6 +49,7 @@ int main(int argc, char** argv)
 {
     CommandList commands;
     commands.push_back(std::make_unique<CaptureCommand>());
+    commands.push_back(std::make_unique<UpdateFirmwareCommand>());
 
     const std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty())

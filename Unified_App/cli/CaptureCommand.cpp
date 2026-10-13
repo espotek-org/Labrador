@@ -19,8 +19,7 @@ struct Options
     ScopeMode mode = ScopeMode::Ch1Ch2;
     double gain = 4;
     double settle_s = 0.5;
-    // ISO1 validates every frame; ISO6 pairs checksums approximately and reports false alarms.
-    UsbTransport transport = UsbTransport::Iso1;
+    UsbTransport transport = UsbTransport::Auto; // librador's per-platform choice
     bool verbose = false;
     librador_capture_request request; // trigger, hysteresis, pre/post, timeout
 };
@@ -57,7 +56,10 @@ UsbTransport parseTransport(const std::string& text)
         return UsbTransport::Iso6;
     if (text == "iso1")
         return UsbTransport::Iso1;
-    throw UsageError("option '--transport' must be auto, iso6 or iso1, got '" + text + "'");
+    if (text == "bulk")
+        return UsbTransport::Bulk;
+    throw UsageError("option '--transport' must be auto, iso6, iso1 or bulk, got '" + text +
+                     "'");
 }
 
 void parseTrigger(const std::string& spec, librador_capture_request& request)
@@ -131,7 +133,8 @@ OptionParser makeParser(Options& options)
                      [&](const std::string& v)
                      { options.settle_s = parseSeconds("--settle", v); });
     parser.addOption("--transport", "T",
-                     "USB transport: iso1, iso6 or auto (the platform default); default iso1",
+                     "USB transport: auto (the platform default: iso6 on Windows and "
+                     "Linux, bulk on macOS), iso6, iso1 or bulk; default auto",
                      [&](const std::string& v) { options.transport = parseTransport(v); });
     parser.addFlag("--verbose", "also show librador's debug messages on stderr",
                    [&]() { options.verbose = true; });
