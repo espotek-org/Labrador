@@ -10,15 +10,18 @@ use it (they take libusb from the system or `deps/libusb-android`).
 In-app firmware updates on Windows go through the Atmel DFU bootloader
 (`03EB:2FE4`), bound to the **libusb-win32** kernel driver (`libusb0.sys`),
 which libusb-1.0 drives through `libusbK.dll`. With the libusbK.dll that the
-driver package installs (3.0.7.0), every control transfer to that device is
-completed by the driver *before* `DeviceIoControl()` returns, and libusbK
-hands libusb's OVERLAPPED straight to the kernel without reporting the byte
-count back. Released libusb then overwrites the byte count the kernel had
-already stored with an uninitialised value and posts a second completion.
-dfu-programmer sees successful transfers come back with `actual_length` 0
-(or garbage), aborts the flash after the erase, and the board is left stuck
-in the bootloader (espotek-org/Labrador#450, #458 for the measurements, #459
-for the diagnosis).
+driver package installs (3.0.7.0), `ControlTransfer` hands libusb's own
+OVERLAPPED to the kernel and then reports success even though the request
+is normally still in flight (`GetLastError()` says `WAIT_TIMEOUT`), without
+ever filling in the byte count. Released libusb takes that success to mean
+"no kernel I/O happened", overwrites the OVERLAPPED's status fields with an
+uninitialised length and posts a second completion packet, racing the
+kernel's real completion. dfu-programmer sees successful transfers come back
+with `actual_length` 0 (or garbage), aborts the flash after the erase, and
+the board is left stuck in the bootloader (espotek-org/Labrador#450, #458
+for the measurements, #459 for the diagnosis). Measured on a Labrador board
+with `control_length` (libusb's new test program, see below): about 2% of
+control transfers come back with the wrong length on stock libusb 1.0.30.
 
 No libusb release has the fix yet, so the sources live here with it applied.
 Keeping a copy in the repo (rather than fetching and patching a tarball at
@@ -55,17 +58,26 @@ Applied on top of the copied files, in order. Each one is the same change as
 submitted upstream, so it can be dropped as soon as a libusb release carries
 it.
 
-1. `0001-windows-do-not-synthesize-a-completion-the-kernel-already-delivered.patch`
-   â€” `libusb/os/windows_common.c`: `windows_submit_transfer()` marks the
-   OVERLAPPED `STATUS_PENDING` before the backend runs, and
-   `windows_force_sync_completion()` returns early when the kernel has
-   already replaced that status, because the kernel's completion packet
-   (with the right byte count) is then already on its way through the
-   completion port. Upstream: libusb fork branch
-   `EspoTek/libusb:windows-sync-control-length` (PR to follow once verified
-   on hardware). Supersedes the earlier "prefer the completion-port length
-   when the two disagree" variant from #459, which guarded against the
-   symptom; this removes the double completion that caused it.
+1. `0001-windows-do-not-synthesize-a-completion-the-kernel-will-deliver.patch`
+   — `libusb/os/windows_common.{c,h}`: `windows_submit_transfer()` stores a
+   sentinel (`WINDOWS_OVERLAPPED_NOT_SUBMITTED`) in the OVERLAPPED before the
+   backend runs. `DeviceIoControl()` replaces it with `STATUS_PENDING` the
+   moment a driver DLL hands the OVERLAPPED to the kernel, so when a backend
+   reports a "synchronous" success, `windows_force_sync_completion()` can tell
+   a request the kernel owns (its completion packet, with the right byte
+   count, will arrive by itself) from one the DLL emulated without kernel I/O
+   (the HID descriptor emulation, the SET_CONFIGURATION shortcut, libusbK
+   3.0.8+ on libusb0.sys), and only synthesizes a completion for the latter.
+   An earlier form of this patch tested for `STATUS_PENDING` itself, which
+   only catches requests the kernel has already finished; on the bootloader
+   that is a minority, so it still produced about 0.1% wrong lengths. The
+   sentinel form measured 0 wrong lengths in 3,000,000 transfers (50 runs of
+   `control_length`, 20,000 iterations each of sync/async `GET_DESCRIPTOR`
+   and `GET_STATUS`; libusb0.sys 1.2.6.0, libusbK.dll 3.0.7.0, Windows 11).
+   Upstream: libusb fork branch `EspoTek/libusb:windows-sync-control-length`
+   (PR to follow). Supersedes the "prefer the completion-port length when
+   the two disagree" variant from #459, which guarded against the symptom;
+   this removes the double completion that caused it.
 
 ## Updating
 
