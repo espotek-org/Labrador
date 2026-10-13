@@ -14,7 +14,8 @@ driving the hardware. One codebase, three form factors:
 All desktop builds use CMake presets (see `CMakePresets.json`); the top-level
 `Makefile` is a thin convenience wrapper. Dependencies (SDL3, ImGui, ImPlot,
 librador, fonts) are vendored under `deps/` — the only system requirements are
-a C++17 toolchain, CMake ≥ 3.22, Ninja, pkg-config and libusb-1.0.
+a C++17 toolchain, CMake ≥ 3.22, Ninja, pkg-config and libusb-1.0 (except on
+Windows, see below).
 
 ### macOS
 
@@ -47,12 +48,18 @@ make pi               # GLES 2.0 renderer (LABRADOR_GLES2=ON)
 ### Windows
 
 From a shell with a C++ toolchain (MSVC “x64 Native Tools” or MSYS2 MinGW64)
-plus CMake, Ninja and libusb (e.g. `pacman -S mingw-w64-x86_64-{toolchain,cmake,ninja,libusb}`):
+plus CMake and Ninja (e.g. `pacman -S mingw-w64-x86_64-{toolchain,cmake,ninja,pkgconf}`):
 
 ```sh
 make windows
 build\windows\labrador.exe
 ```
+
+libusb is not needed from the system on Windows: a copy of libusb 1.0.30
+lives in `deps/libusb` with a fix for the libusb-win32 bootloader driver
+already applied (provenance, patch and update procedure in
+`deps/libusb/README.md`), and `cmake/BundledLibusb.cmake` builds it into the
+exe. Without that fix in-app firmware updates fail part-way.
 
 ### Android
 

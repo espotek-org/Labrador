@@ -9,8 +9,9 @@ set(CMAKE_C_COMPILER i686-w64-mingw32-gcc-posix)
 set(CMAKE_CXX_COMPILER i686-w64-mingw32-g++-posix)
 set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
 set(CMAKE_FIND_ROOT_PATH /usr/i686-w64-mingw32)
-# CI exports LABRADOR_WIN32_ROOT = the prefix holding the cross-built static
-# libusb.  It must be a find root: with FIND_ROOT_PATH_MODE_LIBRARY ONLY,
+# Optional: LABRADOR_WIN32_ROOT = a prefix holding extra i686 libraries (CI no
+# longer needs it; libusb is built in-tree by cmake/BundledLibusb.cmake).  It
+# must be a find root: with FIND_ROOT_PATH_MODE_LIBRARY ONLY,
 # find_library re-roots every hint and would otherwise miss it.
 if(DEFINED ENV{LABRADOR_WIN32_ROOT})
     list(APPEND CMAKE_FIND_ROOT_PATH "$ENV{LABRADOR_WIN32_ROOT}")

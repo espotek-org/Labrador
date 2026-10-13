@@ -28,8 +28,9 @@ if(LABRADOR_STATIC_RUNTIME)
     add_link_options(-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL)
 endif()
 
-# Windows ships a single self-contained exe: libgcc/libstdc++/winpthread and
-# libusb all come from MSYS2's static archives (system DLLs stay dynamic).
+# Windows ships a single self-contained exe: libgcc/libstdc++/winpthread come
+# from MSYS2's static archives and libusb is built in-tree (system DLLs stay
+# dynamic).
 if(MINGW)
     add_link_options(-static)
 endif()
@@ -101,6 +102,15 @@ if(LABRADOR_QA)
 endif()
 
 # --- librador (canonical merged copy) + libdfuprog (firmware flashing) ---
+# Windows: libusb is built from the in-tree copy, which carries a fix for the
+# libusb-win32 bootloader driver (cmake/BundledLibusb.cmake).  Must come
+# before libdfuprog, which links the same target when it exists.
+if(WIN32 AND NOT ANDROID)
+    option(LABRADOR_BUNDLED_LIBUSB "Build the in-tree patched libusb (Windows)" ON)
+endif()
+if(LABRADOR_BUNDLED_LIBUSB AND WIN32 AND NOT ANDROID)
+    include(cmake/BundledLibusb.cmake)
+endif()
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libdfuprog
                  ${CMAKE_CURRENT_BINARY_DIR}/libdfuprog EXCLUDE_FROM_ALL)
 file(GLOB LIBRADOR_SOURCES CONFIGURE_DEPENDS librador/*.cpp)
@@ -119,6 +129,8 @@ if(ANDROID)
         ${CMAKE_CURRENT_SOURCE_DIR}/deps/libusb-android/android/${ANDROID_ABI}/libusb1.0.so)
     target_include_directories(librador PUBLIC deps/libusb-android)
     target_link_libraries(librador PUBLIC libusb_android android log)
+elseif(TARGET labrador_libusb)
+    target_link_libraries(librador PUBLIC labrador_libusb)
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)

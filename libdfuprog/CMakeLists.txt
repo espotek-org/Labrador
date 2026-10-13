@@ -31,6 +31,10 @@ if(ANDROID)
         HAVE_CONFIG_H
         PLATFORM_ANDROID
     )
+elseif(TARGET labrador_libusb)
+    # Unified_App's patched, source-built libusb (Windows; BundledLibusb.cmake).
+    target_link_libraries(libdfuprog PUBLIC labrador_libusb)
+    target_compile_definitions(libdfuprog PRIVATE HAVE_CONFIG_H)
 else()
     # Desktop: system libusb; dfuprog manages its own context and discovery.
     find_package(PkgConfig REQUIRED)
