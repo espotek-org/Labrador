@@ -43,6 +43,9 @@ public:
     int addVector(short *firstElement, int numElements);
     int get(int address, bool daq = false);
     int mostRecentAddress = 0;
+    // Samples written since the last reset(); sample k lives at the address
+    // (mostRecentAddress - (total_samples_added - 1 - k)) mod buffer length.
+    uint64_t total_samples_added = 0;
     int mostRecentAddressPaused = 0;
     int mostRecentAddressDAQ = 0;
     int stream_index_at_last_call = 0;
@@ -61,6 +64,11 @@ public:
     double voltage_ref = 1.65;
     int setPaused(bool is_paused, int mostRecentAddressDelta = 0, bool hard = false);
     void copy_to_daq();
+    // Copies raw samples [start, start+num) by absolute index into out.
+    // False if any of them was overwritten or has not arrived yet.
+    // Caller must hold the buffer mutex (as for copy_to_daq).
+    bool copyWindow(uint64_t start, int num, int *out) const;
+    double toVolts(int raw_sample, double scope_gain) const { return sampleConvert(raw_sample, scope_gain, false); }
     bool getPaused();
     bool setTriggerSettings(trigger_settings new_trigger_settings);
     bool setVirtualTransformSettings(virtual_transform_settings new_virtual_transform_settings);

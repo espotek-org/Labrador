@@ -5,6 +5,9 @@
 #define _USE_MATH_DEFINES
 
 #include <vector>
+#include <algorithm>
+#include <chrono>
+#include <thread>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -117,6 +120,107 @@ int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler
 
     internal_librador_object->usb_driver->spawn_daq_thread(channel, numToGet, interval_samples, units_sel, filename);
     return 1;
+}
+
+int librador_get_analog_sample_count(int channel, uint64_t* count)
+{
+    CHECK_API_INITIALISED
+    CHECK_USB_INITIALISED
+    return internal_librador_object->usb_driver->get_analog_sample_count(channel, count);
+}
+
+int librador_copy_analog_window(int channel, uint64_t start, int num, double* volts_out)
+{
+    CHECK_API_INITIALISED
+    CHECK_USB_INITIALISED
+    return internal_librador_object->usb_driver->get_analog_window(channel, start, num, volts_out);
+}
+
+int librador_capture_around_trigger(const librador_capture_request* req, librador_capture_result* res)
+{
+    CHECK_API_INITIALISED
+    CHECK_USB_INITIALISED
+    usbCallHandler* usb = internal_librador_object->usb_driver;
+    using clock = std::chrono::steady_clock;
+
+    const double sps = usb->get_samples_per_second();
+    const int ch = req->trigger_channel;
+    if(sps <= 0 || (ch != 1 && ch != 2) || req->pre_s < 0 || req->post_s < 0) return -4;
+    const int64_t pre_n = llround(req->pre_s * sps);
+    const int64_t post_n = llround(req->post_s * sps);
+    // Keep half a second of slack so the window start is never overwritten while we wait for post-trigger samples.
+    if(pre_n + post_n <= 0 || pre_n + post_n > NUM_SAMPLES_PER_CHANNEL - (int64_t)(sps / 2)) return -4;
+
+    uint64_t count;
+    if(usb->get_analog_sample_count(ch, &count) != 0) return -3;
+
+    uint64_t frames_bad0, frames_dropped0;
+    usb->get_frame_stats(nullptr, &frames_bad0, &frames_dropped0, nullptr);
+
+    // Never scan from before pre_n so the pre-trigger history is guaranteed to exist.
+    uint64_t scan = std::max<uint64_t>(count, (uint64_t) pre_n);
+    uint64_t last_count = count;
+    bool armed = false;
+    bool found = false;
+    uint64_t trigger_index = 0;
+    const auto t0 = clock::now();
+    std::vector<double> chunk;
+
+    while(!found){
+        if(req->timeout_s > 0 && std::chrono::duration<double>(clock::now() - t0).count() > req->timeout_s) return -5;
+        int rc = usb->get_analog_sample_count(ch, &count);
+        if(rc != 0) return -6;
+        if(count < last_count) return -6;
+        last_count = count;
+        if(count <= scan){
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+        int n = (int) std::min<uint64_t>(count - scan, 100000);
+        chunk.resize(n);
+        rc = usb->get_analog_window(ch, scan, n, chunk.data());
+        if(rc != 0) return rc;
+        for(int i = 0; i < n && !found; i++){
+            const double v = chunk[i];
+            if(!armed){
+                armed = req->rising ? (v < req->level_v - req->hysteresis_v) : (v > req->level_v + req->hysteresis_v);
+            } else if(req->rising ? (v >= req->level_v) : (v <= req->level_v)){
+                found = true;
+                trigger_index = scan + i;
+            }
+        }
+        scan += n;
+    }
+
+    // Wait for the post-trigger samples (bounded: a stalled stream must not hang the caller).
+    const uint64_t need = trigger_index + post_n;
+    const auto t1 = clock::now();
+    while(true){
+        int rc = usb->get_analog_sample_count(ch, &count);
+        if(rc != 0 || count < last_count) return -6;
+        last_count = count;
+        if(count >= need) break;
+        if(std::chrono::duration<double>(clock::now() - t1).count() > req->post_s + 2.0) return -5;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    const uint64_t start = trigger_index - pre_n;
+    const int total = (int)(pre_n + post_n);
+    res->sample_rate_hz = sps;
+    res->trigger_index = trigger_index;
+    res->pre_samples = (int) pre_n;
+    res->ch1.assign(total, 0.0);
+    res->ch2.clear();
+    int rc = usb->get_analog_window(1, start, total, res->ch1.data());
+    if(rc != 0) return rc;
+    std::vector<double> ch2(total);
+    if(usb->get_analog_window(2, start, total, ch2.data()) == 0) res->ch2 = std::move(ch2);
+
+    uint64_t frames_bad1, frames_dropped1;
+    usb->get_frame_stats(nullptr, &frames_bad1, &frames_dropped1, nullptr);
+    res->frames_bad_checksum = frames_bad1 - frames_bad0;
+    res->frames_dropped = frames_dropped1 - frames_dropped0;
+    return 0;
 }
 
 double librador_get_samples_per_second()
