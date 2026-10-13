@@ -285,6 +285,14 @@ private:
     bool frame_csum_valid[CSUM_RING_SIZE];
     uint64_t data_frame_counter = 0;
     uint64_t meta_frame_counter = 0;
+    // Meta packets waiting for their candidate frames (lag -3..+1 around the
+    // meta's slot) to be assembled before they are scored; see
+    // score_pending_meta().  Scoring a meta the moment it arrives was wrong
+    // for iso6, where the six data slices of a frame may still sit in
+    // iso6_queues when the meta is processed.
+    struct PendingMeta { uint64_t index; unsigned char c0, c1; };
+    std::deque<PendingMeta> pending_meta;
+    void score_pending_meta();
     // iso6 reassembly: per-endpoint packet queues consumed in lockstep
     std::deque<std::vector<unsigned char>> iso6_queues[MAX_DATA_ENDPOINTS];
 
