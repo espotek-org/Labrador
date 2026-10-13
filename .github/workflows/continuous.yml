@@ -91,9 +91,11 @@ jobs:
 
           ## Linux (including Raspberry Pi)
 
-          - `Labrador_x86_64.AppImage` / `Labrador_arm64.AppImage` — `chmod +x`
-            the file, then run it. Installs the udev rules on first launch.
-          - `Labrador_x86_64.deb` / `Labrador_arm64.deb` — `sudo dpkg -i <file>`.
+          - `Labrador-for-Linux-x86_64.AppImage` /
+            `Labrador-for-Linux-arm64.AppImage` — `chmod +x` the file, then
+            run it. Installs the udev rules on first launch.
+          - `Labrador-for-Linux-x86_64.deb` / `Labrador-for-Linux-arm64.deb` —
+            `sudo dpkg -i <file>`.
 
           Needs a distro of Ubuntu 20.04 / Debian 11 / Pi OS bullseye vintage
           or newer (glibc 2.31+).

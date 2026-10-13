@@ -170,13 +170,13 @@ jobs:
             --desktop-file=AppDir/usr/share/applications/espotek-labrador.desktop \
             --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png \
             --output=appimage
-          mv Labrador*.AppImage "Labrador_${{ matrix.arch }}.AppImage"
+          mv Labrador*.AppImage "Labrador-for-Linux-${{ matrix.arch }}.AppImage"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-appimage-${{ matrix.arch }}
-          path: Unified_App/Labrador_${{ matrix.arch }}.AppImage
+          path: Unified_App/Labrador-for-Linux-${{ matrix.arch }}.AppImage
           compression-level: 0
           if-no-files-found: error
 
@@ -295,14 +295,14 @@ jobs:
           EOF
           chmod 0755 "$PKG/DEBIAN/postinst"
 
-          dpkg-deb --root-owner-group --build "$PKG" "Labrador_${{ matrix.name }}.deb"
-          dpkg-deb --info "Labrador_${{ matrix.name }}.deb"
+          dpkg-deb --root-owner-group --build "$PKG" "Labrador-for-Linux-${{ matrix.name }}.deb"
+          dpkg-deb --info "Labrador-for-Linux-${{ matrix.name }}.deb"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asset-deb-${{ matrix.name }}
-          path: Unified_App/Labrador_${{ matrix.name }}.deb
+          path: Unified_App/Labrador-for-Linux-${{ matrix.name }}.deb
           compression-level: 0
           if-no-files-found: error
 
