@@ -6,10 +6,6 @@
 #include "imgui_internal.h"
 #include "inputs_ui.h"
 
-ImVec2 center_text(float col_width, float text_width, ImGuiStyle& style) {
-    return ImGui::GetCursorScreenPos() + ImVec2((col_width - text_width)/2. - style.CellPadding.x, 0.0); // for centered text
-}
-
 ImVec2 center_checkbox_delta(float full_col_width, ImGuiStyle& style) {
     return ImVec2((full_col_width - CHECKBOX_SIZE)/2. - style.CellPadding.x, 0.0); // for centered checkbox
 }

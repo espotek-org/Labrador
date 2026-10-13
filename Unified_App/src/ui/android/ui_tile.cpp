@@ -1,5 +1,4 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
 #include "imgui_internal.h"
 #include "ui_tile.h"
 void UI_tile::standard_header(float width_pixels)
@@ -49,4 +48,8 @@ int UI_tile::get_collapsed_height()
 {
     ImGuiStyle& style = ImGui::GetStyle();
     return ImGui::GetFontSize() + 2 * style.ItemSpacing.y;
+}
+
+ImVec2 UI_tile::center_text(float col_width, float text_width, ImGuiStyle& style) {
+    return ImGui::GetCursorScreenPos() + ImVec2((col_width - text_width)/2. - style.CellPadding.x, 0.0); // for centered text
 }
