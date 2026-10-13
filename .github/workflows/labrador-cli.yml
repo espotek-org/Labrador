@@ -1,0 +1,165 @@
+# Builds the headless labrador-cli (Unified_App/cli) on Linux, macOS and
+# Windows and uploads each binary together with the bundled firmware it needs
+# for `labrador-cli update-firmware`.  The GUI workflows compile the same
+# target as part of their default build; this one exists so the CLI has its
+# own artifact and a fast signal when only cli/ or librador/ changed.
+name: Build labrador-cli
+
+on:
+  push:
+    branches: [unified-app]
+    paths:
+      - 'Unified_App/cli/**'
+      - 'Unified_App/librador/**'
+      - 'Unified_App/firmware/**'
+      - 'Unified_App/CMakeLists.txt'
+      - '.github/workflows/labrador-cli.yml'
+  pull_request:
+    branches: [unified-app]
+    paths:
+      - 'Unified_App/cli/**'
+      - 'Unified_App/librador/**'
+      - 'Unified_App/firmware/**'
+      - 'Unified_App/CMakeLists.txt'
+      - '.github/workflows/labrador-cli.yml'
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: Unified_App
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y \
+            build-essential cmake ninja-build pkg-config libusb-1.0-0-dev
+
+      - name: Build
+        run: |
+          cmake --preset linux
+          cmake --build --preset linux --target labrador_cli
+
+      - name: Smoke test (no board needed)
+        run: |
+          build/linux/cli/labrador-cli --help
+          build/linux/cli/labrador-cli help capture
+          build/linux/cli/labrador-cli help update-firmware
+          test -f build/linux/cli/assets/firmware/labrafirm_000C_03.hex
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: labrador-cli-linux-x86_64
+          path: |
+            Unified_App/build/linux/cli/labrador-cli
+            Unified_App/build/linux/cli/assets/firmware/*.hex
+
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: Unified_App
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Dependencies
+        run: brew install ninja pkg-config
+
+      # Same static universal libusb as the app build, so the binary runs on
+      # any Mac without a Homebrew libusb.
+      - name: Build universal libusb
+        run: |
+          set -euxo pipefail
+          curl -sSL -o libusb.tar.bz2 \
+            https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
+          tar xjf libusb.tar.bz2
+          cd libusb-1.0.29
+          ./configure --prefix="$PWD/../libusb-univ" --enable-static --disable-shared \
+            CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=10.13" \
+            LDFLAGS="-arch arm64 -arch x86_64"
+          make -j$(sysctl -n hw.ncpu)
+          make install
+
+      - name: Build
+        run: |
+          export PKG_CONFIG_PATH="$PWD/libusb-univ/lib/pkgconfig"
+          cmake -S . -B build/macos -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLABRADOR_STATIC_LIBUSB=ON \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+          cmake --build build/macos --target labrador_cli -j$(sysctl -n hw.ncpu)
+
+      - name: Smoke test (no board needed)
+        run: |
+          lipo -info build/macos/cli/labrador-cli
+          build/macos/cli/labrador-cli --help
+          build/macos/cli/labrador-cli help capture
+          build/macos/cli/labrador-cli help update-firmware
+          test -f build/macos/cli/assets/firmware/labrafirm_000C_03.hex
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: labrador-cli-macos-universal
+          path: |
+            Unified_App/build/macos/cli/labrador-cli
+            Unified_App/build/macos/cli/assets/firmware/*.hex
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: Unified_App
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-libusb
+
+      - name: Build
+        run: |
+          cmake --preset windows
+          cmake --build --preset windows --target labrador_cli
+
+      - name: Smoke test (no board needed)
+        run: |
+          ./build/windows/cli/labrador-cli.exe --help
+          ./build/windows/cli/labrador-cli.exe help capture
+          ./build/windows/cli/labrador-cli.exe help update-firmware
+          test -f build/windows/cli/assets/firmware/labrafirm_000C_03.hex
+          # Static like the app: no MinGW or libusb DLLs beside the exe.
+          if objdump -x build/windows/cli/labrador-cli.exe | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+            echo "labrador-cli.exe depends on non-system DLLs"; exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: labrador-cli-windows-x86_64
+          path: |
+            Unified_App/build/windows/cli/labrador-cli.exe
+            Unified_App/build/windows/cli/assets/firmware/*.hex
