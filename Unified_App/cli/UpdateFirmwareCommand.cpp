@@ -12,6 +12,12 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
+
+#ifdef __APPLE__
+#include <climits>
+#include <mach-o/dyld.h>
+#endif
 
 namespace
 {
@@ -64,14 +70,42 @@ OptionParser makeParser(Options& options)
 }
 
 // The same place the Labrador app keeps its firmware: assets/firmware next to
-// the executable (Contents/Resources inside a macOS bundle).
+// the executable (Contents/Resources inside a macOS bundle), which is what
+// SDL_GetBasePath() answers on every platform.  On macOS, though, SDL asks
+// NSBundle, which trusts the path the CLI was invoked by: run through a
+// symlink from outside Labrador.app (how it is put on PATH) the lookup lands
+// beside the link.  So the real executable location is tried too.
 std::string bundledHexPath()
 {
-    const char* base = SDL_GetBasePath();
-    if (base == nullptr)
-        throw CommandError(std::string("cannot locate the executable directory: ") +
-                           SDL_GetError());
-    return std::string(base) + "assets/firmware/" + expectedFirmwareName();
+    const std::string name = expectedFirmwareName();
+    std::vector<std::string> candidates;
+    if (const char* base = SDL_GetBasePath())
+        candidates.push_back(std::string(base) + "assets/firmware/" + name);
+#ifdef __APPLE__
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string exe(size, '\0');
+    char real[PATH_MAX];
+    if (_NSGetExecutablePath(&exe[0], &size) == 0 && realpath(exe.c_str(), real) != nullptr)
+    {
+        std::string dir(real);
+        dir.erase(dir.find_last_of('/'));
+        candidates.push_back(dir + "/../Resources/assets/firmware/" + name); // in the bundle
+        const std::string bare = dir + "/assets/firmware/" + name;           // bare binary
+        if (candidates.empty() || candidates.front() != bare)
+            candidates.push_back(bare);
+    }
+#endif
+    for (const std::string& path : candidates)
+        if (std::ifstream(path, std::ios::binary))
+            return path;
+
+    std::string looked;
+    for (const std::string& path : candidates)
+        looked += (looked.empty() ? "" : ", ") + path;
+    throw CommandError("cannot find the bundled firmware image " + name + " (looked for " +
+                       (looked.empty() ? std::string("it next to the executable") : looked) +
+                       "); pass --hex FILE");
 }
 
 // RAII around librador so every exit path tears the USB session down.
@@ -128,11 +162,11 @@ int UpdateFirmwareCommand::run(const std::vector<std::string>& args)
     Options options;
     makeParser(options).parse(args);
 
+    // Resolved and checked before any USB work so a missing image fails
+    // without touching the board.
     const std::string hex = options.hex.empty() ? bundledHexPath() : options.hex;
-    // Checked before any USB work so a missing image fails without touching the board.
     if (!std::ifstream(hex, std::ios::binary))
-        throw CommandError("cannot read firmware image '" + hex + "'" +
-                           (options.hex.empty() ? "; pass --hex FILE" : ""));
+        throw CommandError("cannot read firmware image '" + hex + "'");
 
     LibradorScope librador(&options.verbose);
 
