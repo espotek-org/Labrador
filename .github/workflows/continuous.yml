@@ -79,12 +79,15 @@ jobs:
           `Labrador-for-macOS.dmg` — signed + notarized universal build.
           Needs macOS 10.13 High Sierra or newer on Intel, macOS 11 Big Sur
           or newer on Apple Silicon. Drag Labrador into `/Applications`.
+          The command-line tool is inside the bundle:
+          `/Applications/Labrador.app/Contents/MacOS/labrador-cli`.
 
           ## Windows
 
           `Labrador-for-Windows.exe` — installer bundling the app (64-bit and
-          32-bit; it installs the one matching your Windows), firmware, and
-          USB driver. Run it and accept the driver-install prompt at the end.
+          32-bit; it installs the one matching your Windows), the
+          `labrador-cli.exe` command-line tool beside it, firmware, and USB
+          driver. Run it and accept the driver-install prompt at the end.
           Tested on Windows 10 and 11; Windows 7 SP1 and 8.1 should work (the
           app has no newer OS dependencies) but are untested — reports
           welcome.
@@ -93,7 +96,9 @@ jobs:
 
           - `Labrador_x86_64.AppImage` / `Labrador_arm64.AppImage` — `chmod +x`
             the file, then run it. Installs the udev rules on first launch.
+            `./Labrador_<arch>.AppImage cli ...` runs the command-line tool.
           - `Labrador_x86_64.deb` / `Labrador_arm64.deb` — `sudo dpkg -i <file>`.
+            Installs `labrador` and `labrador-cli` on `PATH`.
 
           Needs a distro of Ubuntu 20.04 / Debian 11 / Pi OS bullseye vintage
           or newer (glibc 2.31+).
@@ -101,7 +106,14 @@ jobs:
           ## Android
 
           `Labrador-for-Android.apk` — sideload on Android 7.1 "Nougat" or later
-          (API level 25).
+          (API level 25). No command-line tool on Android.
+
+          ## Command-line tool
+
+          `labrador-cli` captures full-rate scope samples around a trigger to
+          CSV (`capture`) and flashes the bundled firmware (`update-firmware`)
+          without a window; see `Unified_App/cli/README.md` for the options
+          and examples.
           EOF
           )
           # Recreate the release each run so stale assets never linger, mirroring
