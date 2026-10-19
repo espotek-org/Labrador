@@ -69,14 +69,21 @@ void usbCallHandler::note_frame_csum(unsigned char csum, bool valid){
     frame_csum_ring[data_frame_counter % CSUM_RING_SIZE] = csum;
     frame_csum_valid[data_frame_counter % CSUM_RING_SIZE] = valid;
     data_frame_counter++;
+    // A newly noted frame may complete the candidate window of a waiting meta.
+    score_pending_meta();
 }
 
 void usbCallHandler::note_seq(uint16_t seq){
     if(seq_started){
         uint16_t expect = (uint16_t)(last_seq + 1);
-        if(seq != expect){
-            frames_dropped += (uint16_t)(seq - expect);
+        int16_t delta = (int16_t)(seq - expect);
+        if(delta > 0){
+            frames_dropped += delta;
         }
+        // delta < 0: the device re-sent a header it had already sent (its
+        // meta endpoint was re-armed before the SOF latched a new one) or
+        // the stream restarted.  Neither is a drop; previously this added
+        // 65535 to frames_dropped.
     }
     seq_started = true;
     last_seq = seq;
@@ -86,6 +93,7 @@ void usbCallHandler::reset_frame_state(){
     seq_started = false;
     data_frame_counter = 0;
     meta_frame_counter = 0;
+    pending_meta.clear();
     bulk_stream.clear();
     for(int i = 0; i < CSUM_RING_SIZE; i++) frame_csum_valid[i] = false;
     for(int k = 0; k < MAX_DATA_ENDPOINTS; k++) iso6_queues[k].clear();
@@ -161,7 +169,13 @@ void usbCallHandler::drain_iso6_queues(){
 // Meta packet (iso transports): EB 58 seqL seqH csum_half0 csum_half1
 // usb_state mode, describing the previous frame (lag-1).  Because the meta
 // and data URB streams can start a frame or two apart, each meta is matched
-// against a small window of recent frame checksums.
+// against a small window of recent frame checksums.  The match is deferred
+// until that window has been assembled: on iso6 the data slices of the
+// meta's own block are often still queued when the meta is processed
+// (the ingest thread sees a block's six data URBs and its meta URB in one
+// batch, and iso6 frames are only assembled by drain_iso6_queues()), and
+// scoring immediately then mis-reported about 0.6% bad and 12%
+// unvalidated frames on a healthy stream.
 void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
     meta_frame_counter++;
     if(length == 0) return;   // device had no meta armed that frame
@@ -170,26 +184,38 @@ void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
         return;
     }
     note_seq((uint16_t)(data[2] | (data[3] << 8)));
-    unsigned char c0 = data[4];
-    unsigned char c1 = data[5];
-    // lag-1 nominal: meta in frame N describes data frame N-1
-    bool matched = false;
-    bool any_candidate = false;
-    for(long lag = -3; lag <= 1; lag++){
-        long idx = (long)meta_frame_counter - 1 + lag;
-        if(idx < 0 || idx >= (long)data_frame_counter) continue;
-        if((long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
-        int slot = idx % CSUM_RING_SIZE;
-        if(!frame_csum_valid[slot]) continue;
-        any_candidate = true;
-        if(frame_csum_ring[slot] == c0 || frame_csum_ring[slot] == c1){
-            matched = true;
-            break;
+    pending_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
+    score_pending_meta();
+}
+
+// Scores every pending meta whose candidate frames (lag -3..+1 around its
+// slot; lag -1 is nominal) have all been noted, or which would otherwise
+// fall out of the checksum ring.  Called whenever a meta or a frame arrives.
+void usbCallHandler::score_pending_meta(){
+    while(!pending_meta.empty()){
+        const PendingMeta &p = pending_meta.front();
+        const bool window_complete = data_frame_counter > p.index + 1;
+        const bool about_to_lap = pending_meta.size() > CSUM_RING_SIZE / 2;
+        if(!window_complete && !about_to_lap) return;
+        bool matched = false;
+        bool any_candidate = false;
+        for(long lag = -3; lag <= 1; lag++){
+            long idx = (long)p.index + lag;
+            if(idx < 0 || idx >= (long)data_frame_counter) continue;
+            if((long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
+            int slot = idx % CSUM_RING_SIZE;
+            if(!frame_csum_valid[slot]) continue;
+            any_candidate = true;
+            if(frame_csum_ring[slot] == p.c0 || frame_csum_ring[slot] == p.c1){
+                matched = true;
+                break;
+            }
         }
+        if(matched) frames_ok++;
+        else if(any_candidate) frames_bad_checksum++;
+        else frames_unvalidated++;
+        pending_meta.pop_front();
     }
-    if(matched) frames_ok++;
-    else if(any_candidate) frames_bad_checksum++;
-    else frames_unvalidated++;
 }
 
 // Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum
@@ -311,14 +337,15 @@ void usbCallHandler::ingest_thread_function(){
                 break;
             case 2:
                 handle_iso6_packet(item.ep_index, item.bytes.data(), (int)item.bytes.size());
+                // Assemble as soon as a frame's six slices are in rather than
+                // at the end of the batch, so frames reach the buffers (and
+                // the checksum ring) with no batch-sized lag.
+                drain_iso6_queues();
                 break;
             case 3:
                 handle_meta_packet(item.bytes.data(), (int)item.bytes.size());
                 break;
             }
-        }
-        if(active_transport == LABRADOR_TRANSPORT_ISO6){
-            drain_iso6_queues();
         }
     }
     LIBRADOR_LOG(LOG_DEBUG, "ingest thread finished\n");

@@ -57,7 +57,7 @@ class logicDecodeUI : public UI_tile
     float grabber1_backlog = 0.f;
     float grabber2_backlog = 0.f;
     float grabber_delta_tracker2 = 0.f;
-    float draw_grabber(float grabber_height, const char * label, float* backlog, int ch_idx, bool parity_check);
+    float draw_grabber(float grabber_height, const char * label, float* backlog, int ch_idx, bool parity_check, bool for_uart);
     void print_stream(int id, const char * text, bool *at_bottom, float window_content_width, float ch_console_height);
     bool uart_ch_console_at_bottom[2] = {true, true};
     bool i2c_console_at_bottom = true;
