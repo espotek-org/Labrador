@@ -24,7 +24,7 @@ the CLI, and vice versa.
 | Windows installer | `C:\Program Files\EspoTek Labrador\labrador-cli.exe`, next to `labrador.exe`. Not on `PATH`; run it with the full path or `cd` there first. The installer also installs the USB driver the CLI needs. |
 | macOS DMG | Inside the bundle: `/Applications/Labrador.app/Contents/MacOS/labrador-cli` (signed and notarized with the app). Put it on `PATH` with `sudo mkdir -p /usr/local/bin && sudo ln -s /Applications/Labrador.app/Contents/MacOS/labrador-cli /usr/local/bin/labrador-cli`. |
 | Linux `.deb` | `labrador-cli` on `PATH` (`/usr/bin/labrador-cli` → `/usr/lib/labrador/labrador-cli`). |
-| Linux AppImage | `./Labrador_x86_64.AppImage cli <command> [options]`. A symlink named `labrador-cli` to the AppImage also works: `ln -s ~/Labrador_x86_64.AppImage ~/.local/bin/labrador-cli`. |
+| Linux AppImage | `./Labrador-for-Linux-x86_64.AppImage cli <command> [options]`. A symlink named `labrador-cli` to the AppImage also works: `ln -s ~/Labrador-for-Linux-x86_64.AppImage ~/.local/bin/labrador-cli`. |
 | Android | Not available. |
 
 The Linux packages need the udev rule the GUI installs (the `.deb` installs
