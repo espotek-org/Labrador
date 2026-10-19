@@ -7,7 +7,8 @@
 # static (MinGW runtime + libusb baked in; only OS DLLs remain dynamic); the
 # installer bundles them with the assets + firmware and the unpacked USB
 # driver packages (whose dpinst32/x86 libusbK.sys already covered 32-bit),
-# installed silently during setup.
+# installed silently during setup. The headless labrador-cli.exe (same
+# static build, both arches) installs beside labrador.exe.
 # Reusable (called by continuous.yml) and directly dispatchable. Uploads
 # asset-windows-installer.
 name: Build Windows
@@ -52,19 +53,24 @@ jobs:
       - name: Verify static link
         run: |
           set -euxo pipefail
-          EXE=build/windows32/labrador.exe
-          i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name"
-          if i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
-            echo "ERROR: unexpected non-system DLL import in $EXE" >&2
-            exit 1
-          fi
-          i686-w64-mingw32-objdump -f "$EXE" | grep "pei-i386"
+          for EXE in build/windows32/labrador.exe build/windows32/cli/labrador-cli.exe; do
+            i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name"
+            if i686-w64-mingw32-objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+              echo "ERROR: unexpected non-system DLL import in $EXE" >&2
+              exit 1
+            fi
+            i686-w64-mingw32-objdump -f "$EXE" | grep "pei-i386"
+          done
 
-      - name: Upload x86 exe
+      # Both exes; upload-artifact keeps their paths relative to the common
+      # build/windows32 root, so they land as labrador.exe and cli/labrador-cli.exe.
+      - name: Upload x86 exes
         uses: actions/upload-artifact@v4
         with:
           name: win32-exe
-          path: Unified_App/build/windows32/labrador.exe
+          path: |
+            Unified_App/build/windows32/labrador.exe
+            Unified_App/build/windows32/cli/labrador-cli.exe
           if-no-files-found: error
 
   build-windows:
@@ -90,7 +96,7 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
 
-      - name: Download x86 exe
+      - name: Download x86 exes
         uses: actions/download-artifact@v4
         with:
           name: win32-exe
@@ -106,14 +112,16 @@ jobs:
           set -euxo pipefail
           # Import table must hold only Windows system DLLs - no MinGW
           # runtime, no libusb.
-          objdump -x build/windows/labrador.exe | grep "DLL Name"
-          if objdump -x build/windows/labrador.exe | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
-            echo "ERROR: unexpected non-system DLL import" >&2
-            exit 1
-          fi
-          objdump -f build/windows/labrador.exe | grep "pei-x86-64"
-          # Loader-level check (resolves every import).
-          ldd build/windows/labrador.exe
+          for EXE in build/windows/labrador.exe build/windows/cli/labrador-cli.exe; do
+            objdump -x "$EXE" | grep "DLL Name"
+            if objdump -x "$EXE" | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
+              echo "ERROR: unexpected non-system DLL import in $EXE" >&2
+              exit 1
+            fi
+            objdump -f "$EXE" | grep "pei-x86-64"
+            # Loader-level check (resolves every import).
+            ldd "$EXE"
+          done
 
       - name: Assemble staging tree
         run: |
@@ -124,6 +132,10 @@ jobs:
           # labrador.exe.
           cp build/windows/labrador.exe "$STAGE/labrador64.exe"
           cp win32-exe/labrador.exe "$STAGE/labrador32.exe"
+          # labrador-cli.exe installs beside labrador.exe and shares its
+          # assets\firmware (SDL_GetBasePath() = exe dir for both).
+          cp build/windows/cli/labrador-cli.exe "$STAGE/labrador-cli64.exe"
+          cp win32-exe/cli/labrador-cli.exe "$STAGE/labrador-cli32.exe"
           # Assets (+ firmware) next to the exe; SDL_GetBasePath() = exe dir.
           cp -r assets/. "$STAGE/assets/"
           mkdir -p "$STAGE/assets/firmware"
@@ -141,6 +153,26 @@ jobs:
           # Installer icon next to the .iss (ISCC resolves SetupIconFile relatively).
           cp ../Desktop_Interface/build_win/appicon.ico packaging/windows/appicon.ico
           ls -R "$STAGE" | head -60
+
+      # The CLI needs no display, so it can exercise the staged layout the
+      # installer reproduces under {app}.  update-firmware with no board must
+      # get as far as looking for one, which proves it found assets\firmware
+      # next to the exe.
+      - name: Smoke test labrador-cli from the staging tree
+        run: |
+          set -euxo pipefail
+          STAGE=packaging/windows/staging
+          cp "$STAGE/labrador-cli64.exe" "$STAGE/labrador-cli.exe"
+          "$STAGE/labrador-cli.exe" --help
+          "$STAGE/labrador-cli.exe" help capture
+          "$STAGE/labrador-cli.exe" help update-firmware
+          if "$STAGE/labrador-cli.exe" update-firmware >cli.log 2>&1; then
+            echo "ERROR: update-firmware succeeded with no board attached" >&2
+            exit 1
+          fi
+          cat cli.log
+          grep -q "no Labrador board found" cli.log
+          rm "$STAGE/labrador-cli.exe"
 
       - name: Install Inno Setup
         shell: pwsh

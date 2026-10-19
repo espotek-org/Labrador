@@ -1,8 +1,9 @@
 # Build + package the Unified_App (SDL3/ImGui) macOS app: a signed + notarized
-# universal (arm64 + x86_64) .app inside a DMG. Floors: macOS 10.13 on Intel
-# (SDL3's minimum and the oldest target current Xcode accepts), 11.0 on Apple
-# Silicon. Reusable (called by continuous.yml) and directly dispatchable.
-# Uploads asset-dmg.
+# universal (arm64 + x86_64) .app inside a DMG. The headless labrador-cli ships
+# inside the bundle as Contents/MacOS/labrador-cli, signed and notarized along
+# with the GUI. Floors: macOS 10.13 on Intel (SDL3's minimum and the oldest
+# target current Xcode accepts), 11.0 on Apple Silicon. Reusable (called by
+# continuous.yml) and directly dispatchable. Uploads asset-dmg.
 name: Build macOS
 
 permissions:
@@ -78,8 +79,12 @@ jobs:
           rm -rf "$APP"
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-          # Binary + resources (bundle the firmware hex the librador flashes).
+          # Binaries + resources (bundle the firmware hex the librador flashes).
+          # labrador-cli goes in beside the GUI: SDL_GetBasePath() inside a
+          # bundle is Contents/Resources, so its update-firmware finds the
+          # same assets/firmware hex the app uses.
           cp build/macos/labrador "$APP/Contents/MacOS/labrador"
+          cp build/macos/cli/labrador-cli "$APP/Contents/MacOS/labrador-cli"
           cp -R assets "$APP/Contents/Resources/assets"
           rm -rf "$APP/Contents/Resources/assets/firmware"
           cp -R firmware "$APP/Contents/Resources/assets/firmware"
@@ -94,17 +99,45 @@ jobs:
             packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 
           # libusb is statically linked; the only load commands left should be
-          # Apple system libraries and frameworks.
-          otool -L "$APP/Contents/MacOS/labrador"
-          if otool -L "$APP/Contents/MacOS/labrador" | grep -v "^Labrador" | grep -vE "/usr/lib/|/System/Library/"; then
-            echo "ERROR: unexpected non-system dynamic dependency" >&2
+          # Apple system libraries and frameworks.  Same floors for both
+          # binaries: x86_64 slice 10.13 (High Sierra), arm64 11.0.
+          for BIN in "$APP/Contents/MacOS/labrador" "$APP/Contents/MacOS/labrador-cli"; do
+            lipo -info "$BIN" | grep -E "arm64.*x86_64|x86_64.*arm64"
+            otool -L "$BIN"
+            if otool -L "$BIN" | grep -v "^Labrador" | grep -vE "/usr/lib/|/System/Library/"; then
+              echo "ERROR: unexpected non-system dynamic dependency in $BIN" >&2
+              exit 1
+            fi
+            otool -arch x86_64 -l "$BIN" | grep -E "minos 10.13|version 10.13"
+            otool -arch arm64 -l "$BIN" | grep -E "minos 11.0|version 11.0" | head -1
+          done
+
+      # The CLI needs no display, so it can exercise the assembled bundle.
+      # update-firmware with no board must get as far as looking for one, which
+      # proves it resolved the hex under Contents/Resources/assets/firmware.
+      - name: Smoke test labrador-cli in the bundle
+        run: |
+          set -euxo pipefail
+          CLI=Labrador.app/Contents/MacOS/labrador-cli
+          "$CLI" --help
+          "$CLI" help capture
+          "$CLI" help update-firmware
+          if "$CLI" update-firmware >cli.log 2>&1; then
+            echo "ERROR: update-firmware succeeded with no board attached" >&2
             exit 1
           fi
-          # Deployment floors: x86_64 slice 10.13 (High Sierra), arm64 11.0.
-          otool -arch x86_64 -l "$APP/Contents/MacOS/labrador" \
-            | grep -E "minos 10.13|version 10.13"
-          otool -arch arm64 -l "$APP/Contents/MacOS/labrador" \
-            | grep -E "minos 11.0|version 11.0" | head -1
+          cat cli.log
+          grep -q "no Labrador board found" cli.log
+          # Users are told to symlink it onto PATH; the bundle lookup must
+          # still find Contents/Resources through the link.
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$PWD/$CLI" "$RUNNER_TEMP/bin/labrador-cli"
+          if PATH="$RUNNER_TEMP/bin:$PATH" labrador-cli update-firmware >cli-link.log 2>&1; then
+            echo "ERROR: update-firmware succeeded with no board attached" >&2
+            exit 1
+          fi
+          cat cli-link.log
+          grep -q "no Labrador board found" cli-link.log
 
       - name: Import code signing certificate
         if: env.MACOS_CERTIFICATE != '' && env.MACOS_CERTIFICATE_PWD != ''
@@ -125,8 +158,15 @@ jobs:
         run: |
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
           echo "Using signing identity: $IDENTITY"
+          # Inside out: the helper executable first (notarization requires
+          # every Mach-O in the bundle to carry a hardened-runtime signature
+          # of its own), then the bundle.
+          codesign --force --timestamp --options runtime --sign "$IDENTITY" \
+            Labrador.app/Contents/MacOS/labrador-cli
           codesign --force --deep --timestamp --options runtime --sign "$IDENTITY" Labrador.app
           codesign -vv --deep --strict Labrador.app
+          codesign -vv --strict Labrador.app/Contents/MacOS/labrador-cli
+          codesign -d --verbose=2 Labrador.app/Contents/MacOS/labrador-cli 2>&1 | grep -E "flags=.*runtime"
           echo "App bundle signed successfully"
 
       - name: Create DMG

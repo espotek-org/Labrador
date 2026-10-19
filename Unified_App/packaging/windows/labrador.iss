@@ -4,14 +4,17 @@
 ; single self-contained "Labrador-for-Windows.exe" that installs the app (a
 ; fully static exe: MinGW runtime + libusb baked in; the x64 or x86 build
 ; matching the host - the Qt app always shipped 32-bit, so 32-bit Windows
-; stays supported), its bundled assets + firmware hex, and the three unpacked
-; USB driver packages, which it installs silently during setup.
+; stays supported), the headless labrador-cli.exe beside it (same arch
+; choice; see Unified_App/cli/README.md), its bundled assets + firmware hex,
+; and the three unpacked USB driver packages, which it installs silently
+; during setup.
 ;
 ; Built in CI with:
 ;   ISCC.exe /DMyAppVersion=... /DStagingDir=... /DOutputDir=... labrador.iss
-; The staging dir must contain: labrador64.exe, labrador32.exe, assets\,
-; driver\<package>\ (unpacked dpinst packages).  appicon.ico must sit next to this script (the workflow copies it
-; in).
+; The staging dir must contain: labrador64.exe, labrador32.exe,
+; labrador-cli64.exe, labrador-cli32.exe, assets\, driver\<package>\
+; (unpacked dpinst packages).  appicon.ico must sit next to this script (the
+; workflow copies it in).
 
 #ifndef MyAppVersion
   #define MyAppVersion "2.0.0"
@@ -63,8 +66,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: files; Name: "{app}\*.dll"
 
 [Files]
+; labrador-cli.exe is the headless CLI (console app), run from a terminal as
+; "{app}\labrador-cli.exe"; it shares {app}\assets\firmware with the GUI for
+; update-firmware.  Each arch's pair sits in its own solid block so a 64-bit
+; host never decompresses the 32-bit exes (and vice versa).
 Source: "{#StagingDir}\labrador64.exe"; DestDir: "{app}"; DestName: "labrador.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "{#StagingDir}\labrador-cli64.exe"; DestDir: "{app}"; DestName: "labrador-cli.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
 Source: "{#StagingDir}\labrador32.exe"; DestDir: "{app}"; DestName: "labrador.exe"; Flags: ignoreversion solidbreak; Check: not Is64BitInstallMode
+Source: "{#StagingDir}\labrador-cli32.exe"; DestDir: "{app}"; DestName: "labrador-cli.exe"; Flags: ignoreversion; Check: not Is64BitInstallMode
 Source: "{#StagingDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion recursesubdirs createallsubdirs
 

@@ -80,6 +80,22 @@ APK lands in `android/app/build/outputs/apk/debug/`.
 - Settings persist to `settings.ini` in the per-user pref dir
   (macOS: `~/Library/Application Support/EspoTek/Labrador/`).
 
+## Command-line tool
+
+`labrador-cli` is a headless companion built from the same tree
+(`cli/`, target `labrador_cli`, lands in `build/<preset>/cli/`). It captures
+full-rate scope samples around a trigger to CSV and flashes the bundled
+firmware, for scripts and headless boxes. The installers ship it: beside
+`labrador.exe` on Windows, inside `Labrador.app/Contents/MacOS` on macOS, on
+`PATH` from the `.deb`, and as `<AppImage> cli ...` from the AppImage.
+
+```sh
+labrador-cli capture --trigger ch1:rising:1.5 --pre 0.05 --post 0.1 --out edge.csv
+labrador-cli update-firmware
+```
+
+Options, output format and more examples: [`cli/README.md`](cli/README.md).
+
 ## UI tests (QA builds)
 
 ```sh
@@ -128,6 +144,7 @@ src/ui/            One Frontend per form factor (desktop, android, lowres)
 src/instruments/   Instrument widgets shared by the desktop/compact layouts
 src/qa/            --qa test suite (QA builds only)
 src/platform/      File dialogs, paths, Android glue
+cli/               labrador-cli: headless capture / firmware tool over librador
 librador/          Merged librador (USB protocol, decoding, DAQ)
 deps/              Vendored SDL3/ImGui/ImPlot forks, test engine, stb, exprtk
 assets/            Fonts (with licenses), pinout images, help text

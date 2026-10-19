@@ -116,6 +116,43 @@ LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data_by_rate(int
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_analog_data_sincelast(int channel, double timeWindow_max_seconds, double sample_rate_hz, double delay_seconds, int filter_mode);
 LIBRADORSHARED_EXPORT std::vector<double> * librador_get_digital_data(int channel, double timeWindow_seconds, int numToGet, double delay_seconds, bool daq = false);
 
+// Absolute-indexed access to the live full-rate scope buffers (channel 1 or
+// 2).  Sample 0 is the first sample since the last device-mode change; the
+// buffers hold the most recent 10 s.  Returns 0 on success, -1 if the channel
+// is not a scope stream in the current mode, -2 if the requested range was
+// overwritten or has not arrived yet.
+LIBRADORSHARED_EXPORT int librador_get_analog_sample_count(int channel, uint64_t* count);
+LIBRADORSHARED_EXPORT int librador_copy_analog_window(int channel, uint64_t start, int num, double* volts_out);
+
+struct librador_capture_request {
+    int trigger_channel = 1;        // 1 or 2
+    bool rising = true;
+    double level_v = 3.0;
+    double hysteresis_v = 0.25;     // the signal must leave level +/- this before the trigger re-arms
+    double pre_s = 0.2;
+    double post_s = 0.3;
+    double timeout_s = 0;           // wait for the trigger; <= 0 waits forever
+};
+struct librador_capture_result {
+    double sample_rate_hz = 0;
+    uint64_t trigger_index = 0;     // absolute sample index of the first sample past the level
+    int pre_samples = 0;            // trigger sample is ch1[pre_samples]
+    std::vector<double> ch1;        // volts, chronological
+    std::vector<double> ch2;        // empty unless CH2 streams in the current mode
+    // Counted over the whole wait, so they cannot say whether a bad frame fell inside the
+    // window. A dropped frame is filled with a repeat of the last good one; on the iso
+    // transports a bad-checksum frame is only detected after its samples were stored,
+    // so it stays as received.
+    uint64_t frames_bad_checksum = 0;
+    uint64_t frames_dropped = 0;
+};
+// Blocks until the trigger fires and the post-trigger samples have arrived,
+// then returns both channels over [trigger - pre, trigger + post) with a
+// shared time origin.  Returns 0, -3 no scope stream on the trigger channel,
+// -4 bad request, -5 timed out, -6 stream restarted (mode change) meanwhile,
+// or a negative error from the buffer access.
+LIBRADORSHARED_EXPORT int librador_capture_around_trigger(const librador_capture_request* request, librador_capture_result* result);
+
 LIBRADORSHARED_EXPORT int librador_daq(int channel, int numToGet, int interval_samples, usbCallHandler::daqUnitOptions units_sel[2], const char* filename);
 LIBRADORSHARED_EXPORT bool librador_poll_daq_status();
 
@@ -165,6 +202,11 @@ LIBRADORSHARED_EXPORT bool librador_device_present(bool* bootloader_mode);
 // *bootloader_mode / *gobindar_mode flag the two needs-recovery states.
 // librador_device_present() is unchanged and never reports Gobindar boards.
 LIBRADORSHARED_EXPORT bool librador_device_present_ex(bool* bootloader_mode, bool* gobindar_mode);
+// Opens the board and starts streaming.  Returns 0 when streaming, a negative
+// value when no board could be opened, and 1 when the board is open but runs
+// a firmware other than EXPECTED_FIRMWARE_VERSION/DEFINED_EXPECTED_VARIANT: no
+// stream is started, librador_is_connected() is true (the handle stays open so
+// a host can flash), and the request_firmware_flash host hook is invoked if set.
 LIBRADORSHARED_EXPORT int librador_connect();
 LIBRADORSHARED_EXPORT int librador_disconnect();
 // Blocking, takes several seconds — call from a worker thread.

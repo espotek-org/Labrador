@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <algorithm>
 
 #include "uartstyledecoder.h"
 
@@ -35,6 +36,7 @@ o1buffer::~o1buffer(){
 
 int o1buffer::reset(bool hard){
     mostRecentAddress = 0;
+    total_samples_added = 0;
     stream_index_at_last_call = 0;
     if(hard){
         for (int i=0; i<NUM_SAMPLES_PER_CHANNEL; i++){
@@ -56,6 +58,7 @@ void o1buffer::add(int value, int address){
     //Assign the value
     buffer[address] = value;
     updateMostRecentAddress(address);
+    total_samples_added++;
 }
 
 int o1buffer::addVector(int *firstElement, int numElements){
@@ -437,6 +440,20 @@ void o1buffer::copy_to_daq(){
     // caller should hold a mutex protection on 'buffer' access
     mostRecentAddressDAQ = mostRecentAddress;
     memcpy(buffer_daq, buffer, sizeof(int)*NUM_SAMPLES_PER_CHANNEL);
+}
+
+bool o1buffer::copyWindow(uint64_t start, int num, int *out) const {
+    if(num <= 0 || start + (uint64_t) num > total_samples_added) return false;
+    if(total_samples_added - start > (uint64_t) NUM_SAMPLES_PER_CHANNEL) return false;
+
+    int64_t behind = (int64_t)(total_samples_added - 1 - start);
+    int64_t first = ((int64_t) mostRecentAddress - behind) % NUM_SAMPLES_PER_CHANNEL;
+    if(first < 0) first += NUM_SAMPLES_PER_CHANNEL;
+
+    int head = (int) std::min<int64_t>(num, NUM_SAMPLES_PER_CHANNEL - first);
+    memcpy(out, buffer + first, sizeof(int) * head);
+    if(head < num) memcpy(out + head, buffer, sizeof(int) * (num - head));
+    return true;
 }
 
 bool o1buffer::getPaused(){
