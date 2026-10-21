@@ -188,7 +188,7 @@ jobs:
       - name: Smoke test labrador-cli in the AppImage
         run: |
           set -euxo pipefail
-          IMG="./Labrador_${{ matrix.arch }}.AppImage"
+          IMG="./Labrador-for-Linux-${{ matrix.arch }}.AppImage"
           "$IMG" cli --help
           "$IMG" cli help capture
           "$IMG" cli help update-firmware
@@ -343,7 +343,7 @@ jobs:
       - name: Smoke test labrador-cli from the installed .deb
         run: |
           set -euxo pipefail
-          dpkg -i "Labrador_${{ matrix.name }}.deb"
+          dpkg -i "Labrador-for-Linux-${{ matrix.name }}.deb"
           command -v labrador-cli
           labrador-cli --help
           labrador-cli help capture
