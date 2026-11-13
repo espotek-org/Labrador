@@ -24,6 +24,7 @@
 #include "logic_decode_ui.h"
 #include "daq_ui.h"
 #include "plot_ui.h"
+#include "layout_sel_ui.h"
 
 class AndroidFrontend : public Frontend
 {
@@ -42,11 +43,12 @@ class AndroidFrontend : public Frontend
     logicDecodeUI logic_decode_ui;
     daqUI daq_ui;
     plotUI plot_ui;
+    layoutSelUI layout_sel_ui;
 
     // Order + membership match Brent's settings_panel.cpp tiles[] array.
-    static const int n_tiles = 7;
+    static const int n_tiles = 8;
     UI_tile* tiles[n_tiles] = { &inputs_ui, &trigger_ui, &virtual_transform_ui, &sig_gen_ui,
-        &psu_ui, &logic_decode_ui, &daq_ui };
+        &psu_ui, &logic_decode_ui, &daq_ui, &layout_sel_ui};
 
     bool m_style_tightened = false; // one-time WindowPadding halving (Brent)
 

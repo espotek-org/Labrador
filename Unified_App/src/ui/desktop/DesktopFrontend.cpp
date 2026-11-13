@@ -220,9 +220,8 @@ void DesktopFrontend::renderLayout(App& app)
 {
     handleDesktopShortcuts();
 
-    const ImVec2 display_size = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(display_size);
+    ImGui::SetNextWindowPos(ImVec2(app.contentX(), app.contentY()));
+    ImGui::SetNextWindowSize(ImVec2(app.contentW(), app.contentH()));
 
     const ImGuiWindowFlags main_flags = ImGuiWindowFlags_NoResize
         | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
