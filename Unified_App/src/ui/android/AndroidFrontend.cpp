@@ -113,7 +113,6 @@ void AndroidFrontend::do_settings_panel_layout(
 
 void AndroidFrontend::draw_settings_panel(App& app, bool landscape, bool screen_keyboard_shown)
 {
-    (void)app; // used on desktop builds only (layout escape hatch below)
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     ImGuiStyle& style = ImGui::GetStyle();
@@ -191,6 +190,9 @@ void AndroidFrontend::draw_settings_panel(App& app, bool landscape, bool screen_
             }
             ImGui::NewLine();
         }
+
+        app.setLayoutMode(layout_sel_ui.layout_mode);
+        layout_sel_ui.layout_mode = App::LayoutMode::Mobile;
 
 #ifndef __ANDROID__
         // Desktop testing escape hatch: the tile UI has no View menu, so the
