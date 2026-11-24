@@ -517,26 +517,31 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
     }
 }
 
+// A transfer that fails (an error or timeout rather than COMPLETED) still
+// spanned num_iso_packets frames on its endpoint, so each of its packets is
+// queued empty, to be counted as a lost frame.  Dropping the transfer
+// outright would leave that endpoint's packet count, or the meta count,
+// num_iso_packets behind the others for the rest of the stream: iso6 would
+// assemble every later frame from slices of different milliseconds, and meta
+// pairing would compare checksums against the wrong frames.
 void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
-    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
-    {
-        // Which data endpoint is this?
-        int ep_index = 0;
-        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-            ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
+    const bool transfer_ok = transfer->status == LIBUSB_TRANSFER_COMPLETED;
+    // Which data endpoint is this?
+    int ep_index = 0;
+    if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+        ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
+    }
+    for(int i=0;i<transfer->num_iso_packets;i++){
+        unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+        int actual = transfer->iso_packet_desc[i].actual_length;
+        if(!transfer_ok || transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+            actual = 0;
         }
-        for(int i=0;i<transfer->num_iso_packets;i++){
-            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
-            int actual = transfer->iso_packet_desc[i].actual_length;
-            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
-                actual = 0;
-            }
-            if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-                usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
-            } else {
-                usb_driver->queue_ingest(1, 0, packetPointer, actual);
-            }
+        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+            usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
+        } else {
+            usb_driver->queue_ingest(1, 0, packetPointer, actual);
         }
     }
     usb_driver->rearm_or_retire(transfer);
@@ -544,16 +549,14 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 
 void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer){
     usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
-    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
-    {
-        for(int i=0;i<transfer->num_iso_packets;i++){
-            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
-            int actual = transfer->iso_packet_desc[i].actual_length;
-            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
-                actual = 0;
-            }
-            usb_driver->queue_ingest(3, 0, packetPointer, actual);
+    const bool transfer_ok = transfer->status == LIBUSB_TRANSFER_COMPLETED;
+    for(int i=0;i<transfer->num_iso_packets;i++){
+        unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+        int actual = transfer->iso_packet_desc[i].actual_length;
+        if(!transfer_ok || transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+            actual = 0;
         }
+        usb_driver->queue_ingest(3, 0, packetPointer, actual);
     }
     usb_driver->rearm_or_retire(transfer);
 }
