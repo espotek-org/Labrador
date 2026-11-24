@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -201,6 +202,14 @@ void DesktopFrontend::saveSettings(Settings& s)
     s.set("desk_panel_visible", m_sidebar_visible);
     s.set("desk_panel_page", (double)m_panel);
     s.set("desk_scanlines", m_scanlines);
+}
+
+void DesktopFrontend::showSidePanelPage(int page)
+{
+    if (page < 0 || page >= PanelCount)
+        throw std::out_of_range("side panel page " + std::to_string(page));
+    m_panel = page;
+    m_sidebar_visible = true;
 }
 
 // ---- Shortcuts (desktop-only; the shared set lives in handleShortcuts) ------

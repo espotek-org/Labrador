@@ -67,6 +67,12 @@ LIBRADORSHARED_EXPORT int librador_send_square_wave(int channel, double frequenc
 LIBRADORSHARED_EXPORT int librador_send_sawtooth_wave(int channel, double frequency_Hz, double amplitude_v, double offset_v, double phase_rad = 0.0);
 LIBRADORSHARED_EXPORT int librador_send_triangle_wave(int channel, double frequency_Hz, double amplitude_v, double offset_v, double phase_rad = 0.0);
 LIBRADORSHARED_EXPORT int librador_send_wave(int wf, int channel, double frequency_Hz, double amplitude_v, double offset_v);
+// What signal generator `channel` (1 or 2) was last set to output, after the
+// timer's integer period and the 8-bit DAC rounding (including the floor the
+// DAC cannot drive below and the x3 output stage used above 3.2 V): the
+// waveform's actual frequency and its lowest and highest output voltage.
+// Returns 0, -1 for an invalid channel, -2 if the channel was never set.
+LIBRADORSHARED_EXPORT int librador_get_signal_gen_output(int channel, double* frequency_hz, double* v_min, double* v_max);
 //a2
 ////As above
 //a3

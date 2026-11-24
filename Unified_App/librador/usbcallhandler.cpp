@@ -365,8 +365,9 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
             LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
         }
     } else {
+        // Normal teardown: every in-flight transfer retires here once.
         iso_thread_shutdown_remaining_transfers--;
-        LIBRADOR_LOG(LOG_WARNING, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
+        LIBRADOR_LOG(LOG_DEBUG, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
     }
 }
 
@@ -1340,6 +1341,39 @@ int usbCallHandler::update_function_gen_settings(int channel, unsigned char *sam
     fGenSelected->timerPeriod = (usecs_between_samples * XMEGA_MAIN_FREQ) / (1000000 * validClockDivs[clkSetting]) - 0.5;
     fGenSelected->clockDividerSetting = clkSetting + 1;
 
+    return 0;
+}
+
+int usbCallHandler::get_function_gen_output(int channel, double *frequency_hz, double *v_min, double *v_max){
+    const fGenSettings *fGen;
+    bool triple;
+    if(channel == 1){
+        fGen = &functionGen_CH1;
+        triple = fGenTriple & 0b00000001;
+    } else if (channel == 2){
+        fGen = &functionGen_CH2;
+        triple = fGenTriple & 0b00000010;
+    } else {
+        return -1;  //Invalid channel
+    }
+    if(fGen->numSamples == 0){
+        return -2; //Channel not initialised
+    }
+
+    // Mirrors update_function_gen_settings: the timer overflows every
+    // timerPeriod + 1 ticks of XMEGA_MAIN_FREQ / divider, one sample per overflow.
+    const int validClockDivs[7] = {1, 2, 4, 8, 64, 256, 1024};
+    const double ticks = (double)validClockDivs[fGen->clockDividerSetting - 1] * (fGen->timerPeriod + 1.0);
+    *frequency_hz = XMEGA_MAIN_FREQ / (ticks * fGen->numSamples);
+
+    uint8_t lo = 255, hi = 0;
+    for(int i = 0; i < fGen->numSamples; i++){
+        lo = std::min(lo, fGen->samples[i]);
+        hi = std::max(hi, fGen->samples[i]);
+    }
+    const double volts_per_sample = FGEN_LIMIT / 255.0 * (triple ? 3.0 : 1.0);
+    *v_min = lo * volts_per_sample;
+    *v_max = hi * volts_per_sample;
     return 0;
 }
 

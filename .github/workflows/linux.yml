@@ -106,7 +106,7 @@ jobs:
       - name: Build
         run: |
           export PKG_CONFIG_PATH="$PWD/libusb-static/lib/pkgconfig"
-          cmake --preset appimage
+          cmake --preset appimage -DLABRADOR_VERSION=2.0.${{ github.run_number }}
           cmake --build --preset appimage
 
       # Unit test for the in-app flasher's command splitting (#450); links the
@@ -269,7 +269,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --preset linux
+          cmake --preset linux -DLABRADOR_VERSION=2.0.${{ github.run_number }}
           cmake --build --preset linux
 
       - name: Build .deb
@@ -392,5 +392,5 @@ jobs:
           test -n "$ok"
       - name: Build
         run: |
-          cmake --preset pi
+          cmake --preset pi -DLABRADOR_VERSION=2.0.${{ github.run_number }}
           cmake --build --preset pi

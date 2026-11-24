@@ -26,6 +26,12 @@ class OptionParser
 
     // Strict number parsing (rejects "", "3x", "nan"); `option` names the culprit.
     static double toDouble(const std::string& option, const std::string& text);
+    // As toDouble, and also rejects negative numbers.
+    static double toNonNegative(const std::string& option, const std::string& text);
+
+    // Shortest natural spelling of a number ("0.5", "375000"), for help text and
+    // messages.
+    static std::string formatNumber(double value);
 
   private:
     struct Spec

@@ -9,6 +9,9 @@
 #include "ui/lowres/LowResFrontend.h"
 #include "ui/android/AndroidFrontend.h"
 #include "ui/tablet/TabletFrontend.h"
+#ifndef __ANDROID__
+#include "autoqa/AutoQa.h"
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -56,6 +59,19 @@ void App::StartUp()
             &m_gobindar_img_w, &m_gobindar_img_h))
         m_gobindar_texture = (intptr_t)gob_tmp_texture;
 
+#ifndef __ANDROID__
+    if (m_auto_qa)
+    {
+        // --auto-qa never touches the user's settings.ini or imgui.ini: the run
+        // keeps its own settings (discarded at the end) and no window layout.
+        const std::string path = m_auto_qa->settingsPath();
+        const std::string dir = path.substr(0, path.find_last_of("/"));
+        if (!SDL_CreateDirectory(dir.c_str()))
+            throw std::runtime_error("cannot create " + dir + ": " + SDL_GetError());
+        m_settings.useFile(path);
+        ImGui::GetIO().IniFilename = nullptr;
+    }
+#endif
     loadSettings();
     const ThemeSpec* theme = FindTheme(m_theme);
     SetGlobalStyle(theme ? *theme : ThemeAt(0));
@@ -449,6 +465,17 @@ void App::drawFirmwarePopup()
 
 void App::Update()
 {
+#ifndef __ANDROID__
+    // --auto-qa's hardware phase owns the board: draw its status and nothing
+    // that would talk to the board.
+    if (m_auto_qa && m_auto_qa->hardwarePhase())
+    {
+        drawAutoQaStatus();
+        m_auto_qa->frame(*this);
+        return;
+    }
+#endif
+
     // Ensure the frontend for the resolved layout exists before polling, so
     // pollDevice's onDeviceConnected hook has a live frontend to notify.
     ensureFrontend();
@@ -653,6 +680,43 @@ void App::Update()
     m_settings.saveIfDirty(ImGui::GetTime());
 
     m_frames++;
+#ifndef __ANDROID__
+    if (m_auto_qa)
+        m_auto_qa->frame(*this);
+#endif
+}
+
+std::string App::statusLine()
+{
+    const char* layout = "desktop";
+    switch (resolvedLayout())
+    {
+    case LayoutMode::Mobile: layout = "mobile"; break;
+    case LayoutMode::Compact: layout = "compact"; break;
+    case LayoutMode::Tablet: layout = "tablet"; break;
+    default: break;
+    }
+    const char* board = m_no_usb ? "usb-disabled"
+        : !m_device_present      ? "absent"
+        : !connected             ? "present"
+        : librador_iso_thread_is_active() ? "streaming"
+                                          : "connected";
+    char text[384];
+    int n = snprintf(text, sizeof text, "status: frames=%d layout=%s theme=%s font_scale=%.2f board=%s",
+        m_frames, layout, m_theme.c_str(), fontScale(), board);
+    if (connected)
+    {
+        uint64_t ok = 0, bad = 0, dropped = 0, unvalidated = 0;
+        librador_get_frame_stats(&ok, &bad, &dropped, &unvalidated);
+        n += snprintf(text + n, sizeof text - n,
+            " firmware=0x%04x/%u transport=%d frames_ok=%llu frames_bad=%llu frames_dropped=%llu",
+            librador_get_device_firmware_version(), librador_get_device_firmware_variant(),
+            librador_get_active_transport(), (unsigned long long)ok, (unsigned long long)bad,
+            (unsigned long long)dropped);
+    }
+    snprintf(text + n, sizeof text - n, " safety_mode=%d uninitialised_mode=%d flashing=%d",
+        safety_mode ? 1 : 0, uninitialised_mode ? 1 : 0, m_flashing ? 1 : 0);
+    return text;
 }
 
 void App::ShutDown()
@@ -672,3 +736,49 @@ void App::ShutDown()
     librador_exit();
     g_app = nullptr;
 }
+
+// ---- --auto-qa -------------------------------------------------------------
+#ifndef __ANDROID__
+void App::attachAutoQa(autoqa::AutoQa* qa)
+{
+    m_auto_qa = qa;
+}
+
+void App::disableUsb()
+{
+    if (librador_is_connected())
+        librador_disconnect();
+    m_no_usb = true;
+    connected = false;
+    m_device_present = false;
+}
+
+void App::showSidePanelPage(int page)
+{
+    if (m_active_frontend)
+        m_active_frontend->showSidePanelPage(page);
+}
+
+void App::finishAutoQa(int exit_code)
+{
+    m_exit_code = exit_code;
+    RequestQuit();
+}
+
+void App::drawAutoQaStatus()
+{
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(display);
+    ImGui::Begin("##autoqa", nullptr,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::TextUnformatted("Labrador automatic QA");
+    ImGui::Spacing();
+    ImGui::TextWrapped("Testing the board through its signal generator to scope loopback. "
+                       "The screenshot tour follows; progress is in progress.log.");
+    ImGui::Spacing();
+    const std::string status = m_auto_qa->statusText();
+    ImGui::TextWrapped("%s", status.c_str());
+    ImGui::End();
+}
+#endif

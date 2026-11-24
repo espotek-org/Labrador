@@ -43,6 +43,15 @@ class AppBase
     float fontScale() const { return m_font_scale; }
     void setFontScale(float s) { m_font_scale = s; }
 
+    // --auto-qa screenshots: keep the pixels of the next rendered frame, then
+    // hand them over once (8-bit RGB, rows top to bottom).
+    void requestFrameCapture() { m_capture_requested = true; }
+    bool takeFrameCapture(int* width, int* height, std::vector<unsigned char>* rgb);
+
+    // The window's size in screen coordinates and in pixels.
+    void setWindowSize(int width, int height);
+    void windowSize(int* width, int* height) const;
+    void windowPixelSize(int* width, int* height) const;
 
   protected:
     virtual void StartUp() = 0;
@@ -79,4 +88,9 @@ class AppBase
     int m_smoke_frames = 0;
     bool m_qa_run = false;
     std::string m_qa_filter;
+    bool m_capture_requested = false;
+    bool m_capture_ready = false;
+    int m_capture_w = 0;
+    int m_capture_h = 0;
+    std::vector<unsigned char> m_capture_rgb;
 };

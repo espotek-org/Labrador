@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <ostream>
+#include <sstream>
 
 void OptionParser::addOption(std::string name, std::string metavar,
                              std::string description, ValueHandler handler)
@@ -89,4 +90,19 @@ double OptionParser::toDouble(const std::string& option, const std::string& text
         !std::isfinite(value))
         throw UsageError("option '" + option + "' expects a number, got '" + text + "'");
     return value;
+}
+
+double OptionParser::toNonNegative(const std::string& option, const std::string& text)
+{
+    const double value = toDouble(option, text);
+    if (value < 0)
+        throw UsageError("option '" + option + "' must not be negative");
+    return value;
+}
+
+std::string OptionParser::formatNumber(double value)
+{
+    std::ostringstream text;
+    text << value;
+    return text.str();
 }

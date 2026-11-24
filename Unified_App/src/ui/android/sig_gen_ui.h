@@ -34,6 +34,16 @@ public:
     void draw(float width, inputsUI* inputs_ui = nullptr) override;
     void usb_send_data(int ch);
     int get_height() override;
+    // Preset channel `ch` (1 or 2) without the sliders, e.g. from a testing hook;
+    // `wf` indexes wf_names. Sent with the next usb_send_data(ch).
+    void setChannel(int ch, int wf, float freq, float amp, float min_val)
+    {
+        ch_data& d = both_ch_data[ch - 1];
+        d.wf = wf;
+        d.freq = freq;
+        d.amp = d.amp_delayed = amp;
+        d.min_val = d.min_val_delayed = min_val;
+    }
 };
 
 #endif // SIGGENUI_H

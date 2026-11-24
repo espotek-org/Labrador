@@ -1,5 +1,9 @@
 #include "CaptureCommand.h"
 #include "Command.h"
+#include "InfoCommand.h"
+#include "MeasureCommand.h"
+#include "SiggenCommand.h"
+#include "StreamTestCommand.h"
 #include "UpdateFirmwareCommand.h"
 
 #include <algorithm>
@@ -48,7 +52,11 @@ Command* findCommand(const CommandList& commands, const std::string& name)
 int main(int argc, char** argv)
 {
     CommandList commands;
+    commands.push_back(std::make_unique<InfoCommand>());
+    commands.push_back(std::make_unique<SiggenCommand>());
+    commands.push_back(std::make_unique<MeasureCommand>());
     commands.push_back(std::make_unique<CaptureCommand>());
+    commands.push_back(std::make_unique<StreamTestCommand>());
     commands.push_back(std::make_unique<UpdateFirmwareCommand>());
 
     const std::vector<std::string> args(argv + 1, argv + argc);

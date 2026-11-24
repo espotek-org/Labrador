@@ -1,7 +1,11 @@
 #include "CaptureCommand.h"
 
 #include "DeviceSession.h"
+#include "JsonWriter.h"
 #include "OptionParser.h"
+#include "SampleCsv.h"
+#include "ScopeOptions.h"
+#include "Stimulus.h"
 
 #include "librador.h"
 
@@ -16,51 +20,12 @@ namespace
 struct Options
 {
     std::string out;
-    ScopeMode mode = ScopeMode::Ch1Ch2;
-    double gain = 4;
-    double settle_s = 0.5;
-    UsbTransport transport = UsbTransport::Auto; // librador's per-platform choice
-    bool verbose = false;
+    ScopeOptions scope;
+    // Applied only when --sg1, --sg2 or --psu is given, so capturing an external
+    // circuit never disturbs what the board is driving.
+    Stimulus stimulus;
     librador_capture_request request; // trigger, hysteresis, pre/post, timeout
 };
-
-std::string formatNumber(double value)
-{
-    std::ostringstream text;
-    text << value;
-    return text.str();
-}
-
-double parseSeconds(const std::string& option, const std::string& text)
-{
-    const double value = OptionParser::toDouble(option, text);
-    if (value < 0)
-        throw UsageError("option '" + option + "' must not be negative");
-    return value;
-}
-
-ScopeMode parseMode(const std::string& text)
-{
-    if (text == "scope1")
-        return ScopeMode::Ch1;
-    if (text == "scope2")
-        return ScopeMode::Ch1Ch2;
-    throw UsageError("option '--mode' must be scope1 or scope2, got '" + text + "'");
-}
-
-UsbTransport parseTransport(const std::string& text)
-{
-    if (text == "auto")
-        return UsbTransport::Auto;
-    if (text == "iso6")
-        return UsbTransport::Iso6;
-    if (text == "iso1")
-        return UsbTransport::Iso1;
-    if (text == "bulk")
-        return UsbTransport::Bulk;
-    throw UsageError("option '--transport' must be auto, iso6, iso1 or bulk, got '" + text +
-                     "'");
-}
 
 void parseTrigger(const std::string& spec, librador_capture_request& request)
 {
@@ -89,55 +54,33 @@ OptionParser makeParser(Options& options)
     parser.addOption("--out", "FILE",
                      "CSV file to write (required); FILE.json gets the metadata",
                      [&](const std::string& v) { options.out = v; });
-    parser.addOption("--mode", "MODE",
-                     "scope1 (CH1 only) or scope2 (CH1 and CH2); default scope2",
-                     [&](const std::string& v) { options.mode = parseMode(v); });
-    parser.addOption("--gain", "G",
-                     "hardware gain 0.5, 1, 2, 4, 8, 16, 32 or 64; default " +
-                         formatNumber(defaults.gain),
-                     [&](const std::string& v)
-                     {
-                         const double gain = OptionParser::toDouble("--gain", v);
-                         if (!DeviceSession::isValidScopeGain(gain))
-                             throw UsageError("option '--gain' must be one of 0.5, 1, "
-                                              "2, 4, 8, 16, 32, 64, got '" +
-                                              v + "'");
-                         options.gain = gain;
-                     });
     parser.addOption("--trigger", "CH:EDGE:VOLTS",
                      "channel (ch1|ch2), edge (rising|falling), level; default "
-                     "ch1:rising:" + formatNumber(d.level_v),
+                     "ch1:rising:" + OptionParser::formatNumber(d.level_v),
                      [&](const std::string& v) { parseTrigger(v, options.request); });
     parser.addOption("--hysteresis", "VOLTS",
                      "signal must leave the level by this much to re-arm; default " +
-                         formatNumber(d.hysteresis_v),
-                     [&](const std::string& v)
-                     { options.request.hysteresis_v = parseSeconds("--hysteresis", v); });
+                         OptionParser::formatNumber(d.hysteresis_v),
+                     [&](const std::string& v) {
+                         options.request.hysteresis_v =
+                             OptionParser::toNonNegative("--hysteresis", v);
+                     });
     parser.addOption("--pre", "SECONDS",
                      "keep this long before the trigger; default " +
-                         formatNumber(d.pre_s),
+                         OptionParser::formatNumber(d.pre_s),
                      [&](const std::string& v)
-                     { options.request.pre_s = parseSeconds("--pre", v); });
+                     { options.request.pre_s = OptionParser::toNonNegative("--pre", v); });
     parser.addOption("--post", "SECONDS",
                      "keep this long after the trigger; default " +
-                         formatNumber(d.post_s),
+                         OptionParser::formatNumber(d.post_s),
                      [&](const std::string& v)
-                     { options.request.post_s = parseSeconds("--post", v); });
+                     { options.request.post_s = OptionParser::toNonNegative("--post", v); });
     parser.addOption("--timeout", "SECONDS",
                      "give up if no trigger; 0 waits forever (default)",
                      [&](const std::string& v)
-                     { options.request.timeout_s = parseSeconds("--timeout", v); });
-    parser.addOption("--settle", "SECONDS",
-                     "pause after configuring the scope; default " +
-                         formatNumber(defaults.settle_s),
-                     [&](const std::string& v)
-                     { options.settle_s = parseSeconds("--settle", v); });
-    parser.addOption("--transport", "T",
-                     "USB transport: auto (the platform default: iso6 on Windows and "
-                     "Linux, bulk on macOS), iso6, iso1 or bulk; default auto",
-                     [&](const std::string& v) { options.transport = parseTransport(v); });
-    parser.addFlag("--verbose", "also show librador's debug messages on stderr",
-                   [&]() { options.verbose = true; });
+                     { options.request.timeout_s = OptionParser::toNonNegative("--timeout", v); });
+    options.scope.addOptions(parser);
+    options.stimulus.addOptions(parser);
     return parser;
 }
 
@@ -145,10 +88,12 @@ void validate(const Options& options)
 {
     if (options.out.empty())
         throw UsageError("option '--out' is required");
-    if (options.request.trigger_channel == 2 && options.mode == ScopeMode::Ch1)
+    if (options.request.trigger_channel == 2 && options.scope.mode != ScopeMode::Ch1Ch2)
         throw UsageError("triggering on ch2 needs '--mode scope2'");
     if (options.request.pre_s + options.request.post_s <= 0)
         throw UsageError("'--pre' and '--post' cannot both be zero");
+    if (options.stimulus.given)
+        options.stimulus.validate();
 }
 
 std::string describeCaptureError(int rc)
@@ -169,48 +114,39 @@ std::string describeCaptureError(int rc)
     }
 }
 
-void writeCsv(std::ostream& out, const librador_capture_result& result)
-{
-    const bool two_channels = !result.ch2.empty();
-    out << (two_channels ? "t,CH1,CH2\n" : "t,CH1\n");
-
-    char line[96];
-    for (size_t i = 0; i < result.ch1.size(); i++)
-    {
-        const double t = (static_cast<double>(i) - result.pre_samples) /
-                         result.sample_rate_hz;
-        const int length =
-            two_channels
-                ? std::snprintf(line, sizeof line, "%.7f,%.4f,%.4f\n", t,
-                                result.ch1[i], result.ch2[i])
-                : std::snprintf(line, sizeof line, "%.7f,%.4f\n", t, result.ch1[i]);
-        out.write(line, length);
-    }
-    out.flush();
-    if (!out)
-        throw CommandError("writing the CSV failed");
-}
-
-void writeMetadata(const std::string& path, const Options& options,
+void writeMetadata(const std::string& path, const Options& options, const DeviceSession& session,
+                   const SignalOutput& out1, const SignalOutput& out2,
                    const librador_capture_result& result)
 {
-    std::ofstream json(path, std::ios::binary | std::ios::trunc);
-    json << "{\n"
-         << "  \"sample_rate_hz\": " << result.sample_rate_hz << ",\n"
-         << "  \"samples\": " << result.ch1.size() << ",\n"
-         << "  \"pre_samples\": " << result.pre_samples << ",\n"
-         << "  \"trigger\": {\"channel\": " << options.request.trigger_channel
-         << ", \"edge\": \"" << (options.request.rising ? "rising" : "falling")
-         << "\", \"level_v\": " << options.request.level_v
-         << ", \"hysteresis_v\": " << options.request.hysteresis_v << "},\n"
-         << "  \"gain\": " << options.gain << ",\n"
-         << "  \"mode\": \""
-         << (options.mode == ScopeMode::Ch1 ? "scope1" : "scope2") << "\",\n"
-         << "  \"frames_bad_checksum\": " << result.frames_bad_checksum << ",\n"
-         << "  \"frames_dropped\": " << result.frames_dropped << "\n"
-         << "}\n";
-    json.flush();
-    if (!json)
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    JsonWriter json(file);
+    json.beginObject();
+    json.field("sample_rate_hz", result.sample_rate_hz);
+    json.field("samples", static_cast<uint64_t>(result.ch1.size()));
+    json.field("pre_samples", result.pre_samples);
+    json.key("trigger").beginObject();
+    json.field("channel", options.request.trigger_channel);
+    json.field("edge", options.request.rising ? "rising" : "falling");
+    json.field("level_v", options.request.level_v);
+    json.field("hysteresis_v", options.request.hysteresis_v);
+    json.endObject();
+    json.field("gain", options.scope.gain);
+    json.field("mode", scopeModeName(options.scope.mode));
+    json.field("frames_bad_checksum", result.frames_bad_checksum);
+    json.field("frames_dropped", result.frames_dropped);
+    session.writeJson(json);
+    json.key("stimulus");
+    if (options.stimulus.given)
+    {
+        json.beginObject();
+        options.stimulus.writeJson(json, out1, out2);
+        json.endObject();
+    }
+    else
+        json.null();
+    json.endObject();
+    json.finish();
+    if (!file)
         throw CommandError("writing '" + path + "' failed");
 }
 } // namespace
@@ -231,24 +167,30 @@ void CaptureCommand::printHelp(std::ostream& out, const std::string& program) co
     out << program << " capture - " << summary() << "\n\n"
         << "Arms an edge trigger on one scope channel, waits for it to fire, and writes\n"
         << "the samples from --pre seconds before to --post seconds after the trigger at\n"
-        << "the board's full rate (375 kS/s per channel). \"armed: ...\" appears on\n"
-        << "stderr once the trigger is waiting; press Ctrl-C to abort.\n\n"
+        << "the board's full rate (375 kS/s per channel, 750 kS/s in scope1-750k).\n"
+        << "\"armed: ...\" appears on stderr once the trigger is waiting; press Ctrl-C to\n"
+        << "abort. The signal generators and PSU are left as they are unless --sg1, --sg2\n"
+        << "or --psu is given; then all three are set first, in the same session, so a\n"
+        << "circuit's response to a known stimulus can be captured in one go.\n\n"
         << "Usage:\n"
         << "  " << program << " capture --out FILE [options]\n\n"
         << "Options:\n";
     makeParser(unused).printOptions(out);
     out << "\nOutput:\n"
-        << "  FILE is CSV with header \"t,CH1,CH2\" (\"t,CH1\" in scope1 mode): t is in\n"
-        << "  seconds with 0 at the trigger sample, the channels are volts at the input\n"
-        << "  pins. FILE.json records the sample rate, trigger, gain and any bad or\n"
-        << "  dropped USB frames seen while waiting.\n\n"
+        << "  FILE is CSV with header \"t,CH1,CH2\" (\"t,CH1\" in the one-channel modes): t\n"
+        << "  is in seconds with 0 at the trigger sample, the channels are volts at the\n"
+        << "  input pins. FILE.json records the sample rate, trigger, gain, transport,\n"
+        << "  calibration, stimulus and any bad or dropped USB frames seen while waiting.\n\n"
+        << signalSpecHelp() << '\n'
         << "Notes:\n"
         << "  Full scale is about 1.65 V +/- 23.65 V / gain; larger signals clip, so\n"
         << "  pick the lowest gain that keeps the signal in range.\n"
         << "  The board can only be open in one program: close the Labrador app first.\n\n"
-        << "Example:\n"
+        << "Examples:\n"
         << "  " << program << " capture --gain 4 --trigger ch1:rising:3.0 \\\n"
-        << "      --pre 0.2 --post 0.3 --out capture.csv\n";
+        << "      --pre 0.2 --post 0.3 --out capture.csv\n"
+        << "  " << program << " capture --sg1 square:100:3:0.2 --trigger ch1:rising:1.5 \\\n"
+        << "      --pre 0.01 --post 0.02 --out step.csv\n";
 }
 
 int CaptureCommand::run(const std::vector<std::string>& args)
@@ -262,8 +204,11 @@ int CaptureCommand::run(const std::vector<std::string>& args)
     if (!csv)
         throw CommandError("cannot open '" + options.out + "' for writing");
 
-    DeviceSession session(options.verbose, options.transport);
-    session.configureScope(options.mode, options.gain, options.settle_s);
+    DeviceSession session(options.scope.verbose, options.scope.transport);
+    SignalOutput out1, out2;
+    if (options.stimulus.given)
+        options.stimulus.apply(out1, out2);
+    session.configureScope(options.scope.mode, options.scope.gain, options.scope.settle_s);
 
     std::cerr << "armed: ch" << options.request.trigger_channel << ' '
               << (options.request.rising ? "rising" : "falling") << " through "
@@ -279,8 +224,8 @@ int CaptureCommand::run(const std::vector<std::string>& args)
         throw CommandError("capture failed: " + describeCaptureError(rc));
     }
 
-    writeCsv(csv, result);
-    writeMetadata(options.out + ".json", options, result);
+    writeSamplesCsv(csv, result.ch1, result.ch2, result.sample_rate_hz, result.pre_samples);
+    writeMetadata(options.out + ".json", options, session, out1, out2, result);
 
     std::cout << "wrote " << options.out << ": " << result.ch1.size()
               << " samples at " << result.sample_rate_hz << " Hz ("

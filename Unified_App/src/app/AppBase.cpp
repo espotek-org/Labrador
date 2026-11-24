@@ -345,6 +345,22 @@ void AppBase::Run()
         if (const char* cap = QaConsumeFrameDump())
             dumpFramebufferPpm(cap, display_w, display_h);
 #endif
+        if (m_capture_requested)
+        {
+            std::vector<unsigned char> rgba((size_t)display_w * display_h * 4);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            m_capture_rgb.resize((size_t)display_w * display_h * 3);
+            for (int y = 0; y < display_h; y++) // GL rows are bottom-up
+                for (int x = 0; x < display_w; x++)
+                    for (int c = 0; c < 3; c++)
+                        m_capture_rgb[((size_t)y * display_w + x) * 3 + c]
+                            = rgba[((size_t)(display_h - 1 - y) * display_w + x) * 4 + c];
+            m_capture_w = display_w;
+            m_capture_h = display_h;
+            m_capture_requested = false;
+            m_capture_ready = true;
+        }
         SDL_GL_SwapWindow(m_window);
 
 #ifdef LABRADOR_QA
@@ -362,4 +378,33 @@ void AppBase::Run()
 #endif
 
     ShutDown();
+}
+
+bool AppBase::takeFrameCapture(int* width, int* height, std::vector<unsigned char>* rgb)
+{
+    if (!m_capture_ready)
+        return false;
+    *width = m_capture_w;
+    *height = m_capture_h;
+    rgb->swap(m_capture_rgb);
+    m_capture_rgb.clear();
+    m_capture_ready = false;
+    return true;
+}
+
+void AppBase::setWindowSize(int width, int height)
+{
+    if (!SDL_SetWindowSize(m_window, width, height))
+        throw std::runtime_error(std::string("SDL_SetWindowSize: ") + SDL_GetError());
+    SDL_SyncWindow(m_window);
+}
+
+void AppBase::windowSize(int* width, int* height) const
+{
+    SDL_GetWindowSize(m_window, width, height);
+}
+
+void AppBase::windowPixelSize(int* width, int* height) const
+{
+    SDL_GetWindowSizeInPixels(m_window, width, height);
 }

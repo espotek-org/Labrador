@@ -39,4 +39,8 @@ class Frontend
     // each frontend contributes its widget-specific keys here.
     virtual void loadSettings(Settings& s) {}
     virtual void saveSettings(Settings& s) {}
+
+    // Show side-panel page `page` (0 Scope ... 6 Analysis), for layouts that have
+    // a side panel; --auto-qa's screenshot tour drives this.
+    virtual void showSidePanelPage(int page) {}
 };

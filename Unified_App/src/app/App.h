@@ -10,6 +10,11 @@
 #include <memory>
 #include <thread>
 
+namespace autoqa
+{
+class AutoQa;
+}
+
 // Shared session controller. Owns everything form-factor-independent: SDL/GL
 // lifecycle (via AppBase), the librador connection + polling, firmware /
 // bootloader / gobindar recovery flows and their popups, safety/uninitialised
@@ -20,6 +25,22 @@ class App : public AppBase
 {
   public:
     App() : AppBase("EspoTek Labrador") {}
+
+    // ---- --auto-qa (desktop) ----------------------------------------------
+    // Run the whole QA instead of the normal session: settings go to the QA's
+    // isolated file, and the QA drives the app frame by frame until it calls
+    // finishAutoQa. Call before Run().
+    void attachAutoQa(autoqa::AutoQa* qa);
+    // Stop using USB for the rest of the run (the QA's no-board screenshots).
+    void disableUsb();
+    // Show a side-panel page in layouts that have one (desktop, tablet).
+    void showSidePanelPage(int page);
+    // End the run with this exit code.
+    void finishAutoQa(int exit_code);
+    // One line for --auto-qa's checks: layout, theme, text size, board state
+    // (usb-disabled|absent|present|connected|streaming, with firmware and frame
+    // counters when connected) and the safety/uninitialised/flashing flags.
+    std::string statusLine();
 
   protected:
     void StartUp() override;
@@ -82,6 +103,8 @@ class App : public AppBase
     void pushSettings();
 
     LayoutMode m_layout_mode = LayoutMode::Auto;
+    autoqa::AutoQa* m_auto_qa = nullptr; // --auto-qa run, not owned
+    void drawAutoQaStatus();
 
     // One Frontend per form factor, created lazily the first time its layout
     // is resolved (display size is only known once frames start). m_active_*

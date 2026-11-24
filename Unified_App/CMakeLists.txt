@@ -153,8 +153,20 @@ else()
     endif()
 endif()
 
+# --- Measurement code shared by labrador-cli and the app's --auto-qa (desktop) ---
+if(NOT ANDROID)
+    file(GLOB MEASURE_SOURCES CONFIGURE_DEPENDS measure/*.cpp)
+    add_library(labrador_measure STATIC ${MEASURE_SOURCES})
+    target_include_directories(labrador_measure PUBLIC measure)
+    target_link_libraries(labrador_measure PUBLIC librador)
+endif()
+
 # --- Application ---
 file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+if(ANDROID)
+    # --auto-qa drives the board through desktop-only librador calls.
+    list(FILTER APP_SOURCES EXCLUDE REGEX "/src/autoqa/")
+endif()
 if(ANDROID)
     add_library(labrador SHARED ${APP_SOURCES})
 else()
@@ -172,7 +184,19 @@ else()
     endif()
 endif()
 target_include_directories(labrador PRIVATE src deps)
+# --auto-qa's report names the commit and version it tested. CI passes the
+# release version (2.0.<run>); the commit is read when CMake configures, and
+# is left empty (reported as null) where the tree is not a git checkout.
+set(LABRADOR_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version reported by --auto-qa")
+execute_process(COMMAND git rev-parse HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE LABRADOR_GIT_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+target_compile_definitions(labrador PRIVATE
+    LABRADOR_VERSION="${LABRADOR_VERSION}" LABRADOR_GIT_SHA="${LABRADOR_GIT_SHA}")
 target_link_libraries(labrador PRIVATE imgui librador)
+if(NOT ANDROID)
+    target_link_libraries(labrador PRIVATE labrador_measure)
+endif()
 
 if(NOT ANDROID)
     # Headless transport-integrity regression tool: connects exactly like the

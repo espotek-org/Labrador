@@ -47,7 +47,7 @@ jobs:
       # (cmake/BundledLibusb.cmake); nothing is downloaded.
       - name: Build
         run: |
-          cmake --preset windows32
+          cmake --preset windows32 -DLABRADOR_VERSION=2.0.${{ github.run_number }}
           cmake --build --preset windows32
 
       - name: Verify static link
@@ -104,7 +104,7 @@ jobs:
 
       - name: Build x64
         run: |
-          cmake --preset windows
+          cmake --preset windows -DLABRADOR_VERSION=2.0.${{ github.run_number }}
           cmake --build --preset windows
 
       - name: Verify static link

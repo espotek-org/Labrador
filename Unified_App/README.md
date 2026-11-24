@@ -77,24 +77,51 @@ APK lands in `android/app/build/outputs/apk/debug/`.
   the View ▸ Layout menu or `LABRADOR_LAYOUT=desktop|mobile|compact`.
 - `./labrador --smoke` — render 60 frames and exit (CI smoke test). Add
   `LABRADOR_FRAME_DUMP=<path.ppm>` to dump the final frame for visual review.
+- `./labrador --auto-qa <out_dir>` — run the full QA (hardware loopback
+  tests, firmware round trip, screenshot tour) and write a report; see below.
+- `LABRADOR_SG1` / `LABRADOR_SG2=WAVE:FREQ:VPP[:BASE]` (labrador-cli's signal
+  syntax) start with that signal generator on, so a screenshot of a board
+  with its generators looped back shows live traces.
+- Any other argument is an error (exit status 2).
 - Settings persist to `settings.ini` in the per-user pref dir
   (macOS: `~/Library/Application Support/EspoTek/Labrador/`).
 
 ## Command-line tool
 
 `labrador-cli` is a headless companion built from the same tree
-(`cli/`, target `labrador_cli`, lands in `build/<preset>/cli/`). It captures
-full-rate scope samples around a trigger to CSV and flashes the bundled
-firmware, for scripts and headless boxes. The installers ship it: beside
-`labrador.exe` on Windows, inside `Labrador.app/Contents/MacOS` on macOS, on
-`PATH` from the `.deb`, and as `<AppImage> cli ...` from the AppImage.
+(`cli/`, target `labrador_cli`, lands in `build/<preset>/cli/`). It reports
+the board's firmware and calibration, drives the signal generators, measures
+levels and frequencies, captures full-rate scope samples around a trigger to
+CSV, checks the USB stream for lost frames and flashes the bundled firmware,
+for scripts and headless boxes. The installers ship it: beside `labrador.exe`
+on Windows, inside `Labrador.app/Contents/MacOS` on macOS, on `PATH` from the
+`.deb`, and as `<AppImage> cli ...` from the AppImage.
 
 ```sh
+labrador-cli info
+labrador-cli siggen --sg1 sine:1000:2:0.5
+labrador-cli measure --sg1 square:2000:2:0.5
 labrador-cli capture --trigger ch1:rising:1.5 --pre 0.05 --post 0.1 --out edge.csv
+labrador-cli stream-test --sg1 sine:354.1:2:0.5 --check ch1
 labrador-cli update-firmware
 ```
 
 Options, output format and more examples: [`cli/README.md`](cli/README.md).
+
+## Automatic QA of a release build
+
+With SG1 wired to CH1 and SG2 to CH2, the release binary tests itself and the
+board in one run (no QA build needed): hardware loopback tests, a firmware
+round trip through the DFU bootloader, and a screenshot tour of every layout,
+theme, side-panel page and text size with live traces, written up as
+`report.json` with plots and PNG screenshots:
+
+```sh
+./labrador --auto-qa /tmp/qa-report     # exit status 0 only if every test passed
+```
+
+See [`docs/auto-qa.md`](docs/auto-qa.md) for the tests, their measured
+tolerances and the report format.
 
 ## UI tests (QA builds)
 

@@ -58,6 +58,10 @@ jobs:
           build/linux/cli/labrador-cli --help
           build/linux/cli/labrador-cli help capture
           build/linux/cli/labrador-cli help update-firmware
+          build/linux/cli/labrador-cli help info
+          build/linux/cli/labrador-cli help siggen
+          build/linux/cli/labrador-cli help measure
+          build/linux/cli/labrador-cli help stream-test
           test -f build/linux/cli/assets/firmware/labrafirm_000C_03.hex
 
       - name: Upload artifact
@@ -113,6 +117,10 @@ jobs:
           build/macos/cli/labrador-cli --help
           build/macos/cli/labrador-cli help capture
           build/macos/cli/labrador-cli help update-firmware
+          build/macos/cli/labrador-cli help info
+          build/macos/cli/labrador-cli help siggen
+          build/macos/cli/labrador-cli help measure
+          build/macos/cli/labrador-cli help stream-test
           test -f build/macos/cli/assets/firmware/labrafirm_000C_03.hex
 
       - name: Upload artifact
@@ -156,6 +164,10 @@ jobs:
           ./build/windows/cli/labrador-cli.exe --help
           ./build/windows/cli/labrador-cli.exe help capture
           ./build/windows/cli/labrador-cli.exe help update-firmware
+          ./build/windows/cli/labrador-cli.exe help info
+          ./build/windows/cli/labrador-cli.exe help siggen
+          ./build/windows/cli/labrador-cli.exe help measure
+          ./build/windows/cli/labrador-cli.exe help stream-test
           test -f build/windows/cli/assets/firmware/labrafirm_000C_03.hex
           # Static like the app: no MinGW or libusb DLLs beside the exe.
           if objdump -x build/windows/cli/labrador-cli.exe | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then

@@ -27,6 +27,7 @@ class DesktopFrontend : public InstrumentFrontend
     void startUp(App& app) override;
     void loadSettings(Settings& s) override;
     void saveSettings(Settings& s) override;
+    void showSidePanelPage(int page) override;
 
   protected:
     void renderLayout(App& app) override;

@@ -1,5 +1,8 @@
 #include "app/App.h"
 #include "platform/android_hooks.h"
+#ifndef __ANDROID__
+#include "autoqa/AutoQa.h"
+#endif
 
 #ifndef __ANDROID__
 // Desktop: SDL_main.h provides the platform entry shim. On Android, SDL's Java
@@ -7,6 +10,8 @@
 // header there would rename our entry to SDL_main and SDL couldn't find it.
 #include <SDL3/SDL_main.h>
 #endif
+#include <cstdio>
+#include <memory>
 #include <string>
 #ifdef _WIN32
 #include <cstdio>
@@ -49,21 +54,67 @@ int main(int argc, char** argv)
 #ifdef _WIN32
     attachParentConsole();
 #endif
-    App app;
+    // Every argument must be understood: an unknown one is an error, so a caller
+    // can tell a build that lacks an option (exit 2) from one that runs it.
+    bool smoke = false;
+    std::string auto_qa_dir;
+#ifdef LABRADOR_QA
+    std::string qa_filter;
+#endif
     for (int i = 1; i < argc; i++)
     {
         const std::string arg(argv[i]);
-        if (arg == "--smoke")
-            app.SetSmokeFrames(60);
+        if (arg == "--smoke") // render 60 frames and exit (CI smoke test)
+            smoke = true;
+#ifndef __ANDROID__
+        else if (arg == "--auto-qa") // the whole QA, report in the directory given
+        {
+            if (i + 1 >= argc)
+            {
+                fprintf(stderr, "labrador: --auto-qa needs an output directory\n");
+                return 2;
+            }
+            auto_qa_dir = argv[++i];
+        }
+#endif
 #ifdef LABRADOR_QA
         // Headless UI test run (QA builds): --qa runs everything, or
         // --qa=<filter> for a Test Engine filter like "gui" or "hw".
         else if (arg == "--qa")
-            app.SetQaRun("all");
+            qa_filter = "all";
         else if (arg.rfind("--qa=", 0) == 0)
-            app.SetQaRun(arg.c_str() + 5);
+            qa_filter = arg.substr(5);
 #endif
+#ifdef __APPLE__
+        // Finder adds a process serial number when it launches the bundle on
+        // older macOS releases (the app supports 10.13).
+        else if (arg.rfind("-psn_", 0) == 0)
+            continue;
+#endif
+        else
+        {
+            fprintf(stderr, "labrador: unknown option '%s'\n", arg.c_str());
+            return 2;
+        }
     }
+
+#ifndef __ANDROID__
+    // progress.log exists before any window does: the QA server watches for it.
+    std::unique_ptr<autoqa::AutoQa> auto_qa;
+    if (!auto_qa_dir.empty())
+        auto_qa = std::make_unique<autoqa::AutoQa>(auto_qa_dir, argv[0]);
+#endif
+    App app;
+    if (smoke)
+        app.SetSmokeFrames(60);
+#ifdef LABRADOR_QA
+    if (!qa_filter.empty())
+        app.SetQaRun(qa_filter.c_str());
+#endif
+#ifndef __ANDROID__
+    if (auto_qa)
+        app.attachAutoQa(auto_qa.get());
+#endif
     app.Run();
     return app.exitCode();
 }

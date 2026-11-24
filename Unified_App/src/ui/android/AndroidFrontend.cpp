@@ -14,6 +14,7 @@
 #include "librador.h"
 
 #include "app/App.h"
+#include "app/StartupSignal.h"
 #include "ui/android/AndroidFrontend.h"
 
 #include <cmath>  // fmax / fmin
@@ -307,6 +308,24 @@ void AndroidFrontend::startUp(App& app)
     virtual_transform_ui.is_visible = false;
     sig_gen_ui.next_is_expanded = false;
     sig_gen_ui.is_visible = false;
+
+    // LABRADOR_SG1/LABRADOR_SG2 testing hook (see app/StartupSignal.h); the
+    // per-connect board init below sends both channels.
+    for (int ch = 1; ch <= 2; ch++)
+    {
+        const std::optional<StartupSignal> signal = startupSignalOrNone(ch);
+        if (!signal)
+            continue;
+        int wf = 0; // librador_send_wave: 0 sine, 1 square, 2 triangle, 3 sawtooth
+        switch (signal->wave)
+        {
+        case StartupSignal::Wave::Sine: wf = 0; break;
+        case StartupSignal::Wave::Square: wf = 1; break;
+        case StartupSignal::Wave::Triangle: wf = 2; break;
+        case StartupSignal::Wave::Sawtooth: wf = 3; break;
+        }
+        sig_gen_ui.setChannel(ch, wf, signal->frequency_hz, signal->vpp, signal->base_v);
+    }
 }
 
 void AndroidFrontend::update(App& app)

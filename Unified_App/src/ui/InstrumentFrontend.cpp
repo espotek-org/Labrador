@@ -1,6 +1,7 @@
 #include "ui/InstrumentFrontend.h"
 
 #include "app/App.h"
+#include "app/StartupSignal.h"
 #include "app/settings.h"
 #include "app/textures.h"
 #include "platform/paths.h"
@@ -155,6 +156,36 @@ void InstrumentFrontend::startUp(App& app)
 
     init_constants();
     loadHelpFile();
+
+    // LABRADOR_SG1/LABRADOR_SG2 testing hook: start with a generator on. The
+    // settings reach the board through the normal connect resend (markDirty).
+    SGControl* generators[2] = { &SG1Widget, &SG2Widget };
+    for (int ch = 1; ch <= 2; ch++)
+    {
+        const std::optional<StartupSignal> signal = startupSignalOrNone(ch);
+        if (!signal)
+            continue;
+        SGControl& sg = *generators[ch - 1];
+        const char* label = nullptr;
+        switch (signal->wave)
+        {
+        case StartupSignal::Wave::Sine: label = "Sine"; break;
+        case StartupSignal::Wave::Square: label = "Square"; break;
+        case StartupSignal::Wave::Triangle: label = "Triangle"; break;
+        case StartupSignal::Wave::Sawtooth: label = "Sawtooth"; break;
+        }
+        int index = -1;
+        for (int i = 0; i < sg.signalCount(); i++)
+            if (sg.signalLabel(i) == label)
+                index = i;
+        if (index < 0)
+            throw std::runtime_error(std::string("LABRADOR_SG: no '") + label + "' signal");
+        sg.selectSignal(index);
+        sg.currentSignal().frequencyValue().setLevel(signal->frequency_hz);
+        sg.currentSignal().amplitudeValue().setLevel(signal->vpp);
+        sg.currentSignal().offsetValue().setLevel(signal->base_v);
+        sg.setActive(true);
+    }
 }
 
 void InstrumentFrontend::update(App& app)

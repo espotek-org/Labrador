@@ -42,6 +42,10 @@ class Settings
     void set(const std::string& key, bool value);
     void set(const std::string& key, double value);
 
+    // Keep the store in `path` instead of the per-user settings.ini (--auto-qa's
+    // isolated run). Call before load(); the directory must exist.
+    void useFile(const std::string& path) { m_path = path; }
+
   private:
     const std::string& filePath();
 

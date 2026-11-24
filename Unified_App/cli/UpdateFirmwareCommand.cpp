@@ -107,28 +107,6 @@ std::string bundledHexPath()
                        (looked.empty() ? std::string("it next to the executable") : looked) +
                        "); pass --hex FILE");
 }
-
-// RAII around librador so every exit path tears the USB session down.
-class LibradorScope
-{
-  public:
-    explicit LibradorScope(const bool* verbose)
-    {
-        DeviceSession::routeLogsToStderr(verbose);
-        if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
-        {
-            DeviceSession::resetLogs();
-            throw CommandError("could not initialise librador");
-        }
-    }
-    ~LibradorScope()
-    {
-        librador_exit();
-        DeviceSession::resetLogs();
-    }
-    LibradorScope(const LibradorScope&) = delete;
-    LibradorScope& operator=(const LibradorScope&) = delete;
-};
 } // namespace
 
 std::string UpdateFirmwareCommand::name() const
@@ -168,7 +146,7 @@ int UpdateFirmwareCommand::run(const std::vector<std::string>& args)
     if (!std::ifstream(hex, std::ios::binary))
         throw CommandError("cannot read firmware image '" + hex + "'");
 
-    LibradorScope librador(&options.verbose);
+    LibradorScope librador(&options.verbose, UsbTransport::Auto);
 
     bool bootloader = false;
     bool gobindar = false;

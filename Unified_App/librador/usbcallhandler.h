@@ -147,6 +147,9 @@ public:
     int set_gain(double newGain);
     int update_function_gen_settings(int channel, unsigned char* sampleBuffer, int numSamples, double usecs_between_samples, double amplitude_v, double offset_v);
     int send_function_gen_settings(int channel);
+    // What update_function_gen_settings configured for `channel`, after the
+    // timer and 8-bit DAC rounding; see librador_get_signal_gen_output.
+    int get_function_gen_output(int channel, double *frequency_hz, double *v_min, double *v_max);
     int set_psu_voltage(double voltage);
     // Oscilloscope calibration (Qt Desktop_Interface 3-stage wizard parity).
     // vref = measured channel bias as the Qt app persists it (CalibrateVrefCHx,

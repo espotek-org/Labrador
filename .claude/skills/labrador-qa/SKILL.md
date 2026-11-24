@@ -139,6 +139,11 @@ LABRADOR_LAYOUT=desktop LABRADOR_FRAME_DUMP=/tmp/shot.ppm ./labrador --smoke
 sips -s format png /tmp/shot.ppm --out /tmp/shot.png   # macOS; ImageMagick elsewhere
 ```
 
+`LABRADOR_SG1=sine:1000:2:0.5` / `LABRADOR_SG2=square:500:1.5:0.3` start the
+generators so a looped-back board shows live traces. `labrador --auto-qa
+<dir>` (section 5) runs this whole matrix in-process, with the board
+connected and with USB off, without touching the user's settings.ini.
+
 Drive the state matrix through `settings.ini`
 (macOS: `~/Library/Application Support/EspoTek/Labrador/settings.ini` —
 **back it up and restore it around every run**; the app rewrites it on exit):
@@ -178,6 +183,12 @@ board means the loopback wires aren't attached — report that, don't "fix" the
 test. Tests skip with a warning when no board is present, so `--qa` (all) is
 safe everywhere. The tests wait up to 5 s for enumeration.
 
+Blind spot: a 1 kHz sine has a period of exactly 375 samples, one USB frame,
+so a lost frame (which librador fills with a repeat of the previous one) is
+invisible to these tests. Lost frames need an incommensurate frequency
+(354.1 Hz) and `labrador-cli stream-test`, or the `hw.transport.*.soak` tests
+of `labrador --auto-qa`.
+
 Crash triage: any run that dies instead of printing `QA: n/m tests passed`
 is a crash — rerun the failing filter with `lldb -o run -- ./labrador
 --qa=<filter>` and capture the backtrace.
@@ -214,6 +225,10 @@ Interpretation gotchas (each of these was a real multi-day trap):
 - `librador_bulk_test` (async 16-URB queue) is the acceptance number.
   The sync-loop harness stalls the wire between reads and shows ~97-99%
   on a healthy bulk transport — that gap is the harness, not the device.
+  Read its `dropped=` count as well as the pass rate: the rate is
+  ok/(ok+bad) and ignores drops, so a link losing every other frame (a
+  board behind a USB-C hub on the MacBook Air `air`, Nov 2026) still
+  prints "100.00%" with dropped equal to ok.
 - iso6 typically shows ~99.7% plus a few % "unvalidated" (meta packets
   lost; frames themselves fine) — known, tracked separately.
 - `bulkdiaggen` decodes the DMA write-pointer snapshot the firmware puts
@@ -222,6 +237,29 @@ Interpretation gotchas (each of these was a real multi-day trap):
 - A board that reports the wrong firmware (aio_peek/harness print it)
   may have been downgraded by a stale app build with auto-flash — check
   before diagnosing "corruption" (expected: 0x000C variant 03).
+
+## 5. Automatic QA of a release build (`--auto-qa`, no QA build needed)
+
+The plain release binary tests itself and the board in one run:
+
+```sh
+./build/macos/labrador --auto-qa /tmp/qa-run   # or the installed app
+```
+
+Phase 1, on a worker thread behind a status screen: hardware loopback tests
+through librador (wiring, noise, every waveform on both generators, DC levels,
+all eight gains, a 10 Hz-50 kHz sweep, scope modes, crosstalk, triggers, each
+USB transport with a 60 s soak) and a firmware round trip (0x0007 and back
+through the DFU bootloader). Phase 2: a 36-shot screenshot tour driven through
+the app's own layout/theme/page/text-size setters, with live traces, then
+with USB off. It writes `report.json` (tests with measurements, PNG plots,
+screenshots with `expect` captions) and `progress.log`, keeps its settings
+in the output directory, and exits 0 only if everything passed. Tests,
+measured tolerances and the report format: `Unified_App/docs/auto-qa.md`;
+code: `src/autoqa/` with the measurement code shared with labrador-cli in
+`measure/`. On macOS only the bulk transport exists, so the iso transport
+tests skip there. It takes no lock on the board; wrap it in whatever lock
+the machine uses when VMs or other runs share the board.
 
 ## Reporting
 

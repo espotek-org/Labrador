@@ -331,6 +331,11 @@ int librador_update_signal_gen_settings(int channel, unsigned char *sampleBuffer
     } else return internal_librador_object->usb_driver->send_function_gen_settings(channel);
 }
 
+int librador_get_signal_gen_output(int channel, double* frequency_hz, double* v_min, double* v_max){
+    CHECK_API_INITIALISED
+    return internal_librador_object->usb_driver->get_function_gen_output(channel, frequency_hz, v_min, v_max);
+}
+
 int librador_set_power_supply_voltage(double voltage){
     CHECK_API_INITIALISED
     CHECK_USB_INITIALISED
@@ -481,10 +486,11 @@ int send_convenience_waveform(int channel, double frequency_Hz, double amplitude
         sampleBuffer[i] = sample_generator(x_temp - phase_rad);
     }
 
-    librador_update_signal_gen_settings(channel, sampleBuffer, num_samples, usecs_between_samples, amplitude_v, offset_v);
+    // Pass the send's result on: callers (the GUI's reconnect resend) retry on failure.
+    const int error = librador_update_signal_gen_settings(channel, sampleBuffer, num_samples, usecs_between_samples, amplitude_v, offset_v);
 
     free(sampleBuffer);
-    return 0;
+    return error;
 }
 
 int librador_send_sin_wave(int channel, double frequency_Hz, double amplitude_v, double offset_v, double phase_rad){
