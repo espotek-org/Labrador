@@ -310,7 +310,7 @@ jobs:
           Architecture: ${{ matrix.arch }}
           Maintainer: Chris Esposito <admin@espotek.com>
           Installed-Size: ${INSTALLED_KB}
-          Depends: libc6, libstdc++6, libusb-1.0-0, libgl1, libx11-6
+          Depends: libc6, libstdc++6, libusb-1.0-0, libgl1, libopengl0, libx11-6
           Homepage: https://espotek.com
           Description: driver and GUI for EspoTek Labrador
            The EspoTek Labrador is an open-source board that turns your PC, Raspberry
