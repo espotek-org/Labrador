@@ -102,7 +102,7 @@ passthrough on macOS hosts has aborted there), so a failure costs only its own
 result, not the screenshot tour.
 
 `report.json` is rewritten after every test with `"complete": false` until the
-run finishes, so a crash, a killed process or a dead VM still leaves
+run finishes (schema 2; schema 1 wrote it once, at the end), so a crash, a killed process or a dead VM still leaves
 everything recorded up to that point.
 
 Each shot checks the app's status line (layout, theme, text size, board
@@ -154,10 +154,10 @@ would otherwise read as a wrong shape.
 <out_dir>/screenshots/     the screenshot tour (PNG)
 ```
 
-### report.json (schema_version 1)
+### report.json (schema_version 2)
 
 ```json
-{"schema_version": 1,
+{"schema_version": 2,
  "suite": {"name": "labrador --auto-qa", "commit": "<sha the build was configured from, or null>"},
  "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000C_03.hex"},
  "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "..."},

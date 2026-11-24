@@ -609,7 +609,7 @@ void AutoQa::writeReport(bool complete)
         std::ofstream file(tmp, std::ios::binary | std::ios::trunc);
         JsonWriter json(file);
         json.beginObject();
-        json.field("schema_version", 1);
+        json.field("schema_version", 2); // 2: rewritten after every test, with "complete"
         json.key("suite").beginObject();
         json.field("name", "labrador --auto-qa");
         json.key("commit");
