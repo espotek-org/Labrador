@@ -51,8 +51,12 @@ static const char* const PAGES[] = {"Scope", "Signals", "PSU", "Meter", "Logic",
 
 // Live signals for the board-connected shots, inside the app's limits at its
 // default 4.5 V PSU (env hook read by every frontend, app/StartupSignal.h).
-static const char* const SG1_SIGNAL = "sine:1000:2:0.5";
-static const char* const SG2_SIGNAL = "square:500:1.5:0.3";
+// Neither period is a multiple of the 1 ms USB frame (891 Hz: 1.122 ms, 557 Hz:
+// 1.795 ms), so a dropped frame shows up in the screenshot as a kink in the sine
+// or a mis-sized square pulse. A 1 kHz or 500 Hz signal repeats exactly every
+// frame or two, so it looks perfect even when every other frame is lost.
+static const char* const SG1_SIGNAL = "sine:891:2:0.5";
+static const char* const SG2_SIGNAL = "square:557:1.5:0.3";
 
 static const char* PAGE_EXPECT[] = {
     "the Scope page: acquisition, display, trigger, probe and math channel controls",
@@ -105,10 +109,12 @@ struct Shot
                                                               : "a CRT-style bezel and segment frames";
         std::string plot;
         if (board)
-            plot = "The plot shows two live traces, CH1 a 1 kHz sine between about 0.5 and 2.5 V and CH2 a "
-                   "500 Hz square between about 0.3 and 1.8 V, and the board is reported connected. A square "
-                   "that turns into a train of narrow pulses or a trace with jumps every millisecond means "
-                   "the USB link is losing frames, which is a failure.";
+            plot = "The plot shows two live traces, CH1 an 891 Hz sine between about 0.5 and 2.5 V (about "
+                   "27 cycles across the 30 ms window) and CH2 a 557 Hz square between about 0.3 and 1.8 V "
+                   "(about 17 cycles, high and low halves equal), and the board is reported connected. These "
+                   "frequencies don't line up with the 1 ms USB frame, so a lost frame shows as a kink or step "
+                   "in the sine or square pulses of uneven width; any of those, or a signal at twice its "
+                   "frequency, means the USB link is losing frames, which is a failure.";
         else
             plot = "The plot is empty because USB is disabled, and the status reports no board.";
         const std::string text = font_scale > 1.0f ? " Text is drawn larger than normal and everything still fits."
@@ -128,10 +134,10 @@ struct Shot
         case App::LayoutMode::Compact:
             return "The compact touch layout for 800x480 screens in the " + theme +
                    " theme: a large plot with big touch buttons around it, the SG1 and SG2 buttons naming "
-                   "the running signals (a 1 kHz sine and a 500 Hz square). " + plot + text + common;
+                   "the running signals (an 891 Hz sine and a 557 Hz square). " + plot + text + common;
         default:
             if (board)
-                plot = "The plot shows CH1's live 1 kHz sine between about 0.5 and 2.5 V as a smooth fast "
+                plot = "The plot shows CH1's live 891 Hz sine between about 0.5 and 2.5 V as a smooth fast "
                        "oscillation across the whole window (this layout starts with only CH1 enabled).";
             return "The mobile tile layout in the " + theme + " theme: the plot above a row of control tiles "
                    "(Inputs, Logic Dec., DAQ) whose controls all fit inside the window. " + plot + text + common;

@@ -139,8 +139,10 @@ LABRADOR_LAYOUT=desktop LABRADOR_FRAME_DUMP=/tmp/shot.ppm ./labrador --smoke
 sips -s format png /tmp/shot.ppm --out /tmp/shot.png   # macOS; ImageMagick elsewhere
 ```
 
-`LABRADOR_SG1=sine:1000:2:0.5` / `LABRADOR_SG2=square:500:1.5:0.3` start the
-generators so a looped-back board shows live traces. `labrador --auto-qa
+`LABRADOR_SG1=sine:891:2:0.5` / `LABRADOR_SG2=square:557:1.5:0.3` start the
+generators so a looped-back board shows live traces. Pick frequencies like
+these, whose period isn't a multiple of the 1 ms USB frame: with 1 kHz or
+500 Hz a stream that loses every other frame still draws a perfect waveform. `labrador --auto-qa
 <dir>` (section 5) runs this whole matrix in-process, with the board
 connected and with USB off, without touching the user's settings.ini.
 

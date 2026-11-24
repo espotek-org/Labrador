@@ -78,9 +78,12 @@ expected waveform (green dashed) over it.
 | `firmware.round_trip` | flashes the bundled `labrafirm_0007_02.hex` (librador reports 1, "runs other firmware", and the board 0x0007 variant 2), then the release's bundled image back (0x000c variant 3 here), then checks the board streams. Both directions jump to the DFU bootloader and re-enumerate, which is what USB passthrough and Windows driver binding tend to break. It skips when the board stores calibration, because the DFU erase would wipe it. |
 
 **Phase 2, in the frame loop.** The app gets its USB session back and, with
-`LABRADOR_SG1=sine:1000:2:0.5` and `LABRADOR_SG2=square:500:1.5:0.3` set for
+`LABRADOR_SG1=sine:891:2:0.5` and `LABRADOR_SG2=square:557:1.5:0.3` set for
 the run, every layout starts with both generators on, so the scope shows live
-traces through the loopback. For each shot the QA sets the layout, theme, text
+traces through the loopback. Neither period is a multiple of the 1 ms USB
+frame, so a dropped frame is visible in the screenshots as a kink in the sine
+or uneven square pulses; a 1 kHz sine or 500 Hz square repeats exactly every
+frame or two and looks perfect even when every other frame is lost. For each shot the QA sets the layout, theme, text
 size, side-panel page and window size through the app's own setters, waits at
 least 1.5 s and 10 frames (6 s for the first, while the board connects and
 starts streaming) until the window size is steady, then captures the frame as
