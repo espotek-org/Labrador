@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <functional>
 #include <thread>
 #include <vector>
 
@@ -40,7 +41,10 @@ class AutoQa
     // Called once per frame from App::Update. While hardwarePhase() is true the
     // app must leave the board alone and only draw statusText().
     void frame(App& app);
-    bool hardwarePhase() const { return m_phase == Phase::Start || m_phase == Phase::Hardware; }
+    bool hardwarePhase() const
+    {
+        return m_phase == Phase::Start || m_phase == Phase::Hardware || m_phase == Phase::Firmware;
+    }
     std::string statusText() const;
 
   private:
@@ -49,6 +53,7 @@ class AutoQa
         Start,
         Hardware,
         Shots,
+        Firmware,
         Done
     };
     enum class ShotStep
@@ -60,11 +65,18 @@ class AutoQa
 
     void startHardware(App& app);
     void finishHardware(App& app);
+    // The board work on the worker thread, with the app's own librador session set aside.
+    void startWorker(std::function<void()> work);
+    void restoreAppSession();
+    void startFirmware(App& app);
+    void finishFirmware(App& app);
     void shotFrame(App& app);
     void evaluateShot(App& app, TestContext& ctx, const Shot& shot, int w, int h,
                       const std::vector<unsigned char>& rgb);
     void finish(App& app);
-    void writeReport();
+    // complete is false while the run is still going (the report is rewritten after
+    // every result, so a crash or a killed VM leaves everything recorded so far).
+    void writeReport(bool complete);
 
     std::string m_out;
     std::string m_exe;

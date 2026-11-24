@@ -285,6 +285,7 @@ AutoQa::AutoQa(std::string out_dir, std::string exe_path)
 
     m_shots = shotMatrix();
     m_runner.setPlanned(hardwareTestCount() + static_cast<int>(m_shots.size()));
+    m_runner.setOnRecorded([this]() { writeReport(false); });
 }
 
 AutoQa::~AutoQa()
@@ -327,14 +328,16 @@ void AutoQa::frame(App& app)
             finishHardware(app);
         break;
     case Phase::Shots: shotFrame(app); break;
+    case Phase::Firmware:
+        if (m_worker_done)
+            finishFirmware(app);
+        break;
     case Phase::Done: break;
     }
 }
 
-void AutoQa::startHardware(App& app)
+void AutoQa::startWorker(std::function<void()> work)
 {
-    (void)app;
-    log("phase 1/2: hardware tests and firmware round trip");
     // The worker opens its own librador sessions; the app's own one (and its
     // log sink and flash-request hook, which would queue a flash dialog when the
     // round trip leaves old firmware on the board) is set aside until it is done.
@@ -343,44 +346,82 @@ void AutoQa::startHardware(App& app)
     g_saved_logger_userdata = librador_logger_get_userdata();
     librador_set_host_hooks(librador_host_hooks());
     librador_exit();
-    m_phase = Phase::Hardware;
-    m_worker = std::thread([this]() {
+    m_worker_done = false;
+    m_worker_error.clear();
+    m_worker = std::thread([this, work]() {
         try
         {
-            runHardwareTests(m_runner, m_out, [this](const std::string& s) {
-                std::lock_guard<std::mutex> lock(m_mutex);
-                m_status = s;
-            });
+            work();
         }
         catch (const std::exception& e)
         {
-            m_worker_error = e.what(); // reported as its own failed test below
+            m_worker_error = e.what(); // reported as its own failed test by the caller
         }
         m_worker_done = true;
     });
 }
 
-void AutoQa::finishHardware(App& app)
+void AutoQa::restoreAppSession()
 {
     m_worker.join();
+    if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
+        throw std::runtime_error("librador_init failed after the auto-QA worker");
+    librador_logger_set(g_saved_logger_userdata, g_saved_logger);
+    librador_set_host_hooks(g_saved_hooks);
+}
+
+void AutoQa::startHardware(App& app)
+{
+    (void)app;
+    log("phase 1/3: hardware tests");
+    m_phase = Phase::Hardware;
+    startWorker([this]() {
+        runHardwareTests(m_runner, m_out, [this](const std::string& s) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_status = s;
+        });
+    });
+}
+
+void AutoQa::finishHardware(App& app)
+{
+    restoreAppSession();
     if (!m_worker_error.empty())
         m_runner.run("hw.suite", "hw", "The hardware test sequence ran to the end", {},
                      [this](TestContext& ctx) { ctx.fail("the hardware tests stopped early: " + m_worker_error); });
-    if (librador_init(LABRADOR_TRANSPORT_AUTO) < 0)
-        throw std::runtime_error("librador_init failed after the hardware tests");
-    librador_logger_set(g_saved_logger_userdata, g_saved_logger);
-    librador_set_host_hooks(g_saved_hooks);
     (void)app;
-    log("phase 2/2: screenshot tour (" + std::to_string(m_shots.size()) + " shots)");
+    log("phase 2/3: screenshot tour (" + std::to_string(m_shots.size()) + " shots)");
     m_phase = Phase::Shots;
     m_step = ShotStep::Setup;
+}
+
+void AutoQa::startFirmware(App& app)
+{
+    (void)app;
+    log("phase 3/3: firmware round trip");
+    m_phase = Phase::Firmware;
+    startWorker([this]() {
+        runFirmwareRoundTrip(m_runner, m_out, [this](const std::string& s) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_status = s;
+        });
+    });
+}
+
+void AutoQa::finishFirmware(App& app)
+{
+    restoreAppSession();
+    if (!m_worker_error.empty())
+        m_runner.run("firmware.suite", "firmware", "The firmware round trip ran to the end", {},
+                     [this](TestContext& ctx) { ctx.fail("the firmware round trip stopped early: " + m_worker_error); });
+    finish(app);
 }
 
 void AutoQa::shotFrame(App& app)
 {
     if (m_shot >= m_shots.size())
     {
-        finish(app);
+        startFirmware(app);
         return;
     }
     const Shot& shot = m_shots[m_shot];
@@ -534,7 +575,7 @@ void AutoQa::evaluateShot(App& app, TestContext& ctx, const Shot& shot, int w, i
 
 void AutoQa::finish(App& app)
 {
-    writeReport();
+    writeReport(true);
     // The isolated settings are discarded: nothing of this run stays behind.
     const std::string settings = settingsPath();
     if (SDL_GetPathInfo(settings.c_str(), nullptr) && !SDL_RemovePath(settings.c_str()))
@@ -557,7 +598,7 @@ void AutoQa::finish(App& app)
     app.finishAutoQa(fail == 0 && error == 0 ? 0 : 1);
 }
 
-void AutoQa::writeReport()
+void AutoQa::writeReport(bool complete)
 {
     int pass = 0, fail = 0, skip = 0, error = 0;
     for (const TestResult& t : m_runner.results())
@@ -595,6 +636,7 @@ void AutoQa::writeReport()
         json.endObject();
         json.field("started_at", m_started_at);
         json.field("finished_at", isoNow());
+        json.field("complete", complete);
         json.field("result", fail == 0 && error == 0 ? "pass" : "fail");
         json.key("counts").beginObject();
         json.field("pass", pass);

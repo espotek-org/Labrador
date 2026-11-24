@@ -8,8 +8,8 @@ labrador --auto-qa <out_dir>
 ```
 
 It needs no QA build (no ImGui Test Engine) and no other program: hardware
-loopback tests through librador, a firmware round trip through the DFU
-bootloader, and a screenshot tour of the app's own UI all run in-process. The
+loopback tests through librador, a screenshot tour of the app's own UI and,
+last, a firmware round trip through the DFU bootloader all run in-process. The
 exit status is 0 only if every test passed (skipped tests do not count
 against it). The code is in `src/autoqa/`, with measurement code shared with
 `labrador-cli` in `measure/`.
@@ -49,7 +49,7 @@ or the AppImage itself.
 
 ## Phases and tests
 
-**Phase 1, on a worker thread, while the window shows a status screen.** The
+**Phase 1 of 3, on a worker thread, while the window shows a status screen.** The
 app's own USB session is set aside; each test sets the PSU, both generators
 and the scope itself and measures, so none depends on what an earlier one left
 behind. Each saves the samples it judged (CSV, first 5000 rows) and a plot of
@@ -77,7 +77,7 @@ expected waveform (green dashed) over it.
 | `hw.transport.{bulk,iso1,iso6}.soak` | a 60 s stream with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2: no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period on either input more than 5 % off the median. These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
 | `firmware.round_trip` | flashes the bundled `labrafirm_0007_02.hex` (librador reports 1, "runs other firmware", and the board 0x0007 variant 2), then the release's bundled image back (0x000c variant 3 here), then checks the board streams. Both directions jump to the DFU bootloader and re-enumerate, which is what USB passthrough and Windows driver binding tend to break. It skips when the board stores calibration, because the DFU erase would wipe it. |
 
-**Phase 2, in the frame loop.** The app gets its USB session back and, with
+**Phase 2 of 3, in the frame loop.** The app gets its USB session back and, with
 `LABRADOR_SG1=sine:891:2:0.5` and `LABRADOR_SG2=square:557:1.5:0.3` set for
 the run, every layout starts with both generators on, so the scope shows live
 traces through the loopback. Neither period is a multiple of the 1 ms USB
@@ -94,6 +94,16 @@ Classic Dark and Phosphor Retro; text sizes 0.85, 1.2 and 1.45 on the Scope
 and Signals pages; compact at 800x480 in two themes; tablet at 1024x768 and
 1280x720; mobile at 480x720; and five of those with USB off. Desktop runs at
 1280x720.
+
+**Phase 3 of 3, back on the worker thread: the firmware round trip.** It
+runs last because it is the step most likely to break the USB link (both
+directions re-enumerate the board through the DFU bootloader; QEMU's USB
+passthrough on macOS hosts has aborted there), so a failure costs only its own
+result, not the screenshot tour.
+
+`report.json` is rewritten after every test with `"complete": false` until the
+run finishes, so a crash, a killed process or a dead VM still leaves
+everything recorded up to that point.
 
 Each shot checks the app's status line (layout, theme, text size, board
 `streaming` or `usb-disabled`, no safety-mode, uninitialised-board or flashing
@@ -152,6 +162,7 @@ would otherwise read as a wrong shape.
  "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000C_03.hex"},
  "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "..."},
  "started_at": "2026-11-23T08:29:10Z", "finished_at": "2026-11-23T08:45:51Z",
+ "complete": true,
  "result": "pass|fail",
  "counts": {"pass": 0, "fail": 0, "skip": 0, "error": 0},
  "tests": [{"id": "hw.siggen.ch1.sine_2khz", "group": "hw", "title": "...", "status": "pass|fail|skip|error",

@@ -141,6 +141,8 @@ void Runner::record(TestResult& result, TestContext* ctx)
     if (result.status != "pass" && !result.message.empty())
         text += " - " + result.message.substr(0, 300);
     m_progress(text);
+    if (m_on_recorded)
+        m_on_recorded();
 }
 
 void Runner::run(const std::string& id, const std::string& group, const std::string& title,

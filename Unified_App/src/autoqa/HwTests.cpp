@@ -110,6 +110,7 @@ class Suite
     }
 
     void run();
+    void runFirmware();
 
   private:
     // --- helpers ---------------------------------------------------------
@@ -990,8 +991,13 @@ void Suite::run()
             {"board", "transport_" + ts}, [&, ts](TestContext& c) { transportSoak(c, ts); });
     }
     m_session.reset();
+}
+
+void Suite::runFirmware()
+{
+    // "board" was established by run(); the runner keeps its conditions.
     add("firmware.round_trip", "Flash firmware 0x0007, then the bundled image back, through the DFU bootloader",
-        board, [&](TestContext& c) { firmwareRoundTrip(c); });
+        {"board"}, [&](TestContext& c) { firmwareRoundTrip(c); });
     m_session.reset();
 }
 } // namespace
@@ -1008,5 +1014,12 @@ void runHardwareTests(Runner& runner, const std::string& out_dir,
 {
     Suite suite(runner, out_dir, status);
     suite.run();
+}
+
+void runFirmwareRoundTrip(Runner& runner, const std::string& out_dir,
+                          const std::function<void(const std::string&)>& status)
+{
+    Suite suite(runner, out_dir, status);
+    suite.runFirmware();
 }
 } // namespace autoqa

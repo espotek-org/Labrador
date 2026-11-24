@@ -144,6 +144,8 @@ class Runner
 
     const std::vector<TestResult>& results() const { return m_results; }
     void setPlanned(int n) { m_planned = n; }
+    // Called after every recorded result (the report is rewritten so a crash keeps it).
+    void setOnRecorded(std::function<void()> fn) { m_on_recorded = std::move(fn); }
 
   private:
     bool preconditionsMet(TestResult& result, const std::vector<std::string>& needs);
@@ -155,6 +157,7 @@ class Runner
     std::map<std::string, bool> m_unmet_fails;
     std::vector<TestResult> m_results;
     int m_planned = 0;
+    std::function<void()> m_on_recorded;
     // The multi-frame test in progress.
     std::optional<TestResult> m_open;
     std::optional<TestContext> m_open_ctx;
