@@ -295,8 +295,8 @@ private:
     bool frame_csum_valid[CSUM_RING_SIZE];
     uint64_t data_frame_counter = 0;
     uint64_t meta_frame_counter = 0;
-    // Meta packets waiting for their candidate frames (lag -3..+1 around the
-    // meta's slot) to be assembled before they are scored; see
+    // Meta packets waiting for their candidate frames (meta_lag -2..+2 around
+    // the meta's slot) to be assembled before they are scored; see
     // score_pending_meta().  Scoring a meta the moment it arrives was wrong
     // for iso6, where the six data slices of a frame may still sit in
     // iso6_queues when the meta is processed.
@@ -305,6 +305,30 @@ private:
     void score_pending_meta();
     // iso6 reassembly: per-endpoint packet queues consumed in lockstep
     std::deque<std::vector<unsigned char>> iso6_queues[MAX_DATA_ENDPOINTS];
+    // iso6 alignment; see realign_iso6().  An endpoint can start streaming a
+    // frame or more before or after the others (seen natively behind a USB
+    // 2.0 hub, and on most starts in a VM), after which every lockstep frame
+    // mixes slices of neighbouring milliseconds.  Each endpoint's recent
+    // packet checksums are kept by packet number so that the alignment the
+    // metas describe can be searched for.
+    static const int ISO6_HIST = 128;            // packets of checksum history per endpoint
+    static const int ISO6_MAX_SHIFT = 4;         // frames an endpoint may be out of step
+    static const int ISO6_MAX_LAG = 8;           // frames a meta may be from the frame it describes
+    static const int ISO6_JUDGE_METAS = 24;      // metas a candidate alignment is judged on
+    static const int ISO6_MISSES_TO_REALIGN = 8; // metas in a row that matched no frame
+    short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
+    uint64_t iso6_received[MAX_DATA_ENDPOINTS];      // packets received per endpoint
+    uint64_t iso6_skip[MAX_DATA_ENDPOINTS];          // packets to drop on arrival to reach the new alignment
+    struct RecentMeta { uint64_t index; unsigned char c0, c1; };
+    std::deque<RecentMeta> recent_meta;              // the last ISO6_HIST metas (iso6 only)
+    int meta_misses = 0;
+    uint64_t aligned_from_frame = 0;             // first frame assembled after the last realignment
+    bool iso6_realign_wanted = false;
+    // A meta describes frame (meta index + meta_lag); -1 nominally, and
+    // whatever realign_iso6() finds when the streams started further apart.
+    long meta_lag = -1;
+    void iso6_dropped_packet(int ep_index);
+    void realign_iso6();
 
     // Hand-off between the libusb event thread and the ingest thread.  The
     // event thread must NEVER block on buffer_read_write_mutex: while it
