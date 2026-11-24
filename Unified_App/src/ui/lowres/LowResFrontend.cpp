@@ -320,8 +320,8 @@ void LowResFrontend::renderLayout(App& app)
     style.FramePadding = ImVec2(10, 8);
     style.TouchExtraPadding = ImVec2(4, 4); // hit slop beyond the visuals
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    ImGui::SetNextWindowPos(ImVec2(app.contentX(), app.contentY()));
+    ImGui::SetNextWindowSize(ImVec2(app.contentW(), app.contentH()));
     const ImGuiWindowFlags main_flags = ImGuiWindowFlags_NoResize
         | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
         | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar
