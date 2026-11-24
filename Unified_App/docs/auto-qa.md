@@ -146,7 +146,7 @@ would otherwise read as a wrong shape.
 ```json
 {"schema_version": 1,
  "suite": {"name": "labrador --auto-qa", "commit": "<sha the build was configured from, or null>"},
- "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000C_03.hex"},
+ "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000D_03.hex"},
  "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "..."},
  "started_at": "2026-11-23T08:29:10Z", "finished_at": "2026-11-23T08:45:51Z",
  "result": "pass|fail",

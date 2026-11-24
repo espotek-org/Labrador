@@ -26,7 +26,7 @@
 namespace constants
 {
 // Desired Firmware Version/Variant
-constexpr uint16_t DESIRED_FW_VERSION = 0x000C;
+constexpr uint16_t DESIRED_FW_VERSION = 0x000D;
 constexpr uint8_t DESIRED_FW_VARIANT = 3;
 
 // Theme Colours

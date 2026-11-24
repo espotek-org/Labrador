@@ -100,7 +100,7 @@ void main_aio_iface_disable(uint8_t iface);
 /*! \brief Re-arm the active transport (vendor request 0xaa). */
 bool main_aio_rearm(void);
 
-void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep);
+void bulk_tail_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep);
 void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep);
 void meta_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep);
 #endif

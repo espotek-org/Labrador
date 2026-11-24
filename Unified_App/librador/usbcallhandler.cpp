@@ -218,9 +218,9 @@ void usbCallHandler::score_pending_meta(){
     }
 }
 
-// Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum
-// mode + zero pad] followed by a 768-byte payload block (750 data + 18
-// pad); fixed 832-byte stride.
+// Bulk stream parser: the 750-byte payload, then the header [EB 57 seqL
+// seqH lenL lenH csum mode], 9 diagnostic bytes and 1 pad byte; fixed
+// 768-byte stride (firmware 0x000D and later).
 void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
     // Diagnostic: raw stream capture (LABRADOR_DUMP_BULK=<path>, first 1 MB)
     static FILE *dump_fp = nullptr;
@@ -237,19 +237,21 @@ void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
         if(dump_left <= 0){ fclose(dump_fp); dump_fp = nullptr; }
     }
     bulk_stream.insert(bulk_stream.end(), data, data + length);
+    // pos is a frame start: the payload, then its header at offset 750.
     size_t pos = 0;
     while(true){
-        while(bulk_stream.size() - pos >= 2 &&
-              !(bulk_stream[pos] == AIO_HDR_MAGIC0 && bulk_stream[pos+1] == AIO_HDR_MAGIC1_BULK)){
+        while(bulk_stream.size() - pos >= AIO_BULK_FRAME_XFER &&
+              !(bulk_stream[pos+ISO_PACKET_SIZE] == AIO_HDR_MAGIC0 &&
+                bulk_stream[pos+ISO_PACKET_SIZE+1] == AIO_HDR_MAGIC1_BULK)){
             pos++;
         }
-        if(bulk_stream.size() - pos < 8) break;
-        uint16_t len = bulk_stream[pos+4] | (bulk_stream[pos+5] << 8);
+        if(bulk_stream.size() - pos < AIO_BULK_FRAME_XFER) break;
+        const unsigned char *hdr = bulk_stream.data() + pos + ISO_PACKET_SIZE;
+        uint16_t len = hdr[4] | (hdr[5] << 8);
         if(len != ISO_PACKET_SIZE){ pos++; continue; }
-        if(bulk_stream.size() - pos < (size_t)(AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER)) break;
-        uint16_t seq = bulk_stream[pos+2] | (bulk_stream[pos+3] << 8);
-        unsigned char csum = bulk_stream[pos+6];
-        unsigned char *payload = bulk_stream.data() + pos + AIO_BULK_HDR_XFER;
+        uint16_t seq = hdr[2] | (hdr[3] << 8);
+        unsigned char csum = hdr[6];
+        unsigned char *payload = bulk_stream.data() + pos;
         if(seq_started){
             uint16_t expect = (uint16_t)(last_seq + 1);
             if(seq != expect){
@@ -269,7 +271,7 @@ void usbCallHandler::handle_bulk_bytes(unsigned char *data, int length){
             frames_bad_checksum++;
             dispatch_lost_frames(1);
         }
-        pos += AIO_BULK_HDR_XFER + AIO_BULK_PAYLOAD_XFER;
+        pos += AIO_BULK_FRAME_XFER;
     }
     bulk_stream.erase(bulk_stream.begin(), bulk_stream.begin() + pos);
 }
