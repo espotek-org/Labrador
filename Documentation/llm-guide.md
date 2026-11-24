@@ -8,7 +8,7 @@ the same directory (`getting-started.md`, `tutorial.md`, `user-manual.md`,
 `pinout.md`, `troubleshooting.md`).
 
 Scope: the **unified Labrador app** (`Unified_App/`, "Unified interface
-2.0") with firmware **0x000C variant 3** (shown in-app as "firmware 12.3").
+2.0") with firmware **0x000D variant 3** (shown in-app as "firmware 13.3").
 Facts verified against source and a live board, 2026-07-10. The older Qt app
 (`Desktop_Interface/`) and old wiki pages differ in menu paths and shortcut
 bindings — do not mix them up.
@@ -278,7 +278,7 @@ Safety rules for agents with hardware attached:
 
 Manual firmware recovery (last resort): short DO1→GND, plug in (bootloader
 mode), then `dfu-programmer atxmega32a4u erase --force` and
-`dfu-programmer atxmega32a4u flash labrafirm_000C_03.hex` (hex ships in the
+`dfu-programmer atxmega32a4u flash labrafirm_000D_03.hex` (hex ships in the
 app's `firmware/` resources).
 
 ## Repo map (for coding agents)

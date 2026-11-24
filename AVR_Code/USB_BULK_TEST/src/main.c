@@ -18,7 +18,7 @@
 volatile bool main_b_vendor_enable = false;
 
 COMPILER_WORD_ALIGNED
-volatile unsigned char isoBuf[BUFFER_SIZE + ISOBUF_BULK_PAD];
+volatile unsigned char isoBuf[BUFFER_SIZE];
 COMPILER_WORD_ALIGNED
 volatile unsigned char dacBuf_CH1[DACBUF_SIZE];
 volatile unsigned char dacBuf_CH2[DACBUF_SIZE];
@@ -85,7 +85,7 @@ volatile unsigned char active_transport = TRANSPORT_NONE;
 //receives that frame; if the ADC/DMA loop overwrites a buffer while it is
 //still on the wire, the host sees a mismatch and can discard the frame.
 //
-//Bulk carries the header in-stream ahead of each payload (magic 0xEB 0x57).
+//Bulk carries the header in-stream right after each payload (magic 0xEB 0x57).
 //The iso interfaces carry it on a dedicated 8-byte iso meta endpoint (magic
 //0xEB 0x58) with lag-1 semantics: the meta packet sent in frame N describes
 //the payload of frame N-1, because N-1's payload is the last one whose bytes
@@ -93,12 +93,24 @@ volatile unsigned char active_transport = TRANSPORT_NONE;
 #define AIO_HDR_MAGIC0       0xEB
 #define AIO_HDR_MAGIC1_BULK  0x57
 #define AIO_HDR_MAGIC1_META  0x58
-//64 bytes so the header transfer is a full USB packet, never short;
-//bytes 8..63 stay zero (bss) as padding the host's magic scan skips.
-#define BULK_HDR_XFER_LEN 64
-#define BULK_PAYLOAD_XFER_LEN 768   /* 750 payload + 18 pad = 12 x 64 */
+//A bulk frame is 12 full 64-byte packets (768 bytes, never a short packet):
+//the first 5 (320 bytes) go straight from the half being sent, and the
+//other 7 from bulk_tail: a copy of the remaining 430 payload bytes, the
+//8-byte header, 9 diagnostic bytes and 1 pad byte.  The header used to have
+//a packet of its own (13 per frame).  Behind a USB 2.0 hub's transaction
+//translator, back-to-back frames move at about 12.5 packets per
+//millisecond, so a late 13-packet frame made every later one later still;
+//with 12, frames sent back to back catch up (see main_aio_bulk_kick).
+//The copy is what lets a frame go out late: at ~SOF+800us the ADC starts
+//rewriting the half from byte 0 (first channel) and byte 375 (second
+//channel) at once.  Bytes 320 and up are copied before that, so only the
+//first channel's writer can meet bytes still on the wire, and it starts
+//behind them.
+#define BULK_HEAD_XFER_LEN 320
+#define BULK_TAIL_XFER_LEN 448
+#define BULK_TAIL_PAYLOAD (PACKET_SIZE - BULK_HEAD_XFER_LEN)   /* 430 */
 COMPILER_WORD_ALIGNED
-static volatile unsigned char bulk_hdr[BULK_HDR_XFER_LEN];
+static volatile unsigned char bulk_tail[BULK_TAIL_XFER_LEN];
 COMPILER_WORD_ALIGNED
 static volatile unsigned char iso_meta_buf[8];
 static volatile unsigned char *bulk_payload_ptr;
@@ -109,6 +121,8 @@ static volatile unsigned short bulk_seg1_len;
 static volatile unsigned short bulk_seg2_len;
 static volatile unsigned short aio_seq = 0;
 static volatile unsigned char bulk_busy = 0;
+//A frame became ready while the previous one was still draining.
+static volatile unsigned char bulk_pending = 0;
 static volatile unsigned char meta_busy = 0;
 static volatile unsigned short meta_prev_seq;
 static volatile unsigned char meta_prev_csum0;
@@ -269,15 +283,43 @@ void main_resume_action(void)
 }
 
 #ifdef AIO_INTERFACE
+static void main_aio_bulk_send(void);
+
+//A frame that missed its SOF may still be sent this late into the frame:
+//its first 320 bytes must start on the wire before the ADC starts
+//rewriting the half at ~SOF+800us (see bulk_tail), which leaves the host
+//100us to start pulling.
+#define BULK_LATE_SEND_LIMIT_US 700
+
+//Microseconds since the last SOF: the SOF servo holds TC_CALI (24000
+//counts per frame) at 12000 when each SOF arrives.
+static unsigned short aio_us_since_sof(void)
+{
+	unsigned short cnt = TC_CALI.CNT;
+	return ((cnt >= 12000) ? (cnt - 12000) : (cnt + 12000)) / 24;
+}
+
 static void main_aio_bulk_kick(void)
 {
-	//Queue the next bulk frame if the previous one has fully drained.
-	unsigned short i;
-	unsigned char csum;
+	//Called at every SOF, when a new frame is ready.  If the previous
+	//frame is still draining (a slow link, such as a full-speed device
+	//behind a USB 2.0 hub's transaction translator), don't skip this one:
+	//bulk_tail_callback sends it as soon as the pipe is free.  Skipping
+	//turned any lateness into losing every other frame.
 	aio_seq++;
 	if (bulk_busy) {
+		bulk_pending = 1;
 		return;
 	}
+	main_aio_bulk_send();
+}
+
+static void main_aio_bulk_send(void)
+{
+	//Send the newest complete frame, numbered with the current aio_seq.
+	unsigned short i;
+	unsigned char csum;
+	bulk_pending = 0;
 	if (global_mode >= 5) {
 		//Modes 6/7 run the DMA as a free-running circular buffer that is
 		//not phase-locked to the USB frame, so the fixed halves tear
@@ -288,17 +330,14 @@ static void main_aio_bulk_kick(void)
 		//buffer.  The calibration servo phase-locks the write position at
 		//SOF (median TRFCNT 400 => ~1100 bytes written), so the half the
 		//writer is NOT currently in is safe: the transmitter, starting
-		//now, stays ahead of the writer re-entering that half.  Single
-		//768-byte padded transfer; half B's 18 pad bytes read from the
-		//isoBuf pad tail.
+		//now, stays ahead of the writer re-entering that half.
 		unsigned short written = BUFFER_SIZE - DMA.CH0.TRFCNT;
 		unsigned char safe_half;
 		if (written > BUFFER_SIZE) written = 0; //TRFCNT mid-reload
 		safe_half = (written < PACKET_SIZE) ? 1 : 0;
 		bulk_payload_ptr = &isoBuf[safe_half * PACKET_SIZE];
-		bulk_seg1_len = BULK_PAYLOAD_XFER_LEN;
+		bulk_seg1_len = BULK_HEAD_XFER_LEN;
 		bulk_seg2_len = 0;
-		csum = aio_frame_csum(safe_half);
 	} else {
 		//Modes 0-4: the SOF handler toggles usb_state BEFORE this kick
 		//runs, and the DMA re-arm ISR (firing just before SOF at servo
@@ -313,10 +352,29 @@ static void main_aio_bulk_kick(void)
 		//== old bytes), which is how it survived testing.
 		unsigned char tx_half = usb_state ^ 1;
 		bulk_payload_ptr = &isoBuf[tx_half * PACKET_SIZE];
-		bulk_seg1_len = BULK_PAYLOAD_XFER_LEN;
+		bulk_seg1_len = BULK_HEAD_XFER_LEN;
 		bulk_seg2_len = 0;
-		csum = aio_frame_csum(tx_half);
 	}
+	//Start the head on the wire first, then build the tail behind it: the
+	//head takes at least 5 packet times, and its completion callback (at
+	//this same interrupt level) only runs after this function returns.
+	bulk_busy = 1;
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_payload_ptr, bulk_seg1_len, bulk_payload_callback)) {
+		bulk_busy = 0;
+		return;
+	}
+	//The tail: the rest of the payload, copied before the ADC comes back
+	//to it, then the header.  The checksum covers exactly the bytes sent.
+	csum = 0;
+	for (i = 0; i < BULK_TAIL_PAYLOAD; i++) {
+		unsigned char b = bulk_payload_ptr[BULK_HEAD_XFER_LEN + i];
+		bulk_tail[i] = b;
+		csum ^= b;
+	}
+	for (i = 0; i < BULK_HEAD_XFER_LEN; i++) {
+		csum ^= bulk_payload_ptr[i];
+	}
+	volatile unsigned char *bulk_hdr = &bulk_tail[BULK_TAIL_PAYLOAD];
 	bulk_hdr[0] = AIO_HDR_MAGIC0;
 	bulk_hdr[1] = AIO_HDR_MAGIC1_BULK;
 	bulk_hdr[2] = aio_seq & 0xff;
@@ -338,10 +396,6 @@ static void main_aio_bulk_kick(void)
 	bulk_hdr[14] = DMA.CH1.DESTADDR1;
 	bulk_hdr[15] = DMA.CH1.TRFCNTL;
 	bulk_hdr[16] = DMA.CH1.TRFCNTH;
-	bulk_busy = 1;
-	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_hdr, BULK_HDR_XFER_LEN, bulk_hdr_callback)) {
-		bulk_busy = 0;
-	}
 }
 
 static void main_aio_meta_fill_and_arm(udd_ep_id_t meta_ep)
@@ -381,15 +435,18 @@ static void main_aio_meta_kick(udd_ep_id_t meta_ep)
 	}
 }
 
-void bulk_hdr_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
+void bulk_tail_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
 {
 	aio_dbg[4]++;
-	if (status != UDD_EP_TRANSFER_OK) {
-		bulk_busy = 0;
-		return;
-	}
-	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_payload_ptr, bulk_seg1_len, bulk_payload_callback)) {
-		bulk_busy = 0;
+	bulk_busy = 0;
+	if (status == UDD_EP_TRANSFER_OK && bulk_pending) {
+		if (aio_us_since_sof() < BULK_LATE_SEND_LIMIT_US) {
+			main_aio_bulk_send();
+		} else {
+			//Too late: the ADC would overwrite this frame on the wire.
+			//Drop it; the next SOF sends a fresh one.
+			bulk_pending = 0;
+		}
 	}
 }
 
@@ -408,7 +465,9 @@ void bulk_payload_callback(udd_ep_status_t status, iram_size_t nb_transfered, ud
 		}
 		return;
 	}
-	bulk_busy = 0;
+	if (!udd_ep_run(UDI_AIO_EP_BULK_IN, false, (uint8_t *)bulk_tail, BULK_TAIL_XFER_LEN, bulk_tail_callback)) {
+		bulk_busy = 0;
+	}
 }
 
 void meta_callback(udd_ep_status_t status, iram_size_t nb_transfered, udd_ep_id_t ep)
@@ -593,6 +652,7 @@ static void main_aio_arm_endpoints(void)
 			//Frames are queued from the SOF handler once the pipe is idle.
 			udd_ep_abort(UDI_AIO_EP_BULK_IN);
 			bulk_busy = 0;
+			bulk_pending = 0;
 			break;
 	}
 }
@@ -627,6 +687,7 @@ void main_aio_iface_disable(uint8_t iface)
 	active_transport = TRANSPORT_NONE;
 	main_b_vendor_enable = false;
 	bulk_busy = 0;
+	bulk_pending = 0;
 }
 
 bool main_aio_rearm(void)

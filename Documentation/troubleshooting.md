@@ -113,14 +113,14 @@ If the app can't flash the board at all, you can do it by hand with
 # 1. Short Digital Out 1 to GND, plug the board in (bootloader mode)
 # 2. Point it at the firmware hex shipped with the app:
 dfu-programmer atxmega32a4u erase --force
-dfu-programmer atxmega32a4u flash labrafirm_000C_03.hex
+dfu-programmer atxmega32a4u flash labrafirm_000D_03.hex
 ```
 
 The `.hex` files live in the app's resources (`firmware/` next to the
 executable, `labrafirm_<version>_<variant>.hex`). The microcontroller is an
 ATxmega32A4U.
 
-On Windows the hex is at `assets\firmware\labrafirm_000C_03.hex` inside the
+On Windows the hex is at `assets\firmware\labrafirm_000D_03.hex` inside the
 install folder (default `C:\Program Files\EspoTek Labrador`). This app does
 not ship a standalone `dfu-programmer.exe`; use the one from the original Qt
 app's `firmware` folder or a build of

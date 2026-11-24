@@ -411,7 +411,7 @@ seconds; do not unplug the board meanwhile.
 ```
 labrador-cli update-firmware [options]
 
-  --hex FILE  Intel hex image to flash; default is the bundled labrafirm_000C_03.hex
+  --hex FILE  Intel hex image to flash; default is the bundled labrafirm_000D_03.hex
   --force     reflash even if the board already runs the expected firmware
   --verbose   also show librador's debug messages on stderr
 ```
@@ -432,7 +432,7 @@ Reflash regardless, or flash a different image:
 
 ```sh
 labrador-cli update-firmware --force
-labrador-cli update-firmware --hex ~/labrafirm_000C_03.hex
+labrador-cli update-firmware --hex ~/labrafirm_000D_03.hex
 ```
 
 `capture` refuses to run on a board with other firmware and points here:

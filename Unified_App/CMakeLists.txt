@@ -202,7 +202,7 @@ if(NOT ANDROID)
     # Headless transport-integrity regression tool: connects exactly like the
     # app, streams modes 0 and 2 quiet + with a 354.1 Hz sine on the signal
     # generator (scope looped back), and prints librador's frame-validity
-    # counters.  Expected on firmware 0x000C: 100.00% pass, 0 dropped.
+    # counters.  Expected on firmware 0x000D: 100.00% pass, 0 dropped.
     add_executable(librador_bulk_test tools/librador_bulk_test.cpp)
     target_link_libraries(librador_bulk_test PRIVATE librador)
 

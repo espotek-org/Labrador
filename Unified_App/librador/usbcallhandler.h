@@ -35,7 +35,7 @@ extern "C"
 //   iface 0 (iso6): iso IN 0x81..0x86 (128B) + 8-byte iso meta EP 0x89
 //   iface 1 (iso1): iso IN 0x87 (1023B, carries 750B/frame) + meta EP 0x8a
 //   iface 2 (bulk): bulk IN 0x88 (64B packets, 8-byte in-stream headers)
-// Every frame is protected by {magic, seq16, checksum}: in-stream ahead of
+// Every frame is protected by {magic, seq16, checksum}: in-stream right after
 // each bulk payload (EB 57), lag-1 on the iso meta endpoints (EB 58, which
 // carry the checksum of BOTH double-buffer halves - a frame is valid if it
 // matches either, stomped by the ADC/DMA loop if it matches neither).
@@ -58,13 +58,14 @@ extern "C"
 #define AIO_HDR_MAGIC0 0xEB
 #define AIO_HDR_MAGIC1_BULK 0x57
 #define AIO_HDR_MAGIC1_META 0x58
-// Bulk framing: every transfer is padded to a 64-byte multiple so the
-// stream never contains a short packet (a short packet would terminate a
-// queued URB early and collapse the read-ahead runway).  Each frame is a
-// 64-byte header block (8 meaningful bytes, zero pad) followed by a
-// 768-byte payload block (750 data + 18 pad) - a fixed 832-byte stride.
-#define AIO_BULK_HDR_XFER 64
-#define AIO_BULK_PAYLOAD_XFER 768
+// Bulk framing: every frame is 12 full 64-byte packets, so the stream never
+// contains a short packet (a short packet would terminate a queued URB early
+// and collapse the read-ahead runway).  Each frame is the 750-byte payload,
+// the 8-byte header (magic at payload offset 750), 9 diagnostic bytes and
+// 1 pad byte - a fixed 768-byte stride.  (Firmware before 0x000D gave the
+// header a packet of its own, 13 per frame, more than a full-speed device
+// behind a USB 2.0 hub can stream in a millisecond.)
+#define AIO_BULK_FRAME_XFER 768
 #define MAX_DATA_ENDPOINTS 6
 // Bulk URB queue depth: the host controller keeps draining the pipe into
 // pre-queued kernel buffers even while the app's event thread is busy, so
@@ -76,7 +77,7 @@ extern "C"
 
 // Single source of truth for the firmware the app expects on the board.
 // Flip these together with the .hex shipped in the app assets.
-#define EXPECTED_FIRMWARE_VERSION 0x000C
+#define EXPECTED_FIRMWARE_VERSION 0x000D
 #define DEFINED_EXPECTED_VARIANT 3
 #define LABRADOR_BOOTLOADER_PID 0x2fe4
 // "Gobindar" state (Qt Desktop_Interface GOBINDAR_PID): a misconfigured/

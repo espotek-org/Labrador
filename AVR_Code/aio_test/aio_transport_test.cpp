@@ -3,7 +3,7 @@
 // Exercises the three transports of the Labrador AIO firmware (variant 0x03)
 // and validates frame ordering and payload integrity using the per-frame
 // headers:
-//   bulk (iface 2):  in-stream header 0xEB 0x57 ahead of each 750-byte payload
+//   bulk (iface 2):  in-stream header 0xEB 0x57 right after each 750-byte payload
 //   iso1 (iface 1):  1023-byte iso data EP + 8-byte meta EP (0xEB 0x58, lag-1)
 //   iso6 (iface 0):  6x 128-byte iso data EPs + 8-byte meta EP (lag-1)
 //
@@ -32,11 +32,27 @@
 #define HDR_MAGIC0  0xEB
 #define HDR_MAGIC1_BULK 0x57
 #define HDR_MAGIC1_META 0x58
-// Bulk transfers are padded to 64-byte multiples so the stream never
-// contains a short packet: 64-byte header block (8 meaningful bytes +
-// 56 zero pad) then a 768-byte payload block (750 data + 18 pad).
-#define BULK_HDR_XFER      64
-#define BULK_PAYLOAD_XFER 768
+// Bulk frames are 12 full 64-byte packets (768 bytes), so the stream never
+// contains a short packet: the 750-byte payload, then the header [EB 57
+// seqL seqH lenL lenH csum mode], 9 diagnostic bytes and 1 pad byte
+// (firmware 0x000D and later).
+#define BULK_FRAME_XFER 768
+
+// Drop bytes until the stream starts with a frame: a valid header (magic
+// and length) at offset PACKET_SIZE.  Returns false while more bytes are
+// needed; when it returns true, stream[0..BULK_FRAME_XFER) is one frame.
+// Counts the dropped bytes in *skipped.
+static bool bulk_align(std::deque<uint8_t> &stream, uint64_t *skipped) {
+    while (stream.size() >= BULK_FRAME_XFER) {
+        const size_t h = PACKET_SIZE;
+        if (stream[h] == HDR_MAGIC0 && stream[h + 1] == HDR_MAGIC1_BULK &&
+            (stream[h + 4] | (stream[h + 5] << 8)) == PACKET_SIZE)
+            return true;
+        stream.pop_front();
+        (*skipped)++;
+    }
+    return false;
+}
 
 static libusb_device_handle *g_h = nullptr;
 
@@ -146,33 +162,18 @@ static void test_bulk(int seconds, Stats &st) {
             }
         }
 
-        // Parse frames: 64-byte header block [EB 57 seqL seqH lenL lenH csum
-        // mode + zero pad] then 768-byte payload block (750 data + 18 pad).
-        while (true) {
-            // resync to magic
-            while (stream.size() >= 2 &&
-                   !(stream[0] == HDR_MAGIC0 && stream[1] == HDR_MAGIC1_BULK)) {
-                stream.pop_front();
-                st.hdr_bad++;
-            }
-            if (stream.size() < 8) break;
-            uint16_t seq = stream[2] | (stream[3] << 8);
-            uint16_t len = stream[4] | (stream[5] << 8);
-            uint8_t csum = stream[6];
-            if (len != PACKET_SIZE) { // corrupt header, resync
-                stream.pop_front();
-                st.hdr_bad++;
-                continue;
-            }
-            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
+        // Parse frames: payload, then header (see BULK_FRAME_XFER).
+        while (bulk_align(stream, &st.hdr_bad)) {
+            const size_t h = PACKET_SIZE;
+            uint16_t seq = stream[h + 2] | (stream[h + 3] << 8);
+            uint8_t csum = stream[h + 6];
             uint8_t actual = 0;
-            for (size_t i = 0; i < len; i++) actual ^= stream[BULK_HDR_XFER + i];
+            for (size_t i = 0; i < PACKET_SIZE; i++) actual ^= stream[i];
             st.note_seq(seq);
             st.frames++;
-            st.bytes += len;
+            st.bytes += PACKET_SIZE;
             if (actual == csum) st.csum_ok++; else st.csum_bad++;
-            stream.erase(stream.begin(),
-                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
+            stream.erase(stream.begin(), stream.begin() + BULK_FRAME_XFER);
         }
     }
     double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -224,24 +225,18 @@ static void test_bulkdiag(int seconds, bool fgen) {
         int r = libusb_bulk_transfer(g_h, 0x88, buf.data(), (int)buf.size(), &got, 250);
         if (r && r != LIBUSB_ERROR_TIMEOUT) break;
         stream.insert(stream.end(), buf.begin(), buf.begin() + got);
-        while (true) {
-            while (stream.size() >= 2 &&
-                   !(stream[0] == HDR_MAGIC0 && stream[1] == HDR_MAGIC1_BULK))
-                stream.pop_front();
-            if (stream.size() < 8) break;
-            uint16_t len = stream[4] | (stream[5] << 8);
-            if (len != PACKET_SIZE) { stream.pop_front(); continue; }
-            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
+        uint64_t skipped = 0;
+        while (bulk_align(stream, &skipped)) {
+            const size_t h = PACKET_SIZE;
             Rec rec;
-            rec.seq = stream[2] | (stream[3] << 8);
-            uint8_t csum = stream[6];
-            rec.state = stream[8];
-            rec.ch0_dest = stream[9] | (stream[10] << 8);
-            rec.ch0_trf  = stream[11] | (stream[12] << 8);
-            rec.ch1_dest = stream[13] | (stream[14] << 8);
-            rec.ch1_trf  = stream[15] | (stream[16] << 8);
-            std::vector<uint8_t> payload(stream.begin() + BULK_HDR_XFER,
-                                         stream.begin() + BULK_HDR_XFER + PACKET_SIZE);
+            rec.seq = stream[h + 2] | (stream[h + 3] << 8);
+            uint8_t csum = stream[h + 6];
+            rec.state = stream[h + 8];
+            rec.ch0_dest = stream[h + 9] | (stream[h + 10] << 8);
+            rec.ch0_trf  = stream[h + 11] | (stream[h + 12] << 8);
+            rec.ch1_dest = stream[h + 13] | (stream[h + 14] << 8);
+            rec.ch1_trf  = stream[h + 15] | (stream[h + 16] << 8);
+            std::vector<uint8_t> payload(stream.begin(), stream.begin() + PACKET_SIZE);
             uint8_t actual = 0;
             for (auto b : payload) actual ^= b;
             rec.pass = (actual == csum);
@@ -267,8 +262,7 @@ static void test_bulkdiag(int seconds, bool fgen) {
             }
             prev_same_half[rec.state & 1] = payload;
             recs.push_back(rec);
-            stream.erase(stream.begin(),
-                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
+            stream.erase(stream.begin(), stream.begin() + BULK_FRAME_XFER);
         }
     }
 
@@ -560,17 +554,10 @@ static void bulk_histogram(int seconds, const char *label) {
         int r = libusb_bulk_transfer(g_h, 0x88, buf.data(), (int)buf.size(), &got, 250);
         if (r && r != LIBUSB_ERROR_TIMEOUT) break;
         stream.insert(stream.end(), buf.begin(), buf.begin() + got);
-        while (true) {
-            while (stream.size() >= 2 &&
-                   !(stream[0] == HDR_MAGIC0 && stream[1] == HDR_MAGIC1_BULK))
-                stream.pop_front();
-            if (stream.size() < 8) break;
-            uint16_t len = stream[4] | (stream[5] << 8);
-            if (len != PACKET_SIZE) { stream.pop_front(); continue; }
-            if (stream.size() < (size_t)(BULK_HDR_XFER + BULK_PAYLOAD_XFER)) break;
-            for (size_t i = 0; i < len; i++) { hist[stream[BULK_HDR_XFER + i]]++; total++; }
-            stream.erase(stream.begin(),
-                         stream.begin() + BULK_HDR_XFER + BULK_PAYLOAD_XFER);
+        uint64_t skipped = 0;
+        while (bulk_align(stream, &skipped)) {
+            for (size_t i = 0; i < PACKET_SIZE; i++) { hist[stream[i]]++; total++; }
+            stream.erase(stream.begin(), stream.begin() + BULK_FRAME_XFER);
         }
     }
     // Percentiles + two-cluster measure

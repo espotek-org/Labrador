@@ -354,7 +354,7 @@ jobs:
           fi
           cat cli.log
           grep -q "no Labrador board found" cli.log
-          test -f /usr/lib/labrador/assets/firmware/labrafirm_000C_03.hex
+          test -f /usr/lib/labrador/assets/firmware/labrafirm_000D_03.hex
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
