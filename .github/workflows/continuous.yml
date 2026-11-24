@@ -1,6 +1,7 @@
-# Continuous release fan-in for the Unified_App (SDL3/ImGui). Builds every
-# platform via the reusable per-platform workflows, then publishes all assets to
-# the unified app's OWN rolling tag "unified-continuous".
+# Continuous release of the Unified_App (SDL3/ImGui): runs the QA release
+# (qa-release.yml, which builds and signs every platform and keeps the results
+# as artifacts), then publishes those artifacts to the unified app's OWN
+# rolling tag "unified-continuous".
 #
 # It deliberately NEVER touches the Qt app's "continuous"/"stable" tags, and the
 # release job is gated on the unified-app branch ref so it can't collide with
@@ -22,27 +23,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-android:
-    uses: ./.github/workflows/android.yml
-    secrets: inherit
-  build-linux:
-    uses: ./.github/workflows/linux.yml
-    secrets: inherit
-  build-mac:
-    uses: ./.github/workflows/mac.yml
-    secrets: inherit
-  build-windows:
-    uses: ./.github/workflows/windows.yml
+  build:
+    uses: ./.github/workflows/qa-release.yml
     secrets: inherit
 
   release:
     permissions:
       contents: write
-    needs:
-      - build-android
-      - build-linux
-      - build-mac
-      - build-windows
+    needs: build
     if: github.ref == 'refs/heads/unified-app'
     runs-on: ubuntu-latest
     env:

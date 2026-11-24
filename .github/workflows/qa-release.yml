@@ -1,0 +1,34 @@
+# QA release of the Unified_App (SDL3/ImGui): every platform built and signed
+# exactly as for a release, by the same reusable per-platform workflows, but
+# kept only as this run's artifacts (asset-*) and published nowhere. The QA
+# tester installs those artifacts to test a branch before it is merged; push
+# the branch as qa/<name> to start one.
+#
+# continuous.yml runs this workflow and then publishes its artifacts as the
+# unified-continuous release, so a QA release and a release are the same build.
+name: QA Release
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - 'qa/**'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-android:
+    uses: ./.github/workflows/android.yml
+    secrets: inherit
+  build-linux:
+    uses: ./.github/workflows/linux.yml
+    secrets: inherit
+  build-mac:
+    uses: ./.github/workflows/mac.yml
+    secrets: inherit
+  build-windows:
+    uses: ./.github/workflows/windows.yml
+    secrets: inherit
