@@ -274,43 +274,55 @@ void usbCallHandler::score_pending_meta(){
 // Finds the endpoint shifts and meta lag under which the recent metas match
 // the data, and moves the iso6 queues to that alignment.  Frame m is taken
 // as endpoint 0's packet m and endpoint k's packet m + shift[k]; a meta with
-// index j describes frame j + lag.  Every shift within ISO6_MAX_SHIFT and
-// lag within ISO6_MAX_LAG is tried against the last ISO6_JUDGE_METAS metas
-// (most candidates are rejected at their third mismatch), and an alignment
-// is taken only if 90% of those metas match it.  Measured on air: wrong
-// alignments match about 6% of metas, the right one 99%.
+// index j describes frame j + lag.
+//
+// submit_iso_transfers() submits each stream's first transfer in order (data
+// endpoints 0 to 5, then the meta endpoint) and hosts start isochronous
+// transfers as soon as they can, so each stream starts on the same frame as
+// the one before it or a later one.  An endpoint that starts d frames after
+// endpoint 0 has shift -d, so the shifts never rise from one endpoint to the
+// next; and since a meta describes the frame before its own, the lag is
+// -1 - shift[5] plus however many frames the metas started after endpoint 5.
+// Every such alignment whose seven streams started within ISO6_MAX_SPREAD
+// frames is tried against the last ISO6_JUDGE_METAS metas (18,564
+// candidates, most rejected at their third mismatch), and one is taken only
+// if 90% of those metas match it.  Measured on air: wrong alignments match
+// about 6% of metas, the right one 99%.
 void usbCallHandler::realign_iso6(){
     iso6_realign_wanted = false;
     meta_misses = 0;
+    const auto search_start = std::chrono::steady_clock::now();
     const int n_ep = AIO_EP_ISO6_COUNT;
-    const long reach = ISO6_MAX_LAG + ISO6_MAX_SHIFT;
+    // A meta with index j is checked against packet j + lag + shift[k] of
+    // each endpoint, which runs from j - 1 (every stream started together)
+    // to j + ISO6_MAX_SPREAD - 1 (endpoint 0 alone, with the metas a full
+    // spread after it).
+    const long first_needed = -1;
+    const long last_needed = ISO6_MAX_SPREAD - 1;
     // The most recent metas whose packets are in every endpoint's history
-    // for any shift and lag.
+    // for any candidate.
     std::vector<RecentMeta> judge;
     for(auto it = recent_meta.rbegin(); it != recent_meta.rend() && (int)judge.size() < ISO6_JUDGE_METAS; ++it){
-        bool in_history = (long)it->index - reach >= 0;
+        bool in_history = (long)it->index + first_needed >= 0;
         for(int k = 0; k < n_ep && in_history; k++){
-            if((long)it->index - reach < (long)iso6_received[k] - ISO6_HIST) in_history = false;
-            if((long)it->index + reach >= (long)iso6_received[k]) in_history = false;
+            if((long)it->index + first_needed < (long)iso6_received[k] - ISO6_HIST) in_history = false;
+            if((long)it->index + last_needed >= (long)iso6_received[k]) in_history = false;
         }
         if(in_history) judge.push_back(*it);
     }
     if((int)judge.size() < ISO6_JUDGE_METAS) return;   // too early; tried again after more misses
     const int allowed_misses = ISO6_JUDGE_METAS / 10;
-    const int span = 2 * ISO6_MAX_SHIFT + 1;
-    long combos = 1;
-    for(int k = 1; k < n_ep; k++) combos *= span;
     int best_hits = -1;
     long best_lag = 0;
     int best_shift[MAX_DATA_ENDPOINTS] = {0};
+    // Walks every 0 = shift[0] >= shift[1] >= ... >= shift[5] >= -ISO6_MAX_SPREAD
+    // once, starting from all zeros.
     int shift[MAX_DATA_ENDPOINTS] = {0};
-    for(long lag = -ISO6_MAX_LAG; lag <= ISO6_MAX_LAG; lag++){
-        for(long c = 0; c < combos; c++){
-            long rest = c;
-            for(int k = 1; k < n_ep; k++){
-                shift[k] = (int)(rest % span) - ISO6_MAX_SHIFT;
-                rest /= span;
-            }
+    long candidates = 0;
+    for(bool more = true; more; ){
+        for(long meta_delay = 0; meta_delay <= ISO6_MAX_SPREAD + shift[n_ep - 1]; meta_delay++){
+            candidates++;
+            const long lag = -1 - shift[n_ep - 1] + meta_delay;
             int hits = 0;
             int misses = 0;
             for(const RecentMeta &m : judge){
@@ -330,9 +342,21 @@ void usbCallHandler::realign_iso6(){
                 for(int k = 0; k < n_ep; k++) best_shift[k] = shift[k];
             }
         }
+        // Next sequence: lower the last shift that can still go lower, and
+        // bring every later one down to it.
+        int k = n_ep - 1;
+        while(k > 0 && shift[k] == -ISO6_MAX_SPREAD) k--;
+        more = k > 0;
+        if(more){
+            shift[k]--;
+            for(int i = k + 1; i < n_ep; i++) shift[i] = shift[k];
+        }
     }
+    const long search_us = (long)std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now() - search_start).count();
     if(best_hits < ISO6_JUDGE_METAS - allowed_misses){
-        LIBRADOR_LOG(LOG_DEBUG, "iso6: no alignment explains the metas (best %d of %d)\n", best_hits, ISO6_JUDGE_METAS);
+        LIBRADOR_LOG(LOG_DEBUG, "iso6: no alignment explains the metas (best %d of %d; %ld candidates in %ld us)\n",
+            best_hits, ISO6_JUDGE_METAS, candidates, search_us);
         return;
     }
     // Move every queue forward (never back) until the next packet each will
@@ -357,8 +381,9 @@ void usbCallHandler::realign_iso6(){
         iso6_skip[k] += move;
     }
     aligned_from_frame = data_frame_counter + iso6_skip[0];
-    LIBRADOR_LOG(LOG_DEBUG, "iso6 realigned: endpoint shifts %d %d %d %d %d, meta lag %ld, %d of %d metas matched\n",
-        best_shift[1], best_shift[2], best_shift[3], best_shift[4], best_shift[5], best_lag, best_hits, ISO6_JUDGE_METAS);
+    LIBRADOR_LOG(LOG_DEBUG, "iso6 realigned: endpoint shifts %d %d %d %d %d, meta lag %ld, %d of %d metas matched (%ld candidates in %ld us)\n",
+        best_shift[1], best_shift[2], best_shift[3], best_shift[4], best_shift[5], best_lag, best_hits, ISO6_JUDGE_METAS,
+        candidates, search_us);
 }
 
 // Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum

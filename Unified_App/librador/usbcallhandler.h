@@ -312,8 +312,7 @@ private:
     // packet checksums are kept by packet number so that the alignment the
     // metas describe can be searched for.
     static const int ISO6_HIST = 128;            // packets of checksum history per endpoint
-    static const int ISO6_MAX_SHIFT = 4;         // frames an endpoint may be out of step
-    static const int ISO6_MAX_LAG = 8;           // frames a meta may be from the frame it describes
+    static const int ISO6_MAX_SPREAD = 12;       // frames between the first and the last stream to start (5 measured)
     static const int ISO6_JUDGE_METAS = 24;      // metas a candidate alignment is judged on
     static const int ISO6_MISSES_TO_REALIGN = 8; // metas in a row that matched no frame
     short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
