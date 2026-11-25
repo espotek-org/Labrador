@@ -62,7 +62,7 @@ jobs:
           build/linux/cli/labrador-cli help siggen
           build/linux/cli/labrador-cli help measure
           build/linux/cli/labrador-cli help stream-test
-          test -f build/linux/cli/assets/firmware/labrafirm_000C_03.hex
+          test -f build/linux/cli/assets/firmware/labrafirm_000D_03.hex
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -121,7 +121,7 @@ jobs:
           build/macos/cli/labrador-cli help siggen
           build/macos/cli/labrador-cli help measure
           build/macos/cli/labrador-cli help stream-test
-          test -f build/macos/cli/assets/firmware/labrafirm_000C_03.hex
+          test -f build/macos/cli/assets/firmware/labrafirm_000D_03.hex
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -168,7 +168,7 @@ jobs:
           ./build/windows/cli/labrador-cli.exe help siggen
           ./build/windows/cli/labrador-cli.exe help measure
           ./build/windows/cli/labrador-cli.exe help stream-test
-          test -f build/windows/cli/assets/firmware/labrafirm_000C_03.hex
+          test -f build/windows/cli/assets/firmware/labrafirm_000D_03.hex
           # Static like the app: no MinGW or libusb DLLs beside the exe.
           if objdump -x build/windows/cli/labrador-cli.exe | grep "DLL Name" | grep -iE "libusb|libstdc|libgcc|libwinpthread"; then
             echo "labrador-cli.exe depends on non-system DLLs"; exit 1

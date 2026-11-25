@@ -52,7 +52,7 @@ jobs:
           function Check($ok, $msg) { if ($ok) { "PASS: $msg" } else { "FAIL: $msg"; $script:fail++ } }
 
           Check (Test-Path $exe) "labrador.exe installed"
-          Check (Test-Path "$app\assets\firmware\labrafirm_000C_03.hex") "firmware hex installed next to the app"
+          Check (Test-Path "$app\assets\firmware\labrafirm_000D_03.hex") "firmware hex installed next to the app"
           foreach ($pkg in 'Driver_Install','Bootloader_Install','Gobindar_Install') {
             Check ((Test-Path "$app\driver\$pkg\dpinst64.exe") -and (Test-Path "$app\driver\$pkg\dpscat.exe")) "driver package unpacked: $pkg"
           }
