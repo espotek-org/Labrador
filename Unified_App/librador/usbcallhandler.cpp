@@ -279,9 +279,9 @@ void usbCallHandler::score_pending_meta(){
 // Windows and Linux VMs, where the start-order search then failed for the rest
 // of the stream).  Endpoint k's packet for meta j is taken as j + d[k], each
 // d[k] anywhere in [lo, hi].  Meet in the middle: for every (d0, d1, d2) the
-// XOR of endpoints 0-2's checksums on twelve key metas, in three groups of
-// four, is indexed; for every (d3, d4, d5) the XOR endpoints 0-2 would need
-// on a group's four metas (one of two values each: a meta gives both buffer
+// XOR of endpoints 0-2's checksums on nine key metas, in three groups of
+// three, is indexed; for every (d3, d4, d5) the XOR endpoints 0-2 would need
+// on a group's three metas (one of two values each: a meta gives both buffer
 // halves' checksums) is looked up, and every pair found is judged on all the
 // metas like the start-order candidates; the first one with at most
 // allowed_misses misses is taken (wrong alignments match about 6% of metas).
@@ -293,7 +293,7 @@ void usbCallHandler::score_pending_meta(){
 namespace {
 struct Iso6Meta { uint64_t index; unsigned char c0, c1; };
 const int ISO6_KEY_GROUPS = 3;
-const int ISO6_KEY_METAS = 4;   // per group: a 32-bit key
+const int ISO6_KEY_METAS = 3;   // per group: a 24-bit key
 
 int iso6_search_any_order(const short *hist, int hist_len, const std::vector<Iso6Meta> &judge,
                           long lo, long hi, int allowed_misses, long d_out[6], long *candidates){
