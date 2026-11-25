@@ -1109,12 +1109,22 @@ int usbCallHandler::set_device_mode(int mode){
     send_function_gen_settings(1);
     send_function_gen_settings(2);
 
-    internal_o1_buffer_375_CHA->reset(false);
-    internal_o1_buffer_375_CHA->resetTrigger(current_scope_gain, deviceMode==7);
-    internal_o1_buffer_375_CHB->reset(false);
-    internal_o1_buffer_375_CHB->resetTrigger(current_scope_gain, deviceMode==7);
-    internal_o1_buffer_750->reset(false);
-    internal_o1_buffer_750->resetTrigger(current_scope_gain, deviceMode==7);
+    // Under the same lock as dispatch_frame(), so no frame lands between two
+    // of the resets.  One that did (a frame added to CH1's buffer just after
+    // its reset and to CH2's just before) left CH2's sample count a frame or
+    // more behind CH1's until the next mode change: a window copied from both
+    // at the same start index was then out of step by that much, or, when it
+    // reached past CH2's newest sample, failed ("copying CH2's samples failed
+    // (code -2)" in the QA).
+    {
+        std::lock_guard<std::mutex> lock(buffer_read_write_mutex);
+        internal_o1_buffer_375_CHA->reset(false);
+        internal_o1_buffer_375_CHA->resetTrigger(current_scope_gain, deviceMode==7);
+        internal_o1_buffer_375_CHB->reset(false);
+        internal_o1_buffer_375_CHB->resetTrigger(current_scope_gain, deviceMode==7);
+        internal_o1_buffer_750->reset(false);
+        internal_o1_buffer_750->resetTrigger(current_scope_gain, deviceMode==7);
+    }
 
     return 0;
 }
