@@ -26,6 +26,13 @@ extern "C"
 #define MAX_SUPPORTED_DEVICE_MODE (7)
 #define FGEN_LIMIT (3.2)
 #define FGEN_MAX_SAMPLES (512)
+// The fastest a signal generator is updated, in samples per second: about 2us
+// between samples, not the DAC's 1us.  At 1 MSa/s the two generators running
+// together lost time whenever the scope streamed over iso6 (the Windows and
+// Linux default): a 2 kHz and a 4 kHz sine read 0.08% and 0.25% slow, with a
+// larger shape residual, where bulk and iso1 measured them exactly.  At
+// 512 kSa/s iso6 measures the same as bulk and iso1.
+#define FGEN_MAX_SPS (512000.0)
 #define FGEN_SAMPLE_MIN (5.0)
 #define XMEGA_MAIN_FREQ (48000000)
 #define PSU_ADC_TOP (128)
