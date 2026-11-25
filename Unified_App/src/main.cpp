@@ -24,20 +24,42 @@
 #endif
 #include <windows.h>
 
+// Whether a standard handle already leads to a file or a pipe (as with
+// `labrador.exe > log 2>&1`) rather than to a console or nowhere.
+static bool isRedirected(DWORD which)
+{
+    const HANDLE h = GetStdHandle(which);
+    if (h == nullptr || h == INVALID_HANDLE_VALUE)
+        return false;
+    const DWORD type = GetFileType(h);
+    return type == FILE_TYPE_DISK || type == FILE_TYPE_PIPE;
+}
+
 // labrador.exe is a GUI-subsystem executable (no console window when
 // launched from Explorer or the Start menu).  Started from a terminal, attach
 // to that terminal so --qa/--smoke output and the log mirror still print
 // there; LABRADOR_CONSOLE=1 opens a console for an Explorer launch instead.
+// A stream the caller redirected to a file or pipe stays there: reopening it
+// on the console left `labrador.exe --auto-qa <dir> > log 2>&1` with an empty
+// log, and the QA tester with nothing to go on when the app failed.
 static void attachParentConsole()
 {
+    const bool out_redirected = isRedirected(STD_OUTPUT_HANDLE);
+    const bool err_redirected = isRedirected(STD_ERROR_HANDLE);
+    const bool in_redirected = isRedirected(STD_INPUT_HANDLE);
     bool attached = AttachConsole(ATTACH_PARENT_PROCESS) != 0;
     if (!attached && std::getenv("LABRADOR_CONSOLE"))
         attached = AllocConsole() != 0;
-    if (!attached)
-        return;
-    (void)freopen("CONOUT$", "w", stdout);
-    (void)freopen("CONOUT$", "w", stderr);
-    (void)freopen("CONIN$", "r", stdin);
+    if (attached)
+    {
+        if (!out_redirected)
+            (void)freopen("CONOUT$", "w", stdout);
+        if (!err_redirected)
+            (void)freopen("CONOUT$", "w", stderr);
+        if (!in_redirected)
+            (void)freopen("CONIN$", "r", stdin);
+    }
+    // Unbuffered either way, so nothing is lost if the app dies.
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
 }
