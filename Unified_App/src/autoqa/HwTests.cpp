@@ -34,7 +34,65 @@ constexpr double SETTLE_S = 0.5;          // after configuring the generators an
 constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
 constexpr double SOAK_SECONDS = 60;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
+// The gain tests capture this long and judge each input on its longest stretch
+// of undisturbed periods, which must be at least GAIN_MIN_STRETCH_S.
+constexpr double GAIN_WINDOW_S = 0.25;
+constexpr double GAIN_MIN_STRETCH_S = 0.04;
 const Wave WAVES[] = {Wave::Sine, Wave::Square, Wave::Triangle, Wave::Sawtooth};
+
+// Whole periods [begin, end) of a sine capture whose residual from the window's
+// fit stays near the typical period's, and how many periods did not.
+struct Stretch
+{
+    size_t begin = 0;
+    size_t end = 0;
+    int disturbed = 0;
+};
+
+// The longest run of periods whose fit residual (RMS) is at most three times the
+// median period's plus one LSB (so the near-perfect periods of a quiet input don't
+// make ordinary noise look like a disturbance).
+Stretch steadyStretch(const std::vector<double>& y, double rate, double frequency_hz, double lsb)
+{
+    const WaveFit fit = fitWave(Wave::Sine, frequency_hz, tol::FREQUENCY, y, rate, 0);
+    const double per_period = rate / fit.frequency_hz;
+    const int periods = static_cast<int>(static_cast<double>(y.size()) / per_period);
+    if (periods < 3)
+        throw std::logic_error("steadyStretch: fewer than 3 periods in the window");
+    std::vector<size_t> edge(periods + 1);
+    for (int k = 0; k <= periods; k++)
+        edge[k] = static_cast<size_t>(std::llround(k * per_period));
+    std::vector<double> rms(periods);
+    for (int k = 0; k < periods; k++)
+    {
+        double squares = 0;
+        for (size_t i = edge[k]; i < edge[k + 1]; i++)
+        {
+            const double r = y[i] - fit.at(Wave::Sine, static_cast<double>(i) / rate);
+            squares += r * r;
+        }
+        rms[k] = std::sqrt(squares / static_cast<double>(edge[k + 1] - edge[k]));
+    }
+    std::vector<double> sorted = rms;
+    std::nth_element(sorted.begin(), sorted.begin() + periods / 2, sorted.end());
+    const double limit = 3 * sorted[periods / 2] + lsb;
+    Stretch best;
+    int run_start = 0;
+    for (int k = 0; k <= periods; k++)
+    {
+        if (k < periods && rms[k] <= limit)
+            continue;
+        if (k < periods)
+            best.disturbed++;
+        if (edge[k] - edge[run_start] > best.end - best.begin)
+        {
+            best.begin = edge[run_start];
+            best.end = edge[k];
+        }
+        run_start = k + 1;
+    }
+    return best;
+}
 const char* TRANSPORTS[] = {"bulk", "iso1", "iso6"};
 
 double shapeLimit(Wave w)
@@ -497,10 +555,30 @@ SignalSpec gainSignal(double g)
 void Suite::gain(TestContext& ctx, double g)
 {
     const SignalSpec spec = gainSignal(g);
-    const Capture c = measure(ctx, "gain_" + num(g), spec, spec, g);
+    const Capture whole = measure(ctx, "gain_" + num(g), spec, spec, g, ScopeMode::Ch1Ch2, GAIN_WINDOW_S);
     const double lsb = tol::lsbV(g);
+    const double rate = whole.window.sample_rate_hz;
     for (int ch = 1; ch <= 2; ch++)
     {
+        // At the high gains a disturbance from outside the board swamps the small
+        // signal for a few milliseconds (on the QA tester, a burst on CH2 every
+        // 102.4 ms, the Wi-Fi beacon interval, from the router next to it). Each
+        // input is judged on its longest undisturbed stretch, and what was left
+        // out is recorded.
+        const std::string name = "CH" + std::to_string(ch);
+        const Stretch st = steadyStretch(whole.samples(ch), rate, whole.out[ch - 1].frequency_hz, scopeLsbVolts(g));
+        ctx.measure(name + " periods disturbed (fit residual over 3x the median period's), left out", "periods",
+                    st.disturbed);
+        ctx.measure(name + " undisturbed stretch judged", "s", static_cast<double>(st.end - st.begin) / rate,
+                    std::nullopt, GAIN_MIN_STRETCH_S);
+        if (st.disturbed)
+            ctx.note(name + ": " + std::to_string(st.disturbed) + " disturbed periods left out of a " +
+                     num(GAIN_WINDOW_S) + " s window");
+        Capture c = whole;
+        c.window.ch1.assign(whole.window.ch1.begin() + st.begin, whole.window.ch1.begin() + st.end);
+        c.window.ch2.assign(whole.window.ch2.begin() + st.begin, whole.window.ch2.begin() + st.end);
+        c.stats[0] = analyseChannel(c.window.ch1, rate, scopeLsbVolts(g));
+        c.stats[1] = analyseChannel(c.window.ch2, rate, scopeLsbVolts(g));
         const ChannelStats& s = c.stats[ch - 1];
         ctx.measure("CH" + std::to_string(ch) + " minimum inside the range", "V", s.min_v, std::nullopt,
                     tol::scopeLow(g) + lsb / 2);
