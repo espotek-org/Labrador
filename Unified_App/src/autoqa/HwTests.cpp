@@ -660,11 +660,17 @@ void Suite::gain(TestContext& ctx, double g)
         // level crossings: at gain 64 the noise between disturbances reaches the crossing
         // detector's hysteresis (1/8 of the range) and adds crossings of its own.
         c.stats[ch - 1].frequency_hz = sineFrequency(c.samples(ch), rate, whole.out[ch - 1].frequency_hz);
-        const ChannelStats& s = c.stats[ch - 1];
-        ctx.measure("CH" + std::to_string(ch) + " minimum inside the range", "V", s.min_v, std::nullopt,
-                    tol::scopeLow(g) + lsb / 2);
-        ctx.measure("CH" + std::to_string(ch) + " maximum inside the range", "V", s.max_v, std::nullopt,
-                    std::nullopt, tol::scopeHigh(g) - lsb / 2);
+        // Clipping is judged on the 0.1st and 99.9th percentiles, not the single lowest and
+        // highest samples: a clipped sine sits at the range's end for a run of samples every
+        // period, while at gain 64 one noise sample at a trough (86 mV above the bottom code,
+        // with CH2's noise peaking near 50 mV on the QA tester) can touch it on its own.
+        std::vector<double> sorted(c.samples(ch).begin(), c.samples(ch).end());
+        std::sort(sorted.begin(), sorted.end());
+        const size_t tail = sorted.size() / 1000;
+        ctx.measure("CH" + std::to_string(ch) + " low end (0.1st percentile) inside the range", "V", sorted[tail],
+                    std::nullopt, tol::scopeLow(g) + lsb / 2);
+        ctx.measure("CH" + std::to_string(ch) + " high end (99.9th percentile) inside the range", "V",
+                    sorted[sorted.size() - 1 - tail], std::nullopt, std::nullopt, tol::scopeHigh(g) - lsb / 2);
         checkWave(ctx, "CH" + std::to_string(ch), c, ch,
                   "Gain x" + num(g) + ": " + spec.text() + " on SG1 and SG2, CH" + std::to_string(ch));
     }
