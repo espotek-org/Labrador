@@ -53,7 +53,18 @@ extern "C"
 #define AIO_EP_BULK 0x88
 #define AIO_EP_ISO6_META 0x89
 #define AIO_EP_ISO1_META 0x8a
+// iso6 packets: the board sends 125 bytes (a sixth of the 750-byte frame) on
+// each 128-byte endpoint.  Asking for exactly 125 means no packet ends short:
+// in a VMware Fusion Linux guest, the emulated xHCI lost track of the short
+// isochronous packets under load ("TRB DMA ptr not part of current TD",
+// completion code 13, on all six endpoints) and the controller then died.
+// WinUSB only takes isochronous buffers in multiples of the endpoint's
+// 128-byte MaximumBytesPerInterval, so Windows asks for 128.
+#ifdef _WIN32
 #define AIO_ISO6_PACKET_SIZE 128
+#else
+#define AIO_ISO6_PACKET_SIZE 125
+#endif
 #define AIO_META_PACKET_SIZE 8
 #define AIO_HDR_MAGIC0 0xEB
 #define AIO_HDR_MAGIC1_BULK 0x57
