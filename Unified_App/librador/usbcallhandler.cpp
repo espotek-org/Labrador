@@ -1886,14 +1886,19 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
         LIBRADOR_LOG(LOG_WARNING, "dfu launch reported %d (often benign)\n", exit_code);
 
     // The board may re-enumerate in bootloader mode once more (EEPROM flag);
-    // keep launching until it comes up as the application firmware.
-    for(int attempt = 0; attempt < 50; attempt++){
+    // keep launching (once a second) until it comes up as the application
+    // firmware.  Allow as long as the wait for the bootloader above: through a
+    // VM's USB passthrough the re-enumeration took longer than the 5 s this
+    // used to allow, and the connect below then read the bootloader's answer
+    // to the version request ("0xfe5b variant 91") and failed the update.
+    for(int attempt = 0; attempt < 200; attempt++){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         if(!desktop_device_present(&bootloader))
             continue;
         if(!bootloader)
             break;
-        dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
+        if(attempt % 10 == 0)
+            dfuprog_virtual_cmd("dfu-programmer atxmega32a4u launch");
     }
 
     if(librador_get_host_hooks().confirm_firmware_flash)
