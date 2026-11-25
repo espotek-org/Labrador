@@ -34,6 +34,9 @@ using Wave = SignalSpec::Wave;
 constexpr double SETTLE_S = 0.5;          // after configuring the generators and scope
 constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
 constexpr double SOAK_SECONDS = 60;
+// The hardware sessions pass librador's debug messages to the log (the iso6 realignment
+// among them, without which a misaligned stream on a test machine fails invisibly).
+constexpr bool LIBRADOR_DEBUG_LOG = true;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
 // The gain tests capture this long and judge each input on its longest stretch
 // of undisturbed periods, which must be at least GAIN_MIN_STRETCH_S.
@@ -251,7 +254,7 @@ class Suite
     DeviceSession& session()
     {
         if (!m_session)
-            m_session = std::make_unique<DeviceSession>(false, UsbTransport::Auto);
+            m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, UsbTransport::Auto);
         return *m_session;
     }
 
@@ -901,7 +904,7 @@ void Suite::triggerDc(TestContext& ctx)
 void Suite::transportMeasure(TestContext& ctx, const std::string& t)
 {
     m_session.reset();
-    m_session = std::make_unique<DeviceSession>(false, parseTransport(t));
+    m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, parseTransport(t));
     const std::string active = transportName(m_session->activeTransport());
     if (active != t)
     {
@@ -931,7 +934,7 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t)
 void Suite::transportSoak(TestContext& ctx, const std::string& t)
 {
     m_session.reset();
-    m_session = std::make_unique<DeviceSession>(false, parseTransport(t));
+    m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, parseTransport(t));
     // 354.1 Hz and 1234.5 Hz have periods that are not a whole fraction of the
     // 375-sample USB frame, so a lost or repeated frame shifts the waveform and
     // shows up as a period anomaly even when no counter sees it.
