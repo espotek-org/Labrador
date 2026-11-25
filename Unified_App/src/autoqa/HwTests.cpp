@@ -54,10 +54,18 @@ struct Stretch
 double sineSse(const std::vector<double>& y, double rate, double f)
 {
     double ss = 0, cc = 0, sc = 0, s1 = 0, c1 = 0, ys = 0, yc = 0, y1 = 0, yy = 0;
+    // sin and cos of w*i by rotating a phasor, renormalised now and then; calling sin and cos
+    // per sample made a gain test take half a minute in a busy Windows VM.
     const double w = 2 * M_PI * f / rate;
+    const double cw = std::cos(w), sw = std::sin(w);
+    double s = 0, c = 1;
     for (size_t i = 0; i < y.size(); i++)
     {
-        const double s = std::sin(w * static_cast<double>(i)), c = std::cos(w * static_cast<double>(i));
+        if (i % 4096 == 0)
+        {
+            s = std::sin(w * static_cast<double>(i));
+            c = std::cos(w * static_cast<double>(i));
+        }
         ss += s * s;
         cc += c * c;
         sc += s * c;
@@ -67,6 +75,9 @@ double sineSse(const std::vector<double>& y, double rate, double f)
         yc += y[i] * c;
         y1 += y[i];
         yy += y[i] * y[i];
+        const double next_s = s * cw + c * sw;
+        c = c * cw - s * sw;
+        s = next_s;
     }
     const double n = static_cast<double>(y.size());
     // Solve [ss sc s1; sc cc c1; s1 c1 n] [a b k] = [ys yc y1] by Cramer's rule.
@@ -79,12 +90,13 @@ double sineSse(const std::vector<double>& y, double rate, double f)
     return yy - (a * ys + b * yc + k * y1);
 }
 
-// The least-squares frequency of a sine near f0: a grid over +/-2% in 0.01% steps, then
-// two finer grids around the best point (to 0.00005%).
+// The least-squares frequency of a sine near f0: a grid over +/-2% in 0.05% steps (the fit's
+// main lobe is about 1/T wide, 0.5% for a 0.1 s stretch at 2 kHz), then two finer grids
+// around the best point, to 0.000125%.
 double sineFrequency(const std::vector<double>& y, double rate, double f0)
 {
     double best_f = f0;
-    double span = 0.02, step = 0.0001;
+    double span = 0.02, step = 0.0005;
     for (int pass = 0; pass < 3; pass++)
     {
         const double centre = best_f;
@@ -105,9 +117,12 @@ double sineFrequency(const std::vector<double>& y, double rate, double f0)
     return best_f;
 }
 
-// The longest run of periods whose fit residual (RMS) is at most three times the
-// median period's plus one LSB (so the near-perfect periods of a quiet input don't
-// make ordinary noise look like a disturbance).
+// The longest run of periods whose fit residual stays near the typical period's: a
+// period is disturbed when its residual RMS, or its largest residual, is over three
+// times the median period's plus one LSB (the LSB so that the near-perfect periods of a
+// quiet input don't make ordinary noise look like a disturbance). The largest residual
+// catches a lone spike, which barely moves a period's RMS: one such sample at the
+// bottom of gain 64's range failed hw.gain.x64's "minimum inside the range".
 Stretch steadyStretch(const std::vector<double>& y, double rate, double frequency_hz, double lsb)
 {
     const WaveFit fit = fitWave(Wave::Sine, frequency_hz, tol::FREQUENCY, y, rate, 0);
@@ -118,25 +133,30 @@ Stretch steadyStretch(const std::vector<double>& y, double rate, double frequenc
     std::vector<size_t> edge(periods + 1);
     for (int k = 0; k <= periods; k++)
         edge[k] = static_cast<size_t>(std::llround(k * per_period));
-    std::vector<double> rms(periods);
+    std::vector<double> rms(periods), peak(periods);
     for (int k = 0; k < periods; k++)
     {
-        double squares = 0;
+        double squares = 0, largest = 0;
         for (size_t i = edge[k]; i < edge[k + 1]; i++)
         {
             const double r = y[i] - fit.at(Wave::Sine, static_cast<double>(i) / rate);
             squares += r * r;
+            largest = std::max(largest, std::fabs(r));
         }
         rms[k] = std::sqrt(squares / static_cast<double>(edge[k + 1] - edge[k]));
+        peak[k] = largest;
     }
-    std::vector<double> sorted = rms;
-    std::nth_element(sorted.begin(), sorted.begin() + periods / 2, sorted.end());
-    const double limit = 3 * sorted[periods / 2] + lsb;
+    const auto median = [periods](std::vector<double> v) {
+        std::nth_element(v.begin(), v.begin() + periods / 2, v.end());
+        return v[periods / 2];
+    };
+    const double rms_limit = 3 * median(rms) + lsb;
+    const double peak_limit = 3 * median(peak) + lsb;
     Stretch best;
     int run_start = 0;
     for (int k = 0; k <= periods; k++)
     {
-        if (k < periods && rms[k] <= limit)
+        if (k < periods && rms[k] <= rms_limit && peak[k] <= peak_limit)
             continue;
         if (k < periods)
             best.disturbed++;
@@ -623,7 +643,8 @@ void Suite::gain(TestContext& ctx, double g)
         // out is recorded.
         const std::string name = "CH" + std::to_string(ch);
         const Stretch st = steadyStretch(whole.samples(ch), rate, whole.out[ch - 1].frequency_hz, scopeLsbVolts(g));
-        ctx.measure(name + " periods disturbed (fit residual over 3x the median period's), left out", "periods",
+        ctx.measure(name + " periods disturbed (fit residual RMS or peak over 3x the median period's), left out",
+                    "periods",
                     st.disturbed);
         ctx.measure(name + " undisturbed stretch judged", "s", static_cast<double>(st.end - st.begin) / rate,
                     std::nullopt, GAIN_MIN_STRETCH_S);
