@@ -20,7 +20,13 @@ extern "C"
 #include <jni.h>
 #endif
 
-#define NUM_FUTURE_CTX (4)
+// Isochronous transfers queued per endpoint, each ISO_PACKETS_PER_CTX frames
+// long: 16 keep about half a second queued.  With 4 (132 ms) a host that
+// stalled librador's threads for longer (a Windows VM on a busy two-core host
+// did so constantly) let some of iso6's seven endpoints run dry and not
+// others; each then skipped its own number of frames, which no realignment
+// can explain, and iso6 assembled garbage for the rest of the stream.
+#define NUM_FUTURE_CTX (16)
 #define ISO_PACKET_SIZE (750)
 #define ISO_PACKETS_PER_CTX (33)
 #define MAX_SUPPORTED_DEVICE_MODE (7)
