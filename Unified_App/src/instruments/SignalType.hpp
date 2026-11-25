@@ -400,10 +400,10 @@ public:
 			return -3;
 			// Invalid channel
 		}
-		int num_samples = fmin(1000000.0 / frequency_Hz, 512);
-		// The maximum number of samples that Labrador's buffer holds is 512.
-		// The minimum time between samples is 1us.  Using T=1/f, this gives a maximum
-		// sample number of 10^6/f.
+		int num_samples = fmin(FGEN_MAX_SPS / frequency_Hz, 512);
+		// The maximum number of samples that Labrador's buffer holds is 512, and the
+		// fastest a generator is updated is librador's FGEN_MAX_SPS.  Using T=1/f,
+		// this gives a maximum sample number of FGEN_MAX_SPS/f.
 		num_samples = 2 * (num_samples / 2);
 		// Square waves need an even number.  Others don't care.
 		double usecs_between_samples = 1000000.0 / ((double)num_samples * frequency_Hz);

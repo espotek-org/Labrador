@@ -18,7 +18,7 @@
 ///   line 2: divisibility D — how many times the wave may be halved by
 ///           dropping every 2nd sample before it stops being representative.
 ///           The driver T-stretches (decimates) by up to D-1 when
-///           N * frequency would exceed the 1 MSPS DAC ceiling.
+///           N * frequency would exceed the generator's update ceiling.
 ///   line 3: N tab-separated samples, each 0..255 (255 = amplitude+offset V)
 ///
 /// Frequency limits derived exactly as the Qt app does:
@@ -36,7 +36,9 @@ class WaveformFile
 {
 public:
 	// Hardware constants (Desktop_Interface xmega.h / librador usbcallhandler.h)
-	static constexpr double DAC_SPS = 1000000.0; // Xmega DAC sample ceiling
+	// The generator's update ceiling: librador's FGEN_MAX_SPS (usbcallhandler.h
+	// explains why it is half the Xmega DAC's 1 MSa/s).
+	static constexpr double DAC_SPS = 512000.0;
 	static constexpr double CLOCK_FREQ = 48000000.0; // XMEGA_MAIN_FREQ
 	// librador's per-channel buffer size (FGEN_MAX_SAMPLES macro in
 	// usbcallhandler.h — different name here to dodge the macro).
