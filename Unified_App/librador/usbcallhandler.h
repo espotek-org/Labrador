@@ -340,7 +340,7 @@ private:
     static const int ISO6_MAX_SPREAD = 12;       // frames between the first and the last stream to start (5 measured)
     static const int ISO6_JUDGE_METAS = 24;      // metas a candidate alignment is judged on
     static const int ISO6_MISSES_TO_REALIGN = 8; // metas in a row that matched no frame
-    static const int ISO6_ANY_ORDER_SLACK = 10;  // frames the any-order search reaches beyond the start-order one
+    static const int ISO6_ANY_ORDER_SLACK = 4;   // frames the any-order search reaches beyond the start-order one
     static const int ISO6_ANY_ORDER_BACKOFF = 1000; // metas (about 1 s) after an any-order search that failed
     uint64_t iso6_any_order_after = 0;           // meta index before which no any-order search runs
     short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
