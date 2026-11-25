@@ -688,6 +688,8 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
         ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
     }
+    usb_driver->iso_transfers_done[ep_index]++;
+    if(!transfer_ok) usb_driver->iso_transfers_failed[ep_index]++;
     for(int i=0;i<transfer->num_iso_packets;i++){
         unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
         int actual = transfer->iso_packet_desc[i].actual_length;
@@ -706,6 +708,8 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer){
     usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
     const bool transfer_ok = transfer->status == LIBUSB_TRANSFER_COMPLETED;
+    usb_driver->iso_transfers_done[MAX_DATA_ENDPOINTS]++;
+    if(!transfer_ok) usb_driver->iso_transfers_failed[MAX_DATA_ENDPOINTS]++;
     for(int i=0;i<transfer->num_iso_packets;i++){
         unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
         int actual = transfer->iso_packet_desc[i].actual_length;
@@ -751,6 +755,16 @@ void usbCallHandler::iso_polling_function(libusb_context *ctx){
                 (unsigned long long)frames_ok.load(), (unsigned long long)frames_bad_checksum.load(),
                 (unsigned long long)frames_dropped.load(), (unsigned long long)frames_unvalidated.load(),
                 active_transport);
+            // QA DIAGNOSTIC: transfers completed (and failed) per data endpoint, then the metas'.
+            LIBRADOR_LOG(LOG_DEBUG, "iso transfers done/failed: %llu/%llu %llu/%llu %llu/%llu %llu/%llu %llu/%llu %llu/%llu meta %llu/%llu\n",
+                (unsigned long long)iso_transfers_done[0], (unsigned long long)iso_transfers_failed[0],
+                (unsigned long long)iso_transfers_done[1], (unsigned long long)iso_transfers_failed[1],
+                (unsigned long long)iso_transfers_done[2], (unsigned long long)iso_transfers_failed[2],
+                (unsigned long long)iso_transfers_done[3], (unsigned long long)iso_transfers_failed[3],
+                (unsigned long long)iso_transfers_done[4], (unsigned long long)iso_transfers_failed[4],
+                (unsigned long long)iso_transfers_done[5], (unsigned long long)iso_transfers_failed[5],
+                (unsigned long long)iso_transfers_done[MAX_DATA_ENDPOINTS],
+                (unsigned long long)iso_transfers_failed[MAX_DATA_ENDPOINTS]);
             {
                 char req_summary[256];
                 int off = 0;

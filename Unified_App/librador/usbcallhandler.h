@@ -343,6 +343,10 @@ private:
     static const int ISO6_ANY_ORDER_SLACK = 4;   // frames the any-order search reaches beyond the start-order one
     static const int ISO6_ANY_ORDER_BACKOFF = 1000; // metas (about 1 s) after an any-order search that failed
     uint64_t iso6_any_order_after = 0;           // meta index before which no any-order search runs
+    // QA DIAGNOSTIC: transfers completed and failed per data endpoint, the metas' last; touched only on the
+    // libusb event thread (the callbacks and the periodic stats log).
+    uint64_t iso_transfers_done[MAX_DATA_ENDPOINTS + 1] = {0};
+    uint64_t iso_transfers_failed[MAX_DATA_ENDPOINTS + 1] = {0};
     short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
     uint64_t iso6_received[MAX_DATA_ENDPOINTS];      // packets received per endpoint
     uint64_t iso6_skip[MAX_DATA_ENDPOINTS];          // packets to drop on arrival to reach the new alignment
