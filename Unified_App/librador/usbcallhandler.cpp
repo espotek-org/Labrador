@@ -544,7 +544,7 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
     }
 }
 
-// A transfer that fails (an error or timeout rather than COMPLETED) still
+// A transfer that fails (status other than COMPLETED) still
 // spanned num_iso_packets frames on its endpoint, so each of its packets is
 // queued empty, to be counted as a lost frame.  Dropping the transfer
 // outright would leave that endpoint's packet count, or the meta count,
@@ -924,14 +924,24 @@ void usbCallHandler::alloc_iso_transfers(){
         }
         return;
     }
+    // Timeout 0: an isochronous transfer ends by itself once its frames have
+    // passed (with an error if the device has gone), so a timeout can only
+    // cancel one that is merely late.  libusb counts from submission, and a
+    // transfer queued behind NUM_FUTURE_CTX - 1 others is due about
+    // ISO_PACKETS_PER_CTX * NUM_FUTURE_CTX ms later, so a finite timeout
+    // leaves only the slack beyond that for completion to be delivered.
+    // Inside a VM that slack is regularly exceeded under iso6, and the
+    // cancels did real damage: Windows aborts the whole pipe, restarting the
+    // endpoint on an arbitrary frame, and VMware's emulated xHCI under Linux
+    // fell out of step with the guest's driver until it was declared dead.
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (int k=0;k<num_data_endpoints;k++){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
-            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], data_packet_size*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 150); // assume the NUM_FUTURE_CTX=4 iso transfers are FIFO, in which case timeout should be > 1 ms (amount of data per packet) * NUM_PACKETS_PER_CTX * NUM_FUTURE_CTX
+            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], data_packet_size*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 0);
             libusb_set_iso_packet_lengths(isoCtx[k][n], data_packet_size);
         }
         metaCtx[n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
-        libusb_fill_iso_transfer(metaCtx[n], handle, meta_pipeID, metaBuffer[n], AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, metaIsoCallback, this, 150);
+        libusb_fill_iso_transfer(metaCtx[n], handle, meta_pipeID, metaBuffer[n], AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, metaIsoCallback, this, 0);
         libusb_set_iso_packet_lengths(metaCtx[n], AIO_META_PACKET_SIZE);
     }
 }
