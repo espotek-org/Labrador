@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 
@@ -48,6 +49,61 @@ struct Stretch
     size_t end = 0;
     int disturbed = 0;
 };
+
+// Residual sum of squares of y against the best a*sin + b*cos + c at frequency f.
+double sineSse(const std::vector<double>& y, double rate, double f)
+{
+    double ss = 0, cc = 0, sc = 0, s1 = 0, c1 = 0, ys = 0, yc = 0, y1 = 0, yy = 0;
+    const double w = 2 * M_PI * f / rate;
+    for (size_t i = 0; i < y.size(); i++)
+    {
+        const double s = std::sin(w * static_cast<double>(i)), c = std::cos(w * static_cast<double>(i));
+        ss += s * s;
+        cc += c * c;
+        sc += s * c;
+        s1 += s;
+        c1 += c;
+        ys += y[i] * s;
+        yc += y[i] * c;
+        y1 += y[i];
+        yy += y[i] * y[i];
+    }
+    const double n = static_cast<double>(y.size());
+    // Solve [ss sc s1; sc cc c1; s1 c1 n] [a b k] = [ys yc y1] by Cramer's rule.
+    const double det = ss * (cc * n - c1 * c1) - sc * (sc * n - c1 * s1) + s1 * (sc * c1 - cc * s1);
+    if (!(std::fabs(det) > 0))
+        throw std::runtime_error("sineSse: singular fit (too few samples for the frequency)");
+    const double a = (ys * (cc * n - c1 * c1) - sc * (yc * n - c1 * y1) + s1 * (yc * c1 - cc * y1)) / det;
+    const double b = (ss * (yc * n - y1 * c1) - ys * (sc * n - c1 * s1) + s1 * (sc * y1 - yc * s1)) / det;
+    const double k = (ss * (cc * y1 - c1 * yc) - sc * (sc * y1 - c1 * ys) + s1 * (sc * yc - cc * ys)) / det;
+    return yy - (a * ys + b * yc + k * y1);
+}
+
+// The least-squares frequency of a sine near f0: a grid over +/-2% in 0.01% steps, then
+// two finer grids around the best point (to 0.00005%).
+double sineFrequency(const std::vector<double>& y, double rate, double f0)
+{
+    double best_f = f0;
+    double span = 0.02, step = 0.0001;
+    for (int pass = 0; pass < 3; pass++)
+    {
+        const double centre = best_f;
+        double best = std::numeric_limits<double>::infinity();
+        for (double r = -span; r <= span + step / 2; r += step)
+        {
+            const double f = centre * (1 + r);
+            const double sse = sineSse(y, rate, f);
+            if (sse < best)
+            {
+                best = sse;
+                best_f = f;
+            }
+        }
+        span = step * 2;
+        step /= 20;
+    }
+    return best_f;
+}
 
 // The longest run of periods whose fit residual (RMS) is at most three times the
 // median period's plus one LSB (so the near-perfect periods of a quiet input don't
@@ -579,6 +635,10 @@ void Suite::gain(TestContext& ctx, double g)
         c.window.ch2.assign(whole.window.ch2.begin() + st.begin, whole.window.ch2.begin() + st.end);
         c.stats[0] = analyseChannel(c.window.ch1, rate, scopeLsbVolts(g));
         c.stats[1] = analyseChannel(c.window.ch2, rate, scopeLsbVolts(g));
+        // The frequency from a least-squares sine fit over the stretch, not from counting
+        // level crossings: at gain 64 the noise between disturbances reaches the crossing
+        // detector's hysteresis (1/8 of the range) and adds crossings of its own.
+        c.stats[ch - 1].frequency_hz = sineFrequency(c.samples(ch), rate, whole.out[ch - 1].frequency_hz);
         const ChannelStats& s = c.stats[ch - 1];
         ctx.measure("CH" + std::to_string(ch) + " minimum inside the range", "V", s.min_v, std::nullopt,
                     tol::scopeLow(g) + lsb / 2);
