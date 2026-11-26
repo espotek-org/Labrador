@@ -59,6 +59,14 @@ driver installer with the board unplugged, then retry the update. The driver
 is the same one earlier (Qt) installers set up, so an existing install does
 not need to change anything. Do **not** use Zadig to swap drivers.
 
+On PCs that have had Atmel or Microchip tools installed, or that got Atmel's
+DFU driver from Windows Update, Device Manager may show the bootloader under
+*Atmel Corporation* instead. That works as well: Windows prefers Atmel's
+newer package, which uses the same libusb-win32 driver, and the installer puts
+that driver's `libusb0.sys` in `System32\drivers` so the package has what it
+needs. Before that, such a PC showed the bootloader with error code 18 and
+every update failed (#457); installing this version fixes it.
+
 ## "Sorry to Interrupt!" — the misconfigured-board dialog
 
 If the app detects a board with corrupted/incompatible firmware
