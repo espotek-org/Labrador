@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 
@@ -34,7 +35,140 @@ constexpr double SETTLE_S = 0.5;          // after configuring the generators an
 constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
 constexpr double SOAK_SECONDS = 60;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
+// The gain tests capture this long and judge each input on its longest stretch
+// of undisturbed periods, which must be at least GAIN_MIN_STRETCH_S.
+constexpr double GAIN_WINDOW_S = 0.25;
+constexpr double GAIN_MIN_STRETCH_S = 0.04;
 const Wave WAVES[] = {Wave::Sine, Wave::Square, Wave::Triangle, Wave::Sawtooth};
+
+// Whole periods [begin, end) of a sine capture whose residual from the window's
+// fit stays near the typical period's, and how many periods did not.
+struct Stretch
+{
+    size_t begin = 0;
+    size_t end = 0;
+    int disturbed = 0;
+};
+
+// Residual sum of squares of y against the best a*sin + b*cos + c at frequency f.
+double sineSse(const std::vector<double>& y, double rate, double f)
+{
+    double ss = 0, cc = 0, sc = 0, s1 = 0, c1 = 0, ys = 0, yc = 0, y1 = 0, yy = 0;
+    // sin and cos of w*i by rotating a phasor, renormalised now and then; calling sin and cos
+    // per sample made a gain test take half a minute in a busy Windows VM.
+    const double w = 2 * M_PI * f / rate;
+    const double cw = std::cos(w), sw = std::sin(w);
+    double s = 0, c = 1;
+    for (size_t i = 0; i < y.size(); i++)
+    {
+        if (i % 4096 == 0)
+        {
+            s = std::sin(w * static_cast<double>(i));
+            c = std::cos(w * static_cast<double>(i));
+        }
+        ss += s * s;
+        cc += c * c;
+        sc += s * c;
+        s1 += s;
+        c1 += c;
+        ys += y[i] * s;
+        yc += y[i] * c;
+        y1 += y[i];
+        yy += y[i] * y[i];
+        const double next_s = s * cw + c * sw;
+        c = c * cw - s * sw;
+        s = next_s;
+    }
+    const double n = static_cast<double>(y.size());
+    // Solve [ss sc s1; sc cc c1; s1 c1 n] [a b k] = [ys yc y1] by Cramer's rule.
+    const double det = ss * (cc * n - c1 * c1) - sc * (sc * n - c1 * s1) + s1 * (sc * c1 - cc * s1);
+    if (!(std::fabs(det) > 0))
+        throw std::runtime_error("sineSse: singular fit (too few samples for the frequency)");
+    const double a = (ys * (cc * n - c1 * c1) - sc * (yc * n - c1 * y1) + s1 * (yc * c1 - cc * y1)) / det;
+    const double b = (ss * (yc * n - y1 * c1) - ys * (sc * n - c1 * s1) + s1 * (sc * y1 - yc * s1)) / det;
+    const double k = (ss * (cc * y1 - c1 * yc) - sc * (sc * y1 - c1 * ys) + s1 * (sc * yc - cc * ys)) / det;
+    return yy - (a * ys + b * yc + k * y1);
+}
+
+// The least-squares frequency of a sine near f0: a grid over +/-2% in 0.05% steps (the fit's
+// main lobe is about 1/T wide, 0.5% for a 0.1 s stretch at 2 kHz), then two finer grids
+// around the best point, to 0.000125%.
+double sineFrequency(const std::vector<double>& y, double rate, double f0)
+{
+    double best_f = f0;
+    double span = 0.02, step = 0.0005;
+    for (int pass = 0; pass < 3; pass++)
+    {
+        const double centre = best_f;
+        double best = std::numeric_limits<double>::infinity();
+        for (double r = -span; r <= span + step / 2; r += step)
+        {
+            const double f = centre * (1 + r);
+            const double sse = sineSse(y, rate, f);
+            if (sse < best)
+            {
+                best = sse;
+                best_f = f;
+            }
+        }
+        span = step * 2;
+        step /= 20;
+    }
+    return best_f;
+}
+
+// The longest run of periods whose fit residual stays near the typical period's: a
+// period is disturbed when its residual RMS, or its largest residual, is over three
+// times the median period's plus one LSB (the LSB so that the near-perfect periods of a
+// quiet input don't make ordinary noise look like a disturbance). The largest residual
+// catches a lone spike, which barely moves a period's RMS: one such sample at the
+// bottom of gain 64's range failed hw.gain.x64's "minimum inside the range".
+Stretch steadyStretch(const std::vector<double>& y, double rate, double frequency_hz, double lsb)
+{
+    const WaveFit fit = fitWave(Wave::Sine, frequency_hz, tol::FREQUENCY, y, rate, 0);
+    const double per_period = rate / fit.frequency_hz;
+    const int periods = static_cast<int>(static_cast<double>(y.size()) / per_period);
+    if (periods < 3)
+        throw std::logic_error("steadyStretch: fewer than 3 periods in the window");
+    std::vector<size_t> edge(periods + 1);
+    for (int k = 0; k <= periods; k++)
+        edge[k] = static_cast<size_t>(std::llround(k * per_period));
+    std::vector<double> rms(periods), peak(periods);
+    for (int k = 0; k < periods; k++)
+    {
+        double squares = 0, largest = 0;
+        for (size_t i = edge[k]; i < edge[k + 1]; i++)
+        {
+            const double r = y[i] - fit.at(Wave::Sine, static_cast<double>(i) / rate);
+            squares += r * r;
+            largest = std::max(largest, std::fabs(r));
+        }
+        rms[k] = std::sqrt(squares / static_cast<double>(edge[k + 1] - edge[k]));
+        peak[k] = largest;
+    }
+    const auto median = [periods](std::vector<double> v) {
+        std::nth_element(v.begin(), v.begin() + periods / 2, v.end());
+        return v[periods / 2];
+    };
+    const double rms_limit = 3 * median(rms) + lsb;
+    const double peak_limit = 3 * median(peak) + lsb;
+    Stretch best;
+    int run_start = 0;
+    for (int k = 0; k <= periods; k++)
+    {
+        if (k < periods && rms[k] <= rms_limit && peak[k] <= peak_limit)
+            continue;
+        if (k < periods)
+            best.disturbed++;
+        if (edge[k] - edge[run_start] > best.end - best.begin)
+        {
+            best.begin = edge[run_start];
+            best.end = edge[k];
+        }
+        run_start = k + 1;
+    }
+    return best;
+}
 const char* TRANSPORTS[] = {"bulk", "iso1", "iso6"};
 
 double shapeLimit(Wave w)
@@ -497,15 +631,46 @@ SignalSpec gainSignal(double g)
 void Suite::gain(TestContext& ctx, double g)
 {
     const SignalSpec spec = gainSignal(g);
-    const Capture c = measure(ctx, "gain_" + num(g), spec, spec, g);
+    const Capture whole = measure(ctx, "gain_" + num(g), spec, spec, g, ScopeMode::Ch1Ch2, GAIN_WINDOW_S);
     const double lsb = tol::lsbV(g);
+    const double rate = whole.window.sample_rate_hz;
     for (int ch = 1; ch <= 2; ch++)
     {
-        const ChannelStats& s = c.stats[ch - 1];
-        ctx.measure("CH" + std::to_string(ch) + " minimum inside the range", "V", s.min_v, std::nullopt,
-                    tol::scopeLow(g) + lsb / 2);
-        ctx.measure("CH" + std::to_string(ch) + " maximum inside the range", "V", s.max_v, std::nullopt,
-                    std::nullopt, tol::scopeHigh(g) - lsb / 2);
+        // At the high gains a disturbance from outside the board swamps the small
+        // signal for a few milliseconds (on the QA tester, a burst on CH2 every
+        // 102.4 ms, the Wi-Fi beacon interval, from the router next to it). Each
+        // input is judged on its longest undisturbed stretch, and what was left
+        // out is recorded.
+        const std::string name = "CH" + std::to_string(ch);
+        const Stretch st = steadyStretch(whole.samples(ch), rate, whole.out[ch - 1].frequency_hz, scopeLsbVolts(g));
+        ctx.measure(name + " periods disturbed (fit residual RMS or peak over 3x the median period's), left out",
+                    "periods",
+                    st.disturbed);
+        ctx.measure(name + " undisturbed stretch judged", "s", static_cast<double>(st.end - st.begin) / rate,
+                    std::nullopt, GAIN_MIN_STRETCH_S);
+        if (st.disturbed)
+            ctx.note(name + ": " + std::to_string(st.disturbed) + " disturbed periods left out of a " +
+                     num(GAIN_WINDOW_S) + " s window");
+        Capture c = whole;
+        c.window.ch1.assign(whole.window.ch1.begin() + st.begin, whole.window.ch1.begin() + st.end);
+        c.window.ch2.assign(whole.window.ch2.begin() + st.begin, whole.window.ch2.begin() + st.end);
+        c.stats[0] = analyseChannel(c.window.ch1, rate, scopeLsbVolts(g));
+        c.stats[1] = analyseChannel(c.window.ch2, rate, scopeLsbVolts(g));
+        // The frequency from a least-squares sine fit over the stretch, not from counting
+        // level crossings: at gain 64 the noise between disturbances reaches the crossing
+        // detector's hysteresis (1/8 of the range) and adds crossings of its own.
+        c.stats[ch - 1].frequency_hz = sineFrequency(c.samples(ch), rate, whole.out[ch - 1].frequency_hz);
+        // Clipping is judged on the 0.1st and 99.9th percentiles, not the single lowest and
+        // highest samples: a clipped sine sits at the range's end for a run of samples every
+        // period, while at gain 64 one noise sample at a trough (86 mV above the bottom code,
+        // with CH2's noise peaking near 50 mV on the QA tester) can touch it on its own.
+        std::vector<double> sorted(c.samples(ch).begin(), c.samples(ch).end());
+        std::sort(sorted.begin(), sorted.end());
+        const size_t tail = sorted.size() / 1000;
+        ctx.measure("CH" + std::to_string(ch) + " low end (0.1st percentile) inside the range", "V", sorted[tail],
+                    std::nullopt, tol::scopeLow(g) + lsb / 2);
+        ctx.measure("CH" + std::to_string(ch) + " high end (99.9th percentile) inside the range", "V",
+                    sorted[sorted.size() - 1 - tail], std::nullopt, std::nullopt, tol::scopeHigh(g) - lsb / 2);
         checkWave(ctx, "CH" + std::to_string(ch), c, ch,
                   "Gain x" + num(g) + ": " + spec.text() + " on SG1 and SG2, CH" + std::to_string(ch));
     }
