@@ -334,15 +334,18 @@ private:
     uint64_t iso6_received[MAX_DATA_ENDPOINTS];      // packets received per endpoint
     uint64_t iso6_skip[MAX_DATA_ENDPOINTS];          // packets to drop on arrival to reach the new alignment
     struct RecentMeta { uint64_t index; unsigned char c0, c1; };
-    std::deque<RecentMeta> recent_meta;              // the last ISO6_HIST metas (iso6 only)
+    std::deque<RecentMeta> recent_meta;              // the last ISO6_HIST metas (iso6 and iso1)
     int meta_misses = 0;
     uint64_t aligned_from_frame = 0;             // first frame assembled after the last realignment
     bool iso6_realign_wanted = false;
+    bool iso1_realign_wanted = false;
     // A meta describes frame (meta index + meta_lag); -1 nominally, and
-    // whatever realign_iso6() finds when the streams started further apart.
+    // whatever realign_iso6() or realign_iso1() finds when the streams started
+    // (or, after a stall, carried on) further apart.
     long meta_lag = -1;
     void iso6_dropped_packet(int ep_index);
     void realign_iso6();
+    void realign_iso1();
 
     // Hand-off between the libusb event thread and the ingest thread.  The
     // event thread must NEVER block on buffer_read_write_mutex: while it
