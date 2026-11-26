@@ -654,6 +654,13 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
         std::lock_guard<std::mutex> lock(ingest_mutex);
         // Backstop against an unbounded queue if the ingest thread dies.
         if(ingest_queue.size() > 4096){
+            // QA DIAGNOSTIC
+            ingest_qa_dropped++;
+            if(ingest_qa_dropped <= 5 || ingest_qa_dropped % 1000 == 0){
+                LIBRADOR_LOG(LOG_DEBUG, "ingest QA: hand-off queue full, dropped its oldest item (kind %d, "
+                    "endpoint %d; %llu dropped so far)\n", ingest_queue.front().kind, ingest_queue.front().ep_index,
+                    (unsigned long long)ingest_qa_dropped);
+            }
             ingest_queue.pop_front();
         }
         ingest_queue.push_back(std::move(item));
@@ -672,6 +679,14 @@ void usbCallHandler::ingest_thread_function(){
                 break;
             }
             batch.swap(ingest_queue);
+        }
+        // QA DIAGNOSTIC: about 0.3 s of iso6 items at once means this thread was held up.
+        if(batch.size() >= 2000){
+            ingest_qa_big_batches++;
+            if(ingest_qa_big_batches <= 10 || ingest_qa_big_batches % 100 == 0){
+                LIBRADOR_LOG(LOG_DEBUG, "ingest QA: took over a batch of %zu items (big batch %llu)\n",
+                    batch.size(), (unsigned long long)ingest_qa_big_batches);
+            }
         }
         for(IngestItem &item : batch){
             switch(item.kind){

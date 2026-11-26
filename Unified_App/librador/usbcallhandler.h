@@ -350,6 +350,9 @@ private:
     // QA DIAGNOSTIC: iso6 queue overflows and alignment dumps this stream (ingest thread only).
     uint64_t iso6_qa_overflows = 0;
     int iso6_qa_dumps = 0;
+    // QA DIAGNOSTIC: hand-off queue overflows (under ingest_mutex) and big ingest batches (ingest thread).
+    uint64_t ingest_qa_dropped = 0;
+    uint64_t ingest_qa_big_batches = 0;
     void iso6_qa_dump(const char *why);
     short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
     uint64_t iso6_received[MAX_DATA_ENDPOINTS];      // packets received per endpoint
