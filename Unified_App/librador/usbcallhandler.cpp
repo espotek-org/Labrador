@@ -107,6 +107,7 @@ void usbCallHandler::reset_frame_state(){
     meta_misses = 0;
     aligned_from_frame = 0;
     iso6_realign_wanted = false;
+    iso1_realign_wanted = false;
     iso6_any_order_after = 0;
     meta_lag = -1;
     iso6_qa_overflows = 0;
@@ -278,10 +279,8 @@ void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
     }
     note_seq((uint16_t)(data[2] | (data[3] << 8)));
     pending_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
-    if(active_transport == LABRADOR_TRANSPORT_ISO6){
-        recent_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
-        if(recent_meta.size() > ISO6_HIST) recent_meta.pop_front();
-    }
+    recent_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
+    if(recent_meta.size() > ISO6_HIST) recent_meta.pop_front();
     score_pending_meta();
 }
 
@@ -319,8 +318,9 @@ void usbCallHandler::score_pending_meta(){
             // this function.  Metas describing frames assembled before the
             // last realignment don't count.
             if((long)p.index + meta_lag >= (long)aligned_from_frame &&
-               ++meta_misses >= ISO6_MISSES_TO_REALIGN && active_transport == LABRADOR_TRANSPORT_ISO6){
-                iso6_realign_wanted = true;
+               ++meta_misses >= ISO6_MISSES_TO_REALIGN){
+                if(active_transport == LABRADOR_TRANSPORT_ISO6) iso6_realign_wanted = true;
+                else if(active_transport == LABRADOR_TRANSPORT_ISO1) iso1_realign_wanted = true;
             }
         } else {
             frames_unvalidated++;
@@ -574,6 +574,44 @@ void usbCallHandler::realign_iso6(){
         ISO6_JUDGE_METAS, candidates, search_us);
 }
 
+// iso1's data and its metas come from two endpoints, and a host that stops
+// servicing them for a while can carry on with them some frames apart: in
+// a Linux VM paused for 3 s, no meta matched a frame within meta_lag +-2
+// for the rest of the stream (84% of frames counted bad).  The lag is
+// searched over every frame the checksum ring still holds, and one is taken
+// only if 90% of the last ISO6_JUDGE_METAS metas whose frames are in the
+// ring match it.
+void usbCallHandler::realign_iso1(){
+    iso1_realign_wanted = false;
+    meta_misses = 0;
+    const int allowed_misses = ISO6_JUDGE_METAS / 10;
+    int best_hits = -1;
+    long best_lag = meta_lag;
+    for(long lag = -ISO_INFLIGHT_FRAMES; lag <= ISO_INFLIGHT_FRAMES; lag++){
+        int hits = 0;
+        int misses = 0;
+        for(auto it = recent_meta.rbegin(); it != recent_meta.rend() && hits + misses < ISO6_JUDGE_METAS; ++it){
+            const long idx = (long)it->index + lag;
+            if(idx < 0 || idx >= (long)data_frame_counter || (long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
+            const int slot = idx % CSUM_RING_SIZE;
+            if(frame_csum_valid[slot] && (frame_csum_ring[slot] == it->c0 || frame_csum_ring[slot] == it->c1)) hits++;
+            else if(++misses > allowed_misses) break;
+        }
+        if(hits + misses == ISO6_JUDGE_METAS && hits > best_hits){
+            best_hits = hits;
+            best_lag = lag;
+        }
+    }
+    if(best_hits < ISO6_JUDGE_METAS - allowed_misses){
+        LIBRADOR_LOG(LOG_DEBUG, "iso1: no meta lag explains the metas (best %d of %d)\n", best_hits, ISO6_JUDGE_METAS);
+        return;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "iso1 realigned: meta lag %ld (was %ld), %d of %d metas matched\n",
+        best_lag, meta_lag, best_hits, ISO6_JUDGE_METAS);
+    meta_lag = best_lag;
+    aligned_from_frame = data_frame_counter;
+}
+
 // Bulk stream parser: the 750-byte payload, then the header [EB 57 seqL
 // seqH lenL lenH csum mode], 9 diagnostic bytes and 1 pad byte; fixed
 // 768-byte stride (firmware 0x000D and later).
@@ -725,6 +763,9 @@ void usbCallHandler::ingest_thread_function(){
             }
             if(iso6_realign_wanted){
                 realign_iso6();
+            }
+            if(iso1_realign_wanted){
+                realign_iso1();
             }
         }
     }
