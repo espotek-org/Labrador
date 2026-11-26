@@ -92,6 +92,12 @@ void usbCallHandler::note_seq(uint16_t seq){
 
 void usbCallHandler::reset_frame_state(){
     seq_started = false;
+    reset_alignment_state();
+}
+
+// Everything reset_frame_state() resets but the sequence tracking, so the
+// frames a restart of the transfers misses still count as dropped.
+void usbCallHandler::reset_alignment_state(){
     data_frame_counter = 0;
     meta_frame_counter = 0;
     pending_meta.clear();
@@ -489,6 +495,12 @@ void usbCallHandler::realign_iso6(){
                 found_by = "any order";
             } else {
                 iso6_any_order_after = recent_meta.back().index + ISO6_ANY_ORDER_BACKOFF;
+                // Out of every search's reach: after a long stall (a Linux VM
+                // paused for 3 s) the endpoints carried on up to 32 frames
+                // apart, with the same number of packets each.  Restarting the
+                // transfers starts them together again.
+                LIBRADOR_LOG(LOG_DEBUG, "iso6: no alignment within reach; restarting the transfers together\n");
+                iso6_resync_wanted = true;
             }
         }
     }
@@ -643,6 +655,7 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
         case 2: handle_iso6_packet(ep_index, (unsigned char *)data, length);
                 drain_iso6_queues(); return;
         case 3: handle_meta_packet((unsigned char *)data, length); return;
+        case 4: reset_alignment_state(); return;
         }
         return;
     }
@@ -695,6 +708,9 @@ void usbCallHandler::ingest_thread_function(){
             case 3:
                 handle_meta_packet(item.bytes.data(), (int)item.bytes.size());
                 break;
+            case 4:
+                reset_alignment_state();
+                break;
             }
             if(iso6_realign_wanted){
                 realign_iso6();
@@ -712,6 +728,10 @@ void usbCallHandler::ingest_thread_function(){
 // ---------------------------------------------------------------------------
 
 void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
+    if(!iso_thread_shutdown_requested && iso6_resync_wanted){
+        hold_for_resync();
+        return;
+    }
     if(!iso_thread_shutdown_requested){
         int error = libusb_submit_transfer(transfer);
         if(error){
@@ -725,6 +745,32 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
         iso_thread_shutdown_remaining_transfers--;
         LIBRADOR_LOG(LOG_DEBUG, "Transfer not being rearmed!  %d armed transfers remaining\n", iso_thread_shutdown_remaining_transfers.load());
     }
+}
+
+// Restarting iso6's transfers together: each one is held as it comes back
+// instead of resubmitted, and once every one is back (about half a second,
+// as each covers frames already scheduled) the ingest thread is told to
+// start the alignment afresh, after every packet already queued, and they
+// are all submitted again in the order a new stream submits them, so the
+// endpoints start within a frame or two of each other as they do at a
+// stream's start.  A held transfer counts as retired, so a teardown in the
+// meantime finishes when the ones still in flight retire.
+void usbCallHandler::hold_for_resync(){
+    iso_thread_shutdown_remaining_transfers--;
+    if(++iso6_resync_held < total_inflight_transfers()) return;
+    iso6_resync_held = 0;
+    iso6_resync_wanted = false;
+    queue_ingest(4, 0, nullptr, 0);
+    int submitted = 0;
+    const int error = submit_iso_transfers(&submitted);
+    iso_thread_shutdown_remaining_transfers = submitted;
+    if(error){
+        LIBRADOR_LOG(LOG_WARNING, "iso6: restarting the transfers failed after %d of %d; stopping the stream\n",
+            submitted, total_inflight_transfers());
+        iso_thread_shutdown_requested = true;
+        return;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "iso6: restarted all %d transfers together\n", submitted);
 }
 
 // A transfer that fails (status other than COMPLETED) still
@@ -1092,7 +1138,10 @@ int usbCallHandler::start_streaming(){
     }
 
     alloc_iso_transfers();
-    return submit_iso_transfers();
+    iso6_resync_wanted = false;
+    iso6_resync_held = 0;
+    int submitted = 0;
+    return submit_iso_transfers(&submitted);
 }
 
 void usbCallHandler::alloc_iso_transfers(){
@@ -1129,10 +1178,14 @@ void usbCallHandler::alloc_iso_transfers(){
     }
 }
 
-int usbCallHandler::submit_iso_transfers(){
+// Submits every transfer allocated for the transport; *submitted counts the
+// ones now in flight, also when one fails.
+int usbCallHandler::submit_iso_transfers(int *submitted){
+    *submitted = 0;
     if(active_transport == LABRADOR_TRANSPORT_BULK){
         for(int n=0;n<NUM_BULK_CTX;n++){
             int error = libusb_submit_transfer(bulkCtx[n]);
+            if(!error) (*submitted)++;
             if(error){
                 LIBRADOR_LOG(LOG_ERROR, "bulk submit #%d FAILED with error %d %s\n", n, error, libusb_error_name(error));
                 return error;
@@ -1143,12 +1196,14 @@ int usbCallHandler::submit_iso_transfers(){
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (int k=0;k<num_data_endpoints;k++){
             int error = libusb_submit_transfer(isoCtx[k][n]);
+            if(!error) (*submitted)++;
             if(error){
                 LIBRADOR_LOG(LOG_ERROR, "libusb_submit_transfer #%d:%d FAILED with error %d %s\n", n, k, error, libusb_error_name(error));
                 return error;
             }
         }
         int error = libusb_submit_transfer(metaCtx[n]);
+        if(!error) (*submitted)++;
         if(error){
             LIBRADOR_LOG(LOG_ERROR, "meta submit #%d FAILED with error %d %s\n", n, error, libusb_error_name(error));
             return error;

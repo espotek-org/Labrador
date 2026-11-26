@@ -132,7 +132,7 @@ public:
     int setup_usb_control(int file_descriptor);
     int setup_usb_iso();
     void alloc_iso_transfers();
-    int submit_iso_transfers();
+    int submit_iso_transfers(int *submitted);
     void delete_iso_thread();
     int send_control_transfer(uint8_t RequestType, uint8_t Request, uint16_t Value, uint16_t Index, uint16_t Length, unsigned char *LDATA);
     int avrDebug(void);
@@ -355,7 +355,7 @@ private:
     // bytes here under a short-lived lock; the ingest thread does all
     // parsing, validation and o1buffer dispatch.
     struct IngestItem {
-        uint8_t kind;        // 0=bulk bytes, 1=iso data, 2=iso6 data, 3=meta
+        uint8_t kind;        // 0=bulk bytes, 1=iso data, 2=iso6 data, 3=meta, 4=iso6 transfers restarted
         uint8_t ep_index;    // iso6 endpoint index
         std::vector<unsigned char> bytes;
     };
@@ -425,6 +425,7 @@ private:
     void handle_bulk_bytes(unsigned char *data, int length);
     void note_seq(uint16_t seq);
     void reset_frame_state();
+    void reset_alignment_state();
 
     o1buffer *internal_o1_buffer_375_CHA;
     o1buffer *internal_o1_buffer_375_CHB;
@@ -432,6 +433,11 @@ private:
 
     void free_transfers();
     void rearm_or_retire(struct libusb_transfer *transfer);
+    // Restarting iso6's transfers together; see hold_for_resync().  Set by the
+    // ingest thread, the rest on the event thread.
+    std::atomic<bool> iso6_resync_wanted{false};
+    int iso6_resync_held = 0;
+    void hold_for_resync();
     void iso_polling_function(libusb_context *ctx);
 
 
