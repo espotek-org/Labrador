@@ -385,6 +385,7 @@ struct windows_device_handle_priv {
 struct windows_transfer_priv {
 	OVERLAPPED overlapped;
 	HANDLE handle;
+	DWORD iocp_bytes; /* LABRADOR_PATCH_IOCP_LENGTH: byte count reported by the completion port */
 	struct list_head list;
 	union {
 		struct usbdk_transfer_priv usbdk_priv;
