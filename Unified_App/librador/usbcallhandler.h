@@ -309,13 +309,19 @@ private:
     std::atomic<uint64_t> frames_unvalidated{0};
     bool seq_started = false;
     uint16_t last_seq = 0;
+    // Frames an endpoint's queued transfers cover.  One endpoint's (or the
+    // metas') transfers can complete up to this many frames before another's
+    // with nothing lost: in a Linux VM three iso6 endpoints delivered 264
+    // frames after the other three, then caught up.  The iso6 queues, the
+    // checksum history and the checksum ring below are sized from it.
+    static const int ISO_INFLIGHT_FRAMES = NUM_FUTURE_CTX * ISO_PACKETS_PER_CTX;
     // Recent reassembled-frame checksums for meta (lag-1) pairing:
     // ring indexed by frame counter, holds the XOR of each 750-byte frame.
     // Must exceed the largest frame backlog between a data URB completion
-    // and the matching meta URB completion: iso URBs batch 33 frames, and
-    // data/meta URBs can complete a full batch apart, so 16 was too small
-    // (every meta missed the ring and counted as unvalidated).
-    static const int CSUM_RING_SIZE = 128;
+    // and the matching meta URB completion, either way round (metas are
+    // scored early once half the ring's worth are waiting): 128 frames
+    // left every meta unvalidated when the metas fell 200 frames behind.
+    static const int CSUM_RING_SIZE = 4 * ISO_INFLIGHT_FRAMES;
     unsigned char frame_csum_ring[CSUM_RING_SIZE];
     bool frame_csum_valid[CSUM_RING_SIZE];
     uint64_t data_frame_counter = 0;
@@ -330,13 +336,19 @@ private:
     void score_pending_meta();
     // iso6 reassembly: per-endpoint packet queues consumed in lockstep
     std::deque<std::vector<unsigned char>> iso6_queues[MAX_DATA_ENDPOINTS];
+    // A queue longer than this means another endpoint stalled for longer than
+    // its queued transfers explain; see handle_iso6_packet().
+    static const size_t ISO6_QUEUE_LIMIT = 2 * ISO_INFLIGHT_FRAMES;
     // iso6 alignment; see realign_iso6().  An endpoint can start streaming a
     // frame or more before or after the others (seen natively behind a USB
     // 2.0 hub, and on most starts in a VM), after which every lockstep frame
     // mixes slices of neighbouring milliseconds.  Each endpoint's recent
     // packet checksums are kept by packet number so that the alignment the
     // metas describe can be searched for.
-    static const int ISO6_HIST = 128;            // packets of checksum history per endpoint
+    // Packets of checksum history per endpoint: a realignment judges metas
+    // whose packets every endpoint has delivered, so the history must span
+    // the endpoints' delivery skew as well as the search.
+    static const int ISO6_HIST = 2 * ISO_INFLIGHT_FRAMES;
     static const int ISO6_MAX_SPREAD = 12;       // frames between the first and the last stream to start (5 measured)
     static const int ISO6_JUDGE_METAS = 24;      // metas a candidate alignment is judged on
     static const int ISO6_MISSES_TO_REALIGN = 8; // metas in a row that matched no frame

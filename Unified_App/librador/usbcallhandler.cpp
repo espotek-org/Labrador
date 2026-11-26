@@ -122,7 +122,7 @@ void usbCallHandler::iso6_qa_dump(const char *why){
         (unsigned long long)iso6_qa_overflows);
     for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
         const uint64_t n = iso6_received[k];
-        const uint64_t first = n > (uint64_t)ISO6_HIST ? n - ISO6_HIST : 0;
+        const uint64_t first = n > 256 ? n - 256 : 0;
         std::string hex;
         char b[4];
         for(uint64_t i = first; i < n; i++){
@@ -136,7 +136,8 @@ void usbCallHandler::iso6_qa_dump(const char *why){
     }
     std::string metas;
     char b[40];
-    for(const RecentMeta &m : recent_meta){
+    for(size_t i = recent_meta.size() > 256 ? recent_meta.size() - 256 : 0; i < recent_meta.size(); i++){
+        const RecentMeta &m = recent_meta[i];
         snprintf(b, sizeof b, " %llu:%02x%02x", (unsigned long long)m.index, m.c0, m.c1);
         metas += b;
     }
@@ -189,16 +190,27 @@ void usbCallHandler::handle_iso6_packet(int ep_index, unsigned char *data, int l
         return;
     }
     iso6_queues[ep_index].emplace_back(data, data + length);
-    // Bound the queues in case one endpoint stalls permanently.
-    if(iso6_queues[ep_index].size() > 4 * ISO_PACKETS_PER_CTX){
-        iso6_queues[ep_index].pop_front();
-        iso6_dropped_packet(ep_index);
+    // An endpoint whose queue passes ISO6_QUEUE_LIMIT is further ahead of
+    // another than every queued transfer explains: that one stalled.  Drop
+    // the oldest frame from every endpoint, so they stay in step; an
+    // endpoint with nothing queued drops its slice of that frame on
+    // arrival.  (Dropping only the long queue's packet put that endpoint a
+    // frame further out of step each time.)
+    if(iso6_queues[ep_index].size() > ISO6_QUEUE_LIMIT){
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+            if(iso6_queues[k].empty()){
+                iso6_skip[k]++;
+            } else {
+                iso6_queues[k].pop_front();
+                iso6_dropped_packet(k);
+            }
+        }
         // QA DIAGNOSTIC
         iso6_qa_overflows++;
         if(iso6_qa_overflows <= 5 || iso6_qa_overflows % 1000 == 0){
-            LIBRADOR_LOG(LOG_DEBUG, "iso6 QA: endpoint %d's queue passed %d packets and lost its oldest "
+            LIBRADOR_LOG(LOG_DEBUG, "iso6 QA: endpoint %d's queue passed %d packets, dropped the oldest frame from every endpoint "
                 "(overflow %llu); queued %zu %zu %zu %zu %zu %zu, received %llu %llu %llu %llu %llu %llu\n",
-                ep_index, 4 * ISO_PACKETS_PER_CTX, (unsigned long long)iso6_qa_overflows,
+                ep_index, (int)ISO6_QUEUE_LIMIT, (unsigned long long)iso6_qa_overflows,
                 iso6_queues[0].size(), iso6_queues[1].size(), iso6_queues[2].size(),
                 iso6_queues[3].size(), iso6_queues[4].size(), iso6_queues[5].size(),
                 (unsigned long long)iso6_received[0], (unsigned long long)iso6_received[1],
@@ -652,8 +664,12 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     item.bytes.assign(data, data + length);
     {
         std::lock_guard<std::mutex> lock(ingest_mutex);
-        // Backstop against an unbounded queue if the ingest thread dies.
-        if(ingest_queue.size() > 4096){
+        // Backstop against an unbounded queue if the ingest thread dies:
+        // about 10 s of iso6 (seven items a millisecond).  Dropping items
+        // leaves iso6's endpoints out of step, so it must not be reached by
+        // an ingest thread that was only held up (a Linux VM held it up for
+        // about half a second, 3,234 items; this was 4,096).
+        if(ingest_queue.size() > 70000){
             // QA DIAGNOSTIC
             ingest_qa_dropped++;
             if(ingest_qa_dropped <= 5 || ingest_qa_dropped % 1000 == 0){
