@@ -26,6 +26,7 @@ struct StreamContinuity
     double max_period_deviation = 0; // fraction of the median
     uint64_t anomalies = 0;
     std::vector<double> anomaly_times_s; // the first 20, from the start of the stream
+    std::vector<double> anomaly_at_s;    // every one (not written to JSON)
 };
 
 struct StreamCheckResult
