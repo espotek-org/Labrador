@@ -805,12 +805,32 @@ void Suite::transportSoak(TestContext& ctx, const std::string& t)
     ctx.measure("delivered sample rate", "S/s", r.delivered_sample_rate_hz, r.sample_rate_hz,
                 r.sample_rate_hz * (1 - tol::SAMPLE_RATE), r.sample_rate_hz * (1 + tol::SAMPLE_RATE));
     ctx.measure("longest pause in the stream", "s", r.max_stall_s, std::nullopt, std::nullopt, tol::MAX_STALL_S);
+    // A lost or repeated frame shifts both inputs at once (they share every frame), so the
+    // check that catches what the frame counters miss counts anomalous periods on both inputs
+    // within one period of each other. An anomaly on one input alone is a disturbance on that
+    // input (on the QA tester CH2 picks one up now and then, with every frame intact).
+    if (r.continuity.size() == 2)
+    {
+        const StreamContinuity& a = r.continuity[0];
+        const StreamContinuity& b = r.continuity[1];
+        const double window_s = (a.median_period_samples + b.median_period_samples) / r.sample_rate_hz;
+        uint64_t both = 0;
+        for (const double t1 : a.anomaly_at_s)
+            for (const double t2 : b.anomaly_at_s)
+                if (std::fabs(t1 - t2) <= window_s)
+                {
+                    both++;
+                    break;
+                }
+        ctx.measure("periods off the median on both inputs at once (a lost or repeated frame)", "",
+                    static_cast<double>(both), 0, std::nullopt, 0);
+    }
     for (const StreamContinuity& c : r.continuity)
     {
         const std::string chs = "CH" + std::to_string(c.channel);
         const double f = out[c.channel - 1].frequency_hz;
-        ctx.measure(chs + " periods more than 5% off the median", "", static_cast<double>(c.anomalies), 0,
-                    std::nullopt, 0);
+        ctx.measure(chs + " periods more than 5% off the median (on this input alone, not judged)", "",
+                    static_cast<double>(c.anomalies));
         ctx.measure(chs + " largest period deviation", "fraction", c.max_period_deviation);
         ctx.measure(chs + " median frequency", "Hz", c.frequency_hz, f, f * (1 - tol::FREQUENCY),
                     f * (1 + tol::FREQUENCY));

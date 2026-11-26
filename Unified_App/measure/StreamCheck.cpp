@@ -66,6 +66,7 @@ struct Follower
             if (deviation > STREAM_ANOMALY_FRACTION)
             {
                 c.anomalies++;
+                c.anomaly_at_s.push_back((period_at[i] - static_cast<double>(start_count)) / sample_rate);
                 if (c.anomaly_times_s.size() < MAX_LISTED_ANOMALIES)
                     c.anomaly_times_s.push_back((period_at[i] - static_cast<double>(start_count)) /
                                                 sample_rate);
