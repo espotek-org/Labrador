@@ -1,6 +1,7 @@
 #include "usbcallhandler.h"
 //#include <stdio.h>
 #include <cstring>
+#include <algorithm>
 
 #include <math.h>
 #include "logging_internal.h"
@@ -96,7 +97,19 @@ void usbCallHandler::reset_frame_state(){
     pending_meta.clear();
     bulk_stream.clear();
     for(int i = 0; i < CSUM_RING_SIZE; i++) frame_csum_valid[i] = false;
-    for(int k = 0; k < MAX_DATA_ENDPOINTS; k++) iso6_queues[k].clear();
+    for(int k = 0; k < MAX_DATA_ENDPOINTS; k++){
+        iso6_queues[k].clear();
+        iso6_received[k] = 0;
+        iso6_skip[k] = 0;
+        for(int i = 0; i < ISO6_HIST; i++) iso6_hist[k][i] = -1;
+    }
+    recent_meta.clear();
+    meta_misses = 0;
+    aligned_from_frame = 0;
+    iso6_realign_wanted = false;
+    iso1_realign_wanted = false;
+    iso6_any_order_after = 0;
+    meta_lag = -1;
 }
 
 void usbCallHandler::reset_frame_stats(){
@@ -130,10 +143,46 @@ void usbCallHandler::handle_data_iso_packet(unsigned char *data, int length){
 // iso6: queue per-endpoint packets, assemble frames in lockstep once all
 // six endpoints have delivered their slice of the frame.
 void usbCallHandler::handle_iso6_packet(int ep_index, unsigned char *data, int length){
+    const uint64_t n = iso6_received[ep_index]++;
+    if(length == ISO_PACKET_SIZE / AIO_EP_ISO6_COUNT){
+        unsigned char c = 0;
+        for(int i = 0; i < length; i++) c ^= data[i];
+        iso6_hist[ep_index][n % ISO6_HIST] = c;
+    } else {
+        iso6_hist[ep_index][n % ISO6_HIST] = -1;
+    }
+    if(iso6_skip[ep_index]){
+        // realign_iso6() moved this endpoint on past this packet.
+        iso6_skip[ep_index]--;
+        iso6_dropped_packet(ep_index);
+        return;
+    }
     iso6_queues[ep_index].emplace_back(data, data + length);
-    // Bound the queues in case one endpoint stalls permanently.
-    if(iso6_queues[ep_index].size() > 4 * ISO_PACKETS_PER_CTX){
-        iso6_queues[ep_index].pop_front();
+    // An endpoint whose queue passes ISO6_QUEUE_LIMIT is further ahead of
+    // another than every queued transfer explains: that one stalled.  Drop
+    // the oldest frame from every endpoint, so they stay in step; an
+    // endpoint with nothing queued drops its slice of that frame on
+    // arrival.  (Dropping only the long queue's packet put that endpoint a
+    // frame further out of step each time.)
+    if(iso6_queues[ep_index].size() > ISO6_QUEUE_LIMIT){
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+            if(iso6_queues[k].empty()){
+                iso6_skip[k]++;
+            } else {
+                iso6_queues[k].pop_front();
+                iso6_dropped_packet(k);
+            }
+        }
+    }
+}
+
+// A packet left an endpoint's queue without being assembled.  On endpoint 0
+// that is a lost frame: noting it keeps data_frame_counter equal to endpoint
+// 0's packet number, which meta pairing and realign_iso6() rely on.
+void usbCallHandler::iso6_dropped_packet(int ep_index){
+    if(ep_index == 0){
+        note_frame_csum(0, false);
+        dispatch_lost_frames(1);
     }
 }
 
@@ -185,21 +234,24 @@ void usbCallHandler::handle_meta_packet(unsigned char *data, int length){
     }
     note_seq((uint16_t)(data[2] | (data[3] << 8)));
     pending_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
+    recent_meta.push_back({meta_frame_counter - 1, data[4], data[5]});
+    if(recent_meta.size() > ISO6_HIST) recent_meta.pop_front();
     score_pending_meta();
 }
 
-// Scores every pending meta whose candidate frames (lag -3..+1 around its
-// slot; lag -1 is nominal) have all been noted, or which would otherwise
-// fall out of the checksum ring.  Called whenever a meta or a frame arrives.
+// Scores every pending meta whose candidate frames (meta_lag -2..+2 around
+// its slot; meta_lag is -1 nominally) have all been noted, or which would
+// otherwise fall out of the checksum ring.  Called whenever a meta or a
+// frame arrives.
 void usbCallHandler::score_pending_meta(){
     while(!pending_meta.empty()){
         const PendingMeta &p = pending_meta.front();
-        const bool window_complete = data_frame_counter > p.index + 1;
+        const bool window_complete = (long)data_frame_counter > (long)p.index + meta_lag + 2;
         const bool about_to_lap = pending_meta.size() > CSUM_RING_SIZE / 2;
         if(!window_complete && !about_to_lap) return;
         bool matched = false;
         bool any_candidate = false;
-        for(long lag = -3; lag <= 1; lag++){
+        for(long lag = meta_lag - 2; lag <= meta_lag + 2; lag++){
             long idx = (long)p.index + lag;
             if(idx < 0 || idx >= (long)data_frame_counter) continue;
             if((long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
@@ -211,11 +263,305 @@ void usbCallHandler::score_pending_meta(){
                 break;
             }
         }
-        if(matched) frames_ok++;
-        else if(any_candidate) frames_bad_checksum++;
-        else frames_unvalidated++;
+        if(matched){
+            frames_ok++;
+            meta_misses = 0;
+        } else if(any_candidate){
+            frames_bad_checksum++;
+            // Ask the ingest loop for realign_iso6() rather than calling it
+            // here: it drops packets, which notes frames, which re-enters
+            // this function.  Metas describing frames assembled before the
+            // last realignment don't count.
+            if((long)p.index + meta_lag >= (long)aligned_from_frame &&
+               ++meta_misses >= ISO6_MISSES_TO_REALIGN){
+                if(active_transport == LABRADOR_TRANSPORT_ISO6) iso6_realign_wanted = true;
+                else if(active_transport == LABRADOR_TRANSPORT_ISO1) iso1_realign_wanted = true;
+            }
+        } else {
+            frames_unvalidated++;
+        }
         pending_meta.pop_front();
     }
+}
+
+// The any-order search, for when the start-order one in realign_iso6() finds
+// nothing: a stream that loses packets mid-stream leaves each endpoint (and
+// the metas) off by its own number of frames, in no particular order (seen in
+// Windows and Linux VMs, where the start-order search then failed for the rest
+// of the stream).  Endpoint k's packet for meta j is taken as j + d[k], each
+// d[k] anywhere in [lo, hi].  Meet in the middle: for every (d0, d1, d2) the
+// XOR of endpoints 0-2's checksums on nine key metas, in three groups of
+// three, is indexed; for every (d3, d4, d5) the XOR endpoints 0-2 would need
+// on a group's three metas (one of two values each: a meta gives both buffer
+// halves' checksums) is looked up, and every pair found is judged on all the
+// metas like the start-order candidates; the first one with at most
+// allowed_misses misses is taken (wrong alignments match about 6% of metas).
+// Such an alignment hits every meta of at least one group when
+// allowed_misses < 3, so it is always found.  hist is endpoint-major,
+// hist_len slots each (packet n at n % hist_len, -1 for a short slice);
+// every judged meta's packets index + lo .. index + hi must be in history.
+// Returns the best alignment's hits, its offsets in d_out.
+namespace {
+struct Iso6Meta { uint64_t index; unsigned char c0, c1; };
+const int ISO6_KEY_GROUPS = 3;
+const int ISO6_KEY_METAS = 3;   // per group: a 24-bit key
+
+int iso6_search_any_order(const short *hist, int hist_len, const std::vector<Iso6Meta> &judge,
+                          long lo, long hi, int allowed_misses, long d_out[6], long *candidates){
+    const long w = hi - lo + 1;
+    const long combos = w * w * w;
+    auto at = [&](int k, uint64_t index, long d) -> int {
+        return hist[k * hist_len + (long)((index + d) % (uint64_t)hist_len)];
+    };
+    // XOR of three endpoints' packets for meta j, or -1 if any slice is short.
+    auto triple = [&](int k0, long a, long b, long c, const Iso6Meta &m) -> int {
+        const int x = at(k0, m.index, a), y = at(k0 + 1, m.index, b), z = at(k0 + 2, m.index, c);
+        return (x < 0 || y < 0 || z < 0) ? -1 : (x ^ y ^ z);
+    };
+    std::vector<uint64_t> table[ISO6_KEY_GROUPS];
+    for(long a = 0; a < combos; a++){
+        const long d0 = lo + a / (w * w), d1 = lo + (a / w) % w, d2 = lo + a % w;
+        for(int g = 0; g < ISO6_KEY_GROUPS; g++){
+            uint32_t key = 0;
+            bool full = true;
+            for(int i = 0; i < ISO6_KEY_METAS && full; i++){
+                const int x = triple(0, d0, d1, d2, judge[g * ISO6_KEY_METAS + i]);
+                if(x < 0) full = false;
+                key = (key << 8) | (uint32_t)x;
+            }
+            if(full) table[g].push_back(((uint64_t)key << 32) | (uint64_t)a);
+        }
+    }
+    for(int g = 0; g < ISO6_KEY_GROUPS; g++) std::sort(table[g].begin(), table[g].end());
+    int best = -1;
+    for(long b = 0; b < combos; b++){
+        const long d3 = lo + b / (w * w), d4 = lo + (b / w) % w, d5 = lo + b % w;
+        for(int g = 0; g < ISO6_KEY_GROUPS; g++){
+            int xb[ISO6_KEY_METAS];
+            bool full = true;
+            for(int i = 0; i < ISO6_KEY_METAS && full; i++){
+                xb[i] = triple(3, d3, d4, d5, judge[g * ISO6_KEY_METAS + i]);
+                if(xb[i] < 0) full = false;
+            }
+            if(!full) continue;
+            for(int mask = 0; mask < (1 << ISO6_KEY_METAS); mask++){
+                uint32_t target = 0;
+                for(int i = 0; i < ISO6_KEY_METAS; i++){
+                    const Iso6Meta &m = judge[g * ISO6_KEY_METAS + i];
+                    target = (target << 8) | (uint32_t)(xb[i] ^ ((mask >> i) & 1 ? m.c1 : m.c0));
+                }
+                auto it = std::lower_bound(table[g].begin(), table[g].end(), (uint64_t)target << 32);
+                for(; it != table[g].end() && (uint32_t)(*it >> 32) == target; ++it){
+                    const long a = (long)(*it & 0xffffffffu);
+                    const long d[6] = {lo + a / (w * w), lo + (a / w) % w, lo + a % w, d3, d4, d5};
+                    (*candidates)++;
+                    int hits = 0, misses = 0;
+                    for(const Iso6Meta &m : judge){
+                        int x = 0;
+                        bool slices = true;
+                        for(int k = 0; k < 6 && slices; k++){
+                            const int v = at(k, m.index, d[k]);
+                            if(v < 0) slices = false;
+                            else x ^= v;
+                        }
+                        if(slices && (x == m.c0 || x == m.c1)) hits++;
+                        else if(++misses > allowed_misses) break;
+                    }
+                    if(hits > best){
+                        best = hits;
+                        for(int k = 0; k < 6; k++) d_out[k] = d[k];
+                        if(best >= (int)judge.size() - allowed_misses) return best;
+                    }
+                }
+            }
+        }
+    }
+    return best;
+}
+}
+
+// Finds the endpoint shifts and meta lag under which the recent metas match
+// the data, and moves the iso6 queues to that alignment.  Frame m is taken
+// as endpoint 0's packet m and endpoint k's packet m + shift[k]; a meta with
+// index j describes frame j + lag.
+//
+// submit_iso_transfers() submits each stream's first transfer in order (data
+// endpoints 0 to 5, then the meta endpoint) and hosts start isochronous
+// transfers as soon as they can, so each stream starts on the same frame as
+// the one before it or a later one.  An endpoint that starts d frames after
+// endpoint 0 has shift -d, so the shifts never rise from one endpoint to the
+// next; and since a meta describes the frame before its own, the lag is
+// -1 - shift[5] plus however many frames the metas started after endpoint 5.
+// Every such alignment whose seven streams started within ISO6_MAX_SPREAD
+// frames is tried against the last ISO6_JUDGE_METAS metas (18,564
+// candidates, most rejected at their third mismatch), and one is taken only
+// if 90% of those metas match it.  Measured on air: wrong alignments match
+// about 6% of metas, the right one 99%.
+void usbCallHandler::realign_iso6(){
+    iso6_realign_wanted = false;
+    meta_misses = 0;
+    const auto search_start = std::chrono::steady_clock::now();
+    const int n_ep = AIO_EP_ISO6_COUNT;
+    // A meta with index j is checked against packet j + lag + shift[k] of
+    // each endpoint, which runs from j - 1 (every stream started together)
+    // to j + ISO6_MAX_SPREAD - 1 (endpoint 0 alone, with the metas a full
+    // spread after it).
+    const long first_needed = -1;
+    const long last_needed = ISO6_MAX_SPREAD - 1;
+    // The most recent metas whose packets are in every endpoint's history
+    // for any candidate.
+    std::vector<RecentMeta> judge;
+    for(auto it = recent_meta.rbegin(); it != recent_meta.rend() && (int)judge.size() < ISO6_JUDGE_METAS; ++it){
+        bool in_history = (long)it->index + first_needed >= 0;
+        for(int k = 0; k < n_ep && in_history; k++){
+            if((long)it->index + first_needed < (long)iso6_received[k] - ISO6_HIST) in_history = false;
+            if((long)it->index + last_needed >= (long)iso6_received[k]) in_history = false;
+        }
+        if(in_history) judge.push_back(*it);
+    }
+    if((int)judge.size() < ISO6_JUDGE_METAS) return;   // too early; tried again after more misses
+    const int allowed_misses = ISO6_JUDGE_METAS / 10;
+    int best_hits = -1;
+    long best_lag = 0;
+    int best_shift[MAX_DATA_ENDPOINTS] = {0};
+    // Walks every 0 = shift[0] >= shift[1] >= ... >= shift[5] >= -ISO6_MAX_SPREAD
+    // once, starting from all zeros.
+    int shift[MAX_DATA_ENDPOINTS] = {0};
+    long candidates = 0;
+    for(bool more = true; more; ){
+        for(long meta_delay = 0; meta_delay <= ISO6_MAX_SPREAD + shift[n_ep - 1]; meta_delay++){
+            candidates++;
+            const long lag = -1 - shift[n_ep - 1] + meta_delay;
+            int hits = 0;
+            int misses = 0;
+            for(const RecentMeta &m : judge){
+                int x = 0;
+                bool full = true;
+                for(int k = 0; k < n_ep && full; k++){
+                    const short v = iso6_hist[k][((long)m.index + lag + shift[k]) % ISO6_HIST];
+                    if(v < 0) full = false;
+                    else x ^= v;
+                }
+                if(full && (x == m.c0 || x == m.c1)) hits++;
+                else if(++misses > allowed_misses) break;
+            }
+            if(hits > best_hits){
+                best_hits = hits;
+                best_lag = lag;
+                for(int k = 0; k < n_ep; k++) best_shift[k] = shift[k];
+            }
+        }
+        // Next sequence: lower the last shift that can still go lower, and
+        // bring every later one down to it.
+        int k = n_ep - 1;
+        while(k > 0 && shift[k] == -ISO6_MAX_SPREAD) k--;
+        more = k > 0;
+        if(more){
+            shift[k]--;
+            for(int i = k + 1; i < n_ep; i++) shift[i] = shift[k];
+        }
+    }
+    // Nothing in start order: try every order (iso6_search_any_order), over
+    // ISO6_ANY_ORDER_SLACK frames more either side, but at most once every
+    // ISO6_ANY_ORDER_BACKOFF metas while it keeps failing, since it costs tens
+    // of milliseconds of the ingest thread.
+    const char *found_by = "start order";
+    if(best_hits < ISO6_JUDGE_METAS - allowed_misses && recent_meta.back().index >= iso6_any_order_after){
+        const long lo = first_needed - ISO6_ANY_ORDER_SLACK;
+        const long hi = last_needed + ISO6_ANY_ORDER_SLACK;
+        std::vector<Iso6Meta> judge_any;
+        for(auto it = recent_meta.rbegin(); it != recent_meta.rend() && (int)judge_any.size() < ISO6_JUDGE_METAS; ++it){
+            bool in_history = (long)it->index + lo >= 0;
+            for(int k = 0; k < n_ep && in_history; k++){
+                if((long)it->index + lo < (long)iso6_received[k] - ISO6_HIST) in_history = false;
+                if((long)it->index + hi >= (long)iso6_received[k]) in_history = false;
+            }
+            if(in_history) judge_any.push_back({it->index, it->c0, it->c1});
+        }
+        if((int)judge_any.size() == ISO6_JUDGE_METAS){
+            long d[6];
+            const int hits = iso6_search_any_order(&iso6_hist[0][0], ISO6_HIST, judge_any, lo, hi, allowed_misses,
+                                                   d, &candidates);
+            if(hits >= ISO6_JUDGE_METAS - allowed_misses){
+                best_hits = hits;
+                best_lag = d[0];
+                for(int k = 0; k < n_ep; k++) best_shift[k] = (int)(d[k] - d[0]);
+                found_by = "any order";
+            } else {
+                iso6_any_order_after = recent_meta.back().index + ISO6_ANY_ORDER_BACKOFF;
+            }
+        }
+    }
+    const long search_us = (long)std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now() - search_start).count();
+    if(best_hits < ISO6_JUDGE_METAS - allowed_misses){
+        LIBRADOR_LOG(LOG_DEBUG, "iso6: no alignment explains the metas (best %d of %d; %ld candidates in %ld us)\n",
+            best_hits, ISO6_JUDGE_METAS, candidates, search_us);
+        return;
+    }
+    // Move every queue forward (never back) until the next packet each will
+    // give the lockstep sits best_shift[k] after endpoint 0's.
+    long next[MAX_DATA_ENDPOINTS];
+    long advance = 0;
+    for(int k = 0; k < n_ep; k++){
+        next[k] = (long)(iso6_received[k] - iso6_queues[k].size() + iso6_skip[k]);
+    }
+    for(int k = 0; k < n_ep; k++){
+        const long d = (next[k] - next[0]) - best_shift[k];
+        if(d > advance) advance = d;
+    }
+    meta_lag = best_lag;
+    for(int k = 0; k < n_ep; k++){
+        long move = best_shift[k] + advance - (next[k] - next[0]);
+        while(move > 0 && !iso6_queues[k].empty()){
+            iso6_queues[k].pop_front();
+            iso6_dropped_packet(k);
+            move--;
+        }
+        iso6_skip[k] += move;
+    }
+    aligned_from_frame = data_frame_counter + iso6_skip[0];
+    LIBRADOR_LOG(LOG_DEBUG, "iso6 realigned (%s): endpoint shifts %d %d %d %d %d, meta lag %ld, %d of %d metas matched (%ld candidates in %ld us)\n",
+        found_by, best_shift[1], best_shift[2], best_shift[3], best_shift[4], best_shift[5], best_lag, best_hits,
+        ISO6_JUDGE_METAS, candidates, search_us);
+}
+
+// iso1's data and its metas come from two endpoints, and a host that stops
+// servicing them for a while can carry on with them some frames apart: in
+// a Linux VM paused for 3 s, no meta matched a frame within meta_lag +-2
+// for the rest of the stream (84% of frames counted bad).  The lag is
+// searched over every frame the checksum ring still holds, and one is taken
+// only if 90% of the last ISO6_JUDGE_METAS metas whose frames are in the
+// ring match it.
+void usbCallHandler::realign_iso1(){
+    iso1_realign_wanted = false;
+    meta_misses = 0;
+    const int allowed_misses = ISO6_JUDGE_METAS / 10;
+    int best_hits = -1;
+    long best_lag = meta_lag;
+    for(long lag = -ISO_INFLIGHT_FRAMES; lag <= ISO_INFLIGHT_FRAMES; lag++){
+        int hits = 0;
+        int misses = 0;
+        for(auto it = recent_meta.rbegin(); it != recent_meta.rend() && hits + misses < ISO6_JUDGE_METAS; ++it){
+            const long idx = (long)it->index + lag;
+            if(idx < 0 || idx >= (long)data_frame_counter || (long)data_frame_counter - idx > CSUM_RING_SIZE) continue;
+            const int slot = idx % CSUM_RING_SIZE;
+            if(frame_csum_valid[slot] && (frame_csum_ring[slot] == it->c0 || frame_csum_ring[slot] == it->c1)) hits++;
+            else if(++misses > allowed_misses) break;
+        }
+        if(hits + misses == ISO6_JUDGE_METAS && hits > best_hits){
+            best_hits = hits;
+            best_lag = lag;
+        }
+    }
+    if(best_hits < ISO6_JUDGE_METAS - allowed_misses){
+        LIBRADOR_LOG(LOG_DEBUG, "iso1: no meta lag explains the metas (best %d of %d)\n", best_hits, ISO6_JUDGE_METAS);
+        return;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "iso1 realigned: meta lag %ld (was %ld), %d of %d metas matched\n",
+        best_lag, meta_lag, best_hits, ISO6_JUDGE_METAS);
+    meta_lag = best_lag;
+    aligned_from_frame = data_frame_counter;
 }
 
 // Bulk stream parser: 64-byte header block [EB 57 seqL seqH lenL lenH csum
@@ -306,8 +652,12 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     item.bytes.assign(data, data + length);
     {
         std::lock_guard<std::mutex> lock(ingest_mutex);
-        // Backstop against an unbounded queue if the ingest thread dies.
-        if(ingest_queue.size() > 4096){
+        // Backstop against an unbounded queue if the ingest thread dies:
+        // about 10 s of iso6 (seven items a millisecond).  Dropping items
+        // leaves iso6's endpoints out of step, so it must not be reached by
+        // an ingest thread that was only held up (a Linux VM held it up for
+        // about half a second, 3,234 items; this was 4,096).
+        if(ingest_queue.size() > 70000){
             ingest_queue.pop_front();
         }
         ingest_queue.push_back(std::move(item));
@@ -346,6 +696,12 @@ void usbCallHandler::ingest_thread_function(){
                 handle_meta_packet(item.bytes.data(), (int)item.bytes.size());
                 break;
             }
+            if(iso6_realign_wanted){
+                realign_iso6();
+            }
+            if(iso1_realign_wanted){
+                realign_iso1();
+            }
         }
     }
     LIBRADOR_LOG(LOG_DEBUG, "ingest thread finished\n");
@@ -371,26 +727,31 @@ void usbCallHandler::rearm_or_retire(struct libusb_transfer *transfer){
     }
 }
 
+// A transfer that fails (status other than COMPLETED) still
+// spanned num_iso_packets frames on its endpoint, so each of its packets is
+// queued empty, to be counted as a lost frame.  Dropping the transfer
+// outright would leave that endpoint's packet count, or the meta count,
+// num_iso_packets behind the others for the rest of the stream: iso6 would
+// assemble every later frame from slices of different milliseconds, and meta
+// pairing would compare checksums against the wrong frames.
 void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
     usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
-    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
-    {
-        // Which data endpoint is this?
-        int ep_index = 0;
-        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-            ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
+    const bool transfer_ok = transfer->status == LIBUSB_TRANSFER_COMPLETED;
+    // Which data endpoint is this?
+    int ep_index = 0;
+    if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+        ep_index = transfer->endpoint - AIO_EP_ISO6_FIRST;
+    }
+    for(int i=0;i<transfer->num_iso_packets;i++){
+        unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+        int actual = transfer->iso_packet_desc[i].actual_length;
+        if(!transfer_ok || transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+            actual = 0;
         }
-        for(int i=0;i<transfer->num_iso_packets;i++){
-            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
-            int actual = transfer->iso_packet_desc[i].actual_length;
-            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
-                actual = 0;
-            }
-            if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
-                usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
-            } else {
-                usb_driver->queue_ingest(1, 0, packetPointer, actual);
-            }
+        if(usb_driver->active_transport == LABRADOR_TRANSPORT_ISO6){
+            usb_driver->queue_ingest(2, (uint8_t)ep_index, packetPointer, actual);
+        } else {
+            usb_driver->queue_ingest(1, 0, packetPointer, actual);
         }
     }
     usb_driver->rearm_or_retire(transfer);
@@ -398,16 +759,14 @@ void LIBUSB_CALL isoCallback(struct libusb_transfer * transfer){
 
 void LIBUSB_CALL metaIsoCallback(struct libusb_transfer * transfer){
     usbCallHandler *usb_driver = (usbCallHandler *)transfer->user_data;
-    if(transfer->status==LIBUSB_TRANSFER_COMPLETED)
-    {
-        for(int i=0;i<transfer->num_iso_packets;i++){
-            unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
-            int actual = transfer->iso_packet_desc[i].actual_length;
-            if(transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
-                actual = 0;
-            }
-            usb_driver->queue_ingest(3, 0, packetPointer, actual);
+    const bool transfer_ok = transfer->status == LIBUSB_TRANSFER_COMPLETED;
+    for(int i=0;i<transfer->num_iso_packets;i++){
+        unsigned char *packetPointer = libusb_get_iso_packet_buffer_simple(transfer, i);
+        int actual = transfer->iso_packet_desc[i].actual_length;
+        if(!transfer_ok || transfer->iso_packet_desc[i].status != LIBUSB_TRANSFER_COMPLETED){
+            actual = 0;
         }
+        usb_driver->queue_ingest(3, 0, packetPointer, actual);
     }
     usb_driver->rearm_or_retire(transfer);
 }
@@ -748,14 +1107,24 @@ void usbCallHandler::alloc_iso_transfers(){
         }
         return;
     }
+    // Timeout 0: an isochronous transfer ends by itself once its frames have
+    // passed (with an error if the device has gone), so a timeout can only
+    // cancel one that is merely late.  libusb counts from submission, and a
+    // transfer queued behind NUM_FUTURE_CTX - 1 others is due about
+    // ISO_PACKETS_PER_CTX * NUM_FUTURE_CTX ms later, so a finite timeout
+    // leaves only the slack beyond that for completion to be delivered.
+    // Inside a VM that slack is regularly exceeded under iso6, and the
+    // cancels did real damage: Windows aborts the whole pipe, restarting the
+    // endpoint on an arbitrary frame, and VMware's emulated xHCI under Linux
+    // fell out of step with the guest's driver until it was declared dead.
     for(int n=0;n<NUM_FUTURE_CTX;n++){
         for (int k=0;k<num_data_endpoints;k++){
             isoCtx[k][n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
-            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], data_packet_size*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 150); // assume the NUM_FUTURE_CTX=4 iso transfers are FIFO, in which case timeout should be > 1 ms (amount of data per packet) * NUM_PACKETS_PER_CTX * NUM_FUTURE_CTX
+            libusb_fill_iso_transfer(isoCtx[k][n], handle, pipeID[k], dataBuffer[k][n], data_packet_size*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, isoCallback, this, 0);
             libusb_set_iso_packet_lengths(isoCtx[k][n], data_packet_size);
         }
         metaCtx[n] = libusb_alloc_transfer(ISO_PACKETS_PER_CTX);
-        libusb_fill_iso_transfer(metaCtx[n], handle, meta_pipeID, metaBuffer[n], AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, metaIsoCallback, this, 150);
+        libusb_fill_iso_transfer(metaCtx[n], handle, meta_pipeID, metaBuffer[n], AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX, ISO_PACKETS_PER_CTX, metaIsoCallback, this, 0);
         libusb_set_iso_packet_lengths(metaCtx[n], AIO_META_PACKET_SIZE);
     }
 }
