@@ -1904,7 +1904,17 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
     if(librador_get_host_hooks().confirm_firmware_flash)
         librador_get_host_hooks().confirm_firmware_flash();
     set_bootloader_mode_allowed(false);
-    return desktop_connect();
+    // The application's device node can appear before udev has applied the
+    // rule that lets this user open it: in a Linux VM the connect right after
+    // the board came back failed with EACCES ("libusb requires write access
+    // to USB device nodes").  Keep trying for up to 5 s while the board is
+    // there but can't be opened (-2; nothing is held open then).
+    int error = desktop_connect();
+    for(int attempt = 0; error == -2 && attempt < 50; attempt++){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        error = desktop_connect();
+    }
+    return error;
 }
 
 // WARNING: currently unused — calling libusb_reset_device with live iso
