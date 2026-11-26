@@ -10,6 +10,7 @@
 #include <thread>
 
 #include <SDL3/SDL_iostream.h>
+#include <SDL3/SDL_thread.h>
 #include "librador_platform.h"
 
 // ---------------------------------------------------------------------------
@@ -735,8 +736,27 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     ingest_cv.notify_one();
 }
 
+// Windows: the threads that keep transfers queued run ahead of normal-priority
+// work, so a burst of background activity (Defender scanning, Windows Update,
+// a build) doesn't hold them off while the queued transfers run out.  The
+// event thread, which resubmits every transfer, goes to time-critical, as
+// does libusb's I/O completion thread (deps/libusb patch 0002); the ingest
+// thread, which does the per-frame work, to high, where it still outranks
+// normal work but can't take a core from the system.
+static void raise_usb_thread_priority(SDL_ThreadPriority priority, const char *thread){
+#ifdef _WIN32
+    if(!SDL_SetCurrentThreadPriority(priority)){
+        LIBRADOR_LOG(LOG_WARNING, "couldn't raise the %s thread's priority: %s\n", thread, SDL_GetError());
+    }
+#else
+    (void)priority;
+    (void)thread;
+#endif
+}
+
 void usbCallHandler::ingest_thread_function(){
     LIBRADOR_LOG(LOG_DEBUG, "ingest thread spawned\n");
+    raise_usb_thread_priority(SDL_THREAD_PRIORITY_HIGH, "ingest");
     while(true){
         std::deque<IngestItem> batch;
         {
@@ -904,6 +924,7 @@ std::atomic<uint32_t> g_ctrl_req_counts[256];
 
 void usbCallHandler::iso_polling_function(libusb_context *ctx){
     LIBRADOR_LOG(LOG_DEBUG, "iso_polling_function thread spawned\n");
+    raise_usb_thread_priority(SDL_THREAD_PRIORITY_TIME_CRITICAL, "USB event");
     struct timeval tv;
     tv.tv_sec = 1;
     tv.tv_usec = 0;//ISO_PACKETS_PER_CTX*4000;
