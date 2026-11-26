@@ -157,10 +157,21 @@ void usbCallHandler::handle_iso6_packet(int ep_index, unsigned char *data, int l
         return;
     }
     iso6_queues[ep_index].emplace_back(data, data + length);
-    // Bound the queues in case one endpoint stalls permanently.
-    if(iso6_queues[ep_index].size() > 4 * ISO_PACKETS_PER_CTX){
-        iso6_queues[ep_index].pop_front();
-        iso6_dropped_packet(ep_index);
+    // An endpoint whose queue passes ISO6_QUEUE_LIMIT is further ahead of
+    // another than every queued transfer explains: that one stalled.  Drop
+    // the oldest frame from every endpoint, so they stay in step; an
+    // endpoint with nothing queued drops its slice of that frame on
+    // arrival.  (Dropping only the long queue's packet put that endpoint a
+    // frame further out of step each time.)
+    if(iso6_queues[ep_index].size() > ISO6_QUEUE_LIMIT){
+        for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+            if(iso6_queues[k].empty()){
+                iso6_skip[k]++;
+            } else {
+                iso6_queues[k].pop_front();
+                iso6_dropped_packet(k);
+            }
+        }
     }
 }
 
@@ -603,8 +614,12 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     item.bytes.assign(data, data + length);
     {
         std::lock_guard<std::mutex> lock(ingest_mutex);
-        // Backstop against an unbounded queue if the ingest thread dies.
-        if(ingest_queue.size() > 4096){
+        // Backstop against an unbounded queue if the ingest thread dies:
+        // about 10 s of iso6 (seven items a millisecond).  Dropping items
+        // leaves iso6's endpoints out of step, so it must not be reached by
+        // an ingest thread that was only held up (a Linux VM held it up for
+        // about half a second, 3,234 items; this was 4,096).
+        if(ingest_queue.size() > 70000){
             ingest_queue.pop_front();
         }
         ingest_queue.push_back(std::move(item));
