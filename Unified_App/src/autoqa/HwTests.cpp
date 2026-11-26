@@ -33,6 +33,8 @@ using Wave = SignalSpec::Wave;
 
 constexpr double SETTLE_S = 0.5;          // after configuring the generators and scope
 constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
+// Windows a measurement takes before judging one that had lost or corrupt USB frames.
+constexpr int MEASURE_TRIES = 3;
 constexpr double SOAK_SECONDS = 60;
 // The hardware sessions pass librador's debug messages to the log (the iso6 realignment
 // among them, without which a misaligned stream on a test machine fails invisibly).
@@ -272,7 +274,21 @@ class Suite
         c.out[0] = applySignal(1, sg1);
         c.out[1] = applySignal(2, sg2);
         s.configureScope(mode, gain, SETTLE_S);
-        c.window = s.acquire(seconds);
+        // A window with lost or corrupt USB frames is captured again, up to MEASURE_TRIES times:
+        // these tests judge the analog path, and the hw.transport tests judge the stream. A
+        // stream fault that spoils every window still fails here (the last window is judged).
+        int spoilt = 0;
+        for (int attempt = 1;; attempt++)
+        {
+            c.window = s.acquire(seconds);
+            const FrameStats& f = c.window.frames;
+            if ((f.dropped == 0 && f.bad_checksum == 0) || attempt == MEASURE_TRIES)
+                break;
+            spoilt++;
+        }
+        if (spoilt)
+            ctx.note(name + ": " + std::to_string(spoilt) + " earlier window" + (spoilt == 1 ? " was" : "s were") +
+                     " captured again for lost or corrupt USB frames");
         const double lsb = scopeLsbVolts(gain);
         c.stats[0] = analyseChannel(c.window.ch1, c.window.sample_rate_hz, lsb);
         if (!c.window.ch2.empty())
