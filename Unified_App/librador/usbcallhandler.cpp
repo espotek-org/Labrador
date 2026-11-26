@@ -109,6 +109,38 @@ void usbCallHandler::reset_frame_state(){
     iso6_realign_wanted = false;
     iso6_any_order_after = 0;
     meta_lag = -1;
+    iso6_qa_overflows = 0;
+    iso6_qa_dumps = 0;
+}
+
+// QA DIAGNOSTIC: the iso6 alignment state, for finding a misalignment offline: each endpoint's
+// last ISO6_HIST packet checksums in packet order (-- for a short slice) and the recent metas.
+void usbCallHandler::iso6_qa_dump(const char *why){
+    LIBRADOR_LOG(LOG_DEBUG, "iso6 QA dump (%s): meta_lag %ld, metas %llu, frames %llu, aligned_from %llu, "
+        "overflows %llu\n", why, meta_lag, (unsigned long long)meta_frame_counter,
+        (unsigned long long)data_frame_counter, (unsigned long long)aligned_from_frame,
+        (unsigned long long)iso6_qa_overflows);
+    for(int k = 0; k < AIO_EP_ISO6_COUNT; k++){
+        const uint64_t n = iso6_received[k];
+        const uint64_t first = n > (uint64_t)ISO6_HIST ? n - ISO6_HIST : 0;
+        std::string hex;
+        char b[4];
+        for(uint64_t i = first; i < n; i++){
+            const short v = iso6_hist[k][i % ISO6_HIST];
+            if(v < 0) hex += "--";
+            else { snprintf(b, sizeof b, "%02x", v); hex += b; }
+        }
+        LIBRADOR_LOG(LOG_DEBUG, "iso6 QA hist %d: received %llu, queued %zu, skip %llu, from %llu: %s\n", k,
+            (unsigned long long)n, iso6_queues[k].size(), (unsigned long long)iso6_skip[k],
+            (unsigned long long)first, hex.c_str());
+    }
+    std::string metas;
+    char b[40];
+    for(const RecentMeta &m : recent_meta){
+        snprintf(b, sizeof b, " %llu:%02x%02x", (unsigned long long)m.index, m.c0, m.c1);
+        metas += b;
+    }
+    LIBRADOR_LOG(LOG_DEBUG, "iso6 QA metas:%s\n", metas.c_str());
 }
 
 void usbCallHandler::reset_frame_stats(){
@@ -161,6 +193,18 @@ void usbCallHandler::handle_iso6_packet(int ep_index, unsigned char *data, int l
     if(iso6_queues[ep_index].size() > 4 * ISO_PACKETS_PER_CTX){
         iso6_queues[ep_index].pop_front();
         iso6_dropped_packet(ep_index);
+        // QA DIAGNOSTIC
+        iso6_qa_overflows++;
+        if(iso6_qa_overflows <= 5 || iso6_qa_overflows % 1000 == 0){
+            LIBRADOR_LOG(LOG_DEBUG, "iso6 QA: endpoint %d's queue passed %d packets and lost its oldest "
+                "(overflow %llu); queued %zu %zu %zu %zu %zu %zu, received %llu %llu %llu %llu %llu %llu\n",
+                ep_index, 4 * ISO_PACKETS_PER_CTX, (unsigned long long)iso6_qa_overflows,
+                iso6_queues[0].size(), iso6_queues[1].size(), iso6_queues[2].size(),
+                iso6_queues[3].size(), iso6_queues[4].size(), iso6_queues[5].size(),
+                (unsigned long long)iso6_received[0], (unsigned long long)iso6_received[1],
+                (unsigned long long)iso6_received[2], (unsigned long long)iso6_received[3],
+                (unsigned long long)iso6_received[4], (unsigned long long)iso6_received[5]);
+        }
     }
 }
 
@@ -486,6 +530,9 @@ void usbCallHandler::realign_iso6(){
     if(best_hits < ISO6_JUDGE_METAS - allowed_misses){
         LIBRADOR_LOG(LOG_DEBUG, "iso6: no alignment explains the metas (best %d of %d; %ld candidates in %ld us)\n",
             best_hits, ISO6_JUDGE_METAS, candidates, search_us);
+        // QA DIAGNOSTIC: the first failures of a stream, and one every few hundred after.
+        if(iso6_qa_dumps < 3 || iso6_qa_dumps % 300 == 0) iso6_qa_dump("search failed");
+        iso6_qa_dumps++;
         return;
     }
     // Move every queue forward (never back) until the next packet each will

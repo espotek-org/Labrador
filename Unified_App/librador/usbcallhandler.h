@@ -347,6 +347,10 @@ private:
     // libusb event thread (the callbacks and the periodic stats log).
     uint64_t iso_transfers_done[MAX_DATA_ENDPOINTS + 1] = {0};
     uint64_t iso_transfers_failed[MAX_DATA_ENDPOINTS + 1] = {0};
+    // QA DIAGNOSTIC: iso6 queue overflows and alignment dumps this stream (ingest thread only).
+    uint64_t iso6_qa_overflows = 0;
+    int iso6_qa_dumps = 0;
+    void iso6_qa_dump(const char *why);
     short iso6_hist[MAX_DATA_ENDPOINTS][ISO6_HIST];  // XOR of packet n at [n % ISO6_HIST], -1 if not a full slice
     uint64_t iso6_received[MAX_DATA_ENDPOINTS];      // packets received per endpoint
     uint64_t iso6_skip[MAX_DATA_ENDPOINTS];          // packets to drop on arrival to reach the new alignment
