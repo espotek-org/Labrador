@@ -78,6 +78,15 @@ it.
    (PR to follow). Supersedes the "prefer the completion-port length when
    the two disagree" variant from #459, which guarded against the symptom;
    this removes the double completion that caused it.
+2. `0002-windows-run-the-io-completion-thread-at-time-critical-priority.patch`
+   - `libusb/os/windows_common.c`: the I/O completion thread runs at
+   `THREAD_PRIORITY_TIME_CRITICAL`. Every completion reaches the event thread
+   through it, so when it waits behind normal-priority work (Defender, Windows
+   Update, a build) no transfer is resubmitted and a stream loses frames once
+   its queued transfers run out; librador raises its own event thread the same
+   way. Not submitted upstream: whether a library should pick its threads'
+   priority is libusb's call, so this stays a Labrador patch until libusb
+   offers an option for it.
 
 ## Updating
 
