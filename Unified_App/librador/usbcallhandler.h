@@ -98,6 +98,8 @@ extern "C"
 // ~340 ms at full rate.
 #define NUM_BULK_CTX 16
 #define BULK_CTX_SIZE 16384
+// qa only (experiment): the largest LIBRADOR_BULK_XFER, 168 frames.
+#define BULK_CTX_MAX (168*768)
 
 // Single source of truth for the firmware the app expects on the board.
 // Flip these together with the .hex shipped in the app assets.
@@ -293,7 +295,7 @@ private:
     unsigned char metaBuffer[NUM_FUTURE_CTX][AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX];
     // Bulk transport: queued bulk reads parsed as a framed byte stream.
     libusb_transfer *bulkCtx[NUM_BULK_CTX];
-    unsigned char bulkBuffer[NUM_BULK_CTX][BULK_CTX_SIZE];
+    unsigned char bulkBuffer[NUM_BULK_CTX][BULK_CTX_MAX];
     std::vector<unsigned char> bulk_stream;
     // Transport state
     int requested_transport = LABRADOR_TRANSPORT_AUTO;

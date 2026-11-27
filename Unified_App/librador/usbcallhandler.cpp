@@ -1,6 +1,8 @@
 #include "usbcallhandler.h"
 //#include <stdio.h>
 #include <cstring>
+#include <cstdlib>
+#include <cstdio>
 #include <algorithm>
 
 #include <math.h>
@@ -1247,12 +1249,20 @@ int usbCallHandler::start_streaming(){
 void usbCallHandler::alloc_iso_transfers(){
     alloc_transport = active_transport;
     if(active_transport == LABRADOR_TRANSPORT_BULK){
+        // qa only (experiment): the bulk transfer size from LIBRADOR_BULK_XFER.
+        int bulk_xfer = BULK_CTX_SIZE;
+        if(const char *e = getenv("LIBRADOR_BULK_XFER")) bulk_xfer = atoi(e);
+        if(bulk_xfer <= 0 || bulk_xfer > BULK_CTX_MAX || bulk_xfer % 64){
+            fprintf(stderr, "LIBRADOR_BULK_XFER=%d: must be a multiple of 64 up to %d\n", bulk_xfer, BULK_CTX_MAX);
+            abort();
+        }
+        LIBRADOR_LOG(LOG_WARNING, "bulk transfers of %d bytes (%d x %d queued)\n", bulk_xfer, NUM_BULK_CTX, bulk_xfer);
         for(int n=0;n<NUM_BULK_CTX;n++){
             bulkCtx[n] = libusb_alloc_transfer(0);
             // Timeout 0: with a deep queue the tail URBs legitimately wait
             // longer than any finite timeout before data reaches them
             // (libusb counts from submission).  Teardown cancels explicitly.
-            libusb_fill_bulk_transfer(bulkCtx[n], handle, AIO_EP_BULK, bulkBuffer[n], BULK_CTX_SIZE, bulkCallback, this, 0);
+            libusb_fill_bulk_transfer(bulkCtx[n], handle, AIO_EP_BULK, bulkBuffer[n], bulk_xfer, bulkCallback, this, 0);
         }
         return;
     }
