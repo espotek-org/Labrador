@@ -95,9 +95,10 @@ extern "C"
 // pre-queued kernel buffers even while the app's event thread is busy (on
 // Windows only with RAW_IO, which start_streaming() sets), so
 // this is the stall runway protecting the device's 1 ms drain deadline
-// (ADC overwrites its double buffer every 2 ms).  16 x 16 KB = 256 KB =
-// ~340 ms at full rate.
-#define NUM_BULK_CTX 16
+// (ADC overwrites its double buffer every 2 ms).  64 x 16 KB = 1 MB =
+// ~1.37 s at full rate: in a Windows VM the reads stopped being serviced for
+// 0.5 to 0.9 s every few minutes, longer than 16 reads (~340 ms) last.
+#define NUM_BULK_CTX 64
 #define BULK_CTX_SIZE 16384
 
 // Single source of truth for the firmware the app expects on the board.
