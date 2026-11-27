@@ -1260,10 +1260,10 @@ void usbCallHandler::alloc_iso_transfers(){
 #ifdef _WIN32
         if(const char *raw = getenv("LIBRADOR_BULK_RAW_IO")){
             int supported = libusb_endpoint_supports_raw_io(handle, AIO_EP_BULK);
-            int max_size = libusb_get_max_raw_io_transfer_size(handle, AIO_EP_BULK);
+            // libusb_get_max_raw_io_transfer_size() crashes in libusbK.dll 3.0.7 (0xC0000005).
             int err = libusb_endpoint_set_raw_io(handle, AIO_EP_BULK, atoi(raw));
-            LIBRADOR_LOG(LOG_WARNING, "bulk RAW_IO=%s: supported %d, max raw transfer %d, set: %s\n",
-                         raw, supported, max_size, libusb_error_name(err));
+            LIBRADOR_LOG(LOG_WARNING, "bulk RAW_IO=%s: supported %d, set: %s\n",
+                         raw, supported, libusb_error_name(err));
             if(err != LIBUSB_SUCCESS) abort();
         }
 #endif
