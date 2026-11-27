@@ -1919,16 +1919,20 @@ int usbCallHandler::desktop_bootloader_recover(const char* hex_path){
     LIBRADOR_LOG(LOG_DEBUG, "Bootloader-mode board found: attempting launch\n");
     dfu_launch();
 
-    // Wait for the board to come back as the application firmware
+    // Wait for the board to come back as the application firmware.  The
+    // bootloader's device is often still listed just after the launch, so
+    // this waits for the application's device itself: stopping at the first
+    // Labrador seen sent a board that was launching fine to be reflashed,
+    // by when it had left the bootloader, and the recovery then failed
+    // though the board was running its firmware.  5 s, as after a flash.
+    bool app_mode = false;
     bool bootloader = false;
-    bool present = false;
-    for(int attempt = 0; attempt < 30; attempt++){
+    bool gobindar = false;
+    for(int attempt = 0; attempt < 50 && !app_mode; attempt++){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        present = desktop_device_present(&bootloader);
-        if(present)
-            break;
+        desktop_device_present_ex(&app_mode, &bootloader, &gobindar);
     }
-    if(present && !bootloader){
+    if(app_mode){
         int error = desktop_connect();
         if(error == 0 || error == 1){
             // 0 = streaming; 1 = connected but wrong firmware (the
