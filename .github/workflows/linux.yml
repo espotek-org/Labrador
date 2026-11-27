@@ -135,9 +135,6 @@ jobs:
         with:
           submodules: recursive
 
-      # The checkout belongs to the runner's user, not the container's root,
-      # so git needs it marked safe (the submodules too, hence "*") before
-      # CMake and linuxdeploy can read the commit.
       - name: Build, check and smoke-test the ${{ matrix.package }} in i386 Debian 11
         run: |
           docker run --rm --platform linux/386 \
@@ -146,7 +143,6 @@ jobs:
             linux32 bash -c '
               set -euxo pipefail
               packaging/linux/install-build-deps.sh ${{ matrix.package }}
-              git config --global --add safe.directory "*"
               packaging/linux/build-${{ matrix.package }}.sh i386 2.0.${{ github.run_number }}
             '
 
