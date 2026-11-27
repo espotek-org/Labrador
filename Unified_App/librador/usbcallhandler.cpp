@@ -4,6 +4,8 @@
 #endif
 //#include <stdio.h>
 #include <cstring>
+#include <cstdlib>
+#include <cstdio>
 #include <algorithm>
 
 #include <math.h>
@@ -1206,8 +1208,19 @@ int usbCallHandler::setup_usb_iso(){
     return 0;
 }
 
+// qa only (experiment): the bulk queue depth from LIBRADOR_BULK_CTX (default NUM_BULK_CTX).
+static int bulk_ctx_count(){
+    int n = NUM_BULK_CTX;
+    if(const char *e = getenv("LIBRADOR_BULK_CTX")) n = atoi(e);
+    if(n < 1 || n > NUM_BULK_CTX_MAX){
+        fprintf(stderr, "LIBRADOR_BULK_CTX=%d: must be 1 to %d\n", n, NUM_BULK_CTX_MAX);
+        abort();
+    }
+    return n;
+}
+
 int usbCallHandler::total_inflight_transfers(){
-    if(active_transport == LABRADOR_TRANSPORT_BULK) return NUM_BULK_CTX;
+    if(active_transport == LABRADOR_TRANSPORT_BULK) return bulk_ctx_count();
     return (num_data_endpoints + 1) * NUM_FUTURE_CTX;
 }
 
@@ -1252,6 +1265,7 @@ int usbCallHandler::start_streaming(){
         // packets, which BULK_CTX_SIZE is.  (Don't call
         // libusb_get_max_raw_io_transfer_size(): it crashes in the libusbK.dll
         // 3.0.7 the driver packages install.)
+        LIBRADOR_LOG(LOG_WARNING, "bulk queue: %d reads of %d bytes\n", bulk_ctx_count(), BULK_CTX_SIZE);
         static_assert(BULK_CTX_SIZE % 64 == 0, "RAW_IO bulk reads must be whole 64-byte packets");
         error = libusb_endpoint_set_raw_io(handle, AIO_EP_BULK, 1);
         if(error){
@@ -1271,7 +1285,7 @@ int usbCallHandler::start_streaming(){
 void usbCallHandler::alloc_iso_transfers(){
     alloc_transport = active_transport;
     if(active_transport == LABRADOR_TRANSPORT_BULK){
-        for(int n=0;n<NUM_BULK_CTX;n++){
+        for(int n=0;n<bulk_ctx_count();n++){
             bulkCtx[n] = libusb_alloc_transfer(0);
             // Timeout 0: with a deep queue the tail URBs legitimately wait
             // longer than any finite timeout before data reaches them
@@ -1307,7 +1321,7 @@ void usbCallHandler::alloc_iso_transfers(){
 int usbCallHandler::submit_iso_transfers(int *submitted){
     *submitted = 0;
     if(active_transport == LABRADOR_TRANSPORT_BULK){
-        for(int n=0;n<NUM_BULK_CTX;n++){
+        for(int n=0;n<bulk_ctx_count();n++){
             int error = libusb_submit_transfer(bulkCtx[n]);
             if(!error) (*submitted)++;
             if(error){
@@ -2267,7 +2281,7 @@ void usbCallHandler::teardown_connection(){
 void usbCallHandler::free_transfers(){
     if(alloc_transport < 0) return;
     if(alloc_transport == LABRADOR_TRANSPORT_BULK){
-        for(int n=0; n<NUM_BULK_CTX; n++){
+        for(int n=0; n<bulk_ctx_count(); n++){
             libusb_free_transfer(bulkCtx[n]);
         }
     } else {

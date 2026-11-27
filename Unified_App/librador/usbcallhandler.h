@@ -98,6 +98,8 @@ extern "C"
 // (ADC overwrites its double buffer every 2 ms).  16 x 16 KB = 256 KB =
 // ~340 ms at full rate.
 #define NUM_BULK_CTX 16
+// qa only (experiment): the most LIBRADOR_BULK_CTX may ask for.
+#define NUM_BULK_CTX_MAX 64
 #define BULK_CTX_SIZE 16384
 
 // Single source of truth for the firmware the app expects on the board.
@@ -293,8 +295,8 @@ private:
     unsigned char dataBuffer[MAX_DATA_ENDPOINTS][NUM_FUTURE_CTX][ISO_PACKET_SIZE*ISO_PACKETS_PER_CTX];
     unsigned char metaBuffer[NUM_FUTURE_CTX][AIO_META_PACKET_SIZE*ISO_PACKETS_PER_CTX];
     // Bulk transport: queued bulk reads parsed as a framed byte stream.
-    libusb_transfer *bulkCtx[NUM_BULK_CTX];
-    unsigned char bulkBuffer[NUM_BULK_CTX][BULK_CTX_SIZE];
+    libusb_transfer *bulkCtx[NUM_BULK_CTX_MAX];
+    unsigned char bulkBuffer[NUM_BULK_CTX_MAX][BULK_CTX_SIZE];
     std::vector<unsigned char> bulk_stream;
     // Transport state
     int requested_transport = LABRADOR_TRANSPORT_AUTO;
