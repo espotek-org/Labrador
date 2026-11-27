@@ -117,6 +117,7 @@ jobs:
   # host checks out and uploads.  linux32 makes uname -m report i686, which
   # configure, CMake and linuxdeploy go by.
   build-i386:
+    name: build-i386 (${{ matrix.package }})
     strategy:
       fail-fast: false
       matrix:
