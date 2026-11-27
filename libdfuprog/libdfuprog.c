@@ -33,6 +33,9 @@
 #include <libusb.h>
 #else
 #include <usb.h>
+#ifdef _WIN32
+#include "libusb0_dyn.h"
+#endif
 #endif
 
 #include "config.h"
@@ -325,6 +328,14 @@ int dfuprog_virtual_main(int argc, char **argv)
         return DEVICE_ACCESS_ERROR;
     }
 #else
+#ifdef _WIN32
+    /* Windows flashes through libusb0.dll, which the bootloader driver
+     * package installs; without it there is no way to reach the device. */
+    if( !dfuprog_libusb0_available() ) {
+        fprintf( stderr, "%s: the bootloader USB driver (libusb-win32) is not installed.\n", progname );
+        return DEVICE_ACCESS_ERROR;
+    }
+#endif
     usb_init();
 #endif
 

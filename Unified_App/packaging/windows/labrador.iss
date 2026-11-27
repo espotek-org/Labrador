@@ -90,6 +90,13 @@ Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion 
 ; since other devices may be using the service.  No x64 driver loads on ARM64.
 Source: "{#StagingDir}\driver\Bootloader_Install\amd64\libusb0.sys"; DestDir: "{sys}\drivers"; Flags: uninsneveruninstall restartreplace; Check: IsX64OS
 Source: "{#StagingDir}\driver\Bootloader_Install\x86\libusb0.sys"; DestDir: "{sys}\drivers"; Flags: uninsneveruninstall restartreplace; Check: not Is64BitInstallMode
+; The firmware flasher reaches the bootloader through libusb0.dll
+; (libdfuprog/win32), loaded from System32 as dfu-programmer.exe always has.
+; The driver packages copy it there only when Windows installs one of them
+; on a device, so Setup puts it there as well, on the same terms as
+; libusb0.sys.
+Source: "{#StagingDir}\driver\Bootloader_Install\amd64\libusb0.dll"; DestDir: "{sys}"; Flags: uninsneveruninstall restartreplace; Check: IsX64OS
+Source: "{#StagingDir}\driver\Bootloader_Install\x86\libusb0_x86.dll"; DestDir: "{sys}"; DestName: "libusb0.dll"; Flags: uninsneveruninstall restartreplace; Check: not Is64BitInstallMode
 ; Sets up again the bootloader device nodes that were left without a driver
 ; before libusb0.sys was there (see the script).
 Source: "reset-bootloader-devices.ps1"; DestDir: "{app}\driver"; Flags: ignoreversion
