@@ -76,6 +76,10 @@ jobs:
           # Inno appends " version X.Y.Z" to the display name.
           Check ($reg.DisplayName -like 'EspoTek Labrador Unified App (Beta)*') "Add/Remove Programs entry: '$($reg.DisplayName)'"
 
+          $sys = "$env:windir\System32\drivers\libusb0.sys"
+          Check ((Test-Path $sys) -and (Get-Item $sys).VersionInfo.FileVersion -like '1.2.6.0*') "bootloader driver binary in System32\drivers (libusb0.sys $(if (Test-Path $sys) { (Get-Item $sys).VersionInfo.FileVersion }))"
+          $dll = "$env:windir\System32\libusb0.dll"
+          Check ((Test-Path $dll) -and (Get-Item $dll).VersionInfo.FileVersion -like '1.2.6.0*') "firmware flasher's libusb0.dll in System32 ($(if (Test-Path $dll) { (Get-Item $dll).VersionInfo.FileVersion }))"
           $drivers = (pnputil /enum-drivers) -join "`n"
           foreach ($inf in 'atxmega32a4u.inf','labrador.inf','usbgobindar_dummy_device.inf') {
             Check ($drivers -match [regex]::Escape($inf)) "driver store has $inf"

@@ -76,6 +76,30 @@ Source: "{#StagingDir}\labrador32.exe"; DestDir: "{app}"; DestName: "labrador.ex
 Source: "{#StagingDir}\labrador-cli32.exe"; DestDir: "{app}"; DestName: "labrador-cli.exe"; Flags: ignoreversion; Check: not Is64BitInstallMode
 Source: "{#StagingDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StagingDir}\driver\*"; DestDir: "{app}\driver"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The bootloader's kernel driver, libusb0.sys, also goes straight into
+; System32\drivers (#457).  Windows ranks all signed driver packages equally
+; by default, so the bootloader (03EB:2FE4) gets the newest-dated package that
+; matches it, and Atmel's atmel_usb_dfu.inf 2.0.0.1 (06/20/2019, offered by
+; Windows Update and installed with Atmel/Microchip tools) is newer than
+; ATxmega32A4U.inf (02/24/2013).  Atmel's package installs the same libusb0
+; service but copies no libusb0.sys, so on a PC that had none the bootloader
+; was left without a driver (code 18) and every firmware update failed.  With
+; the file already there either package puts the bootloader on this
+; libusb0.sys.  Setup keeps a newer copy (Inno's version check), replaces an
+; older one that's loaded at the next restart, and the uninstaller leaves it,
+; since other devices may be using the service.  No x64 driver loads on ARM64.
+Source: "{#StagingDir}\driver\Bootloader_Install\amd64\libusb0.sys"; DestDir: "{sys}\drivers"; Flags: uninsneveruninstall restartreplace; Check: IsX64OS
+Source: "{#StagingDir}\driver\Bootloader_Install\x86\libusb0.sys"; DestDir: "{sys}\drivers"; Flags: uninsneveruninstall restartreplace; Check: not Is64BitInstallMode
+; The firmware flasher reaches the bootloader through libusb0.dll
+; (libdfuprog/win32), loaded from System32 as dfu-programmer.exe always has.
+; The driver packages copy it there only when Windows installs one of them
+; on a device, so Setup puts it there as well, on the same terms as
+; libusb0.sys.
+Source: "{#StagingDir}\driver\Bootloader_Install\amd64\libusb0.dll"; DestDir: "{sys}"; Flags: uninsneveruninstall restartreplace; Check: IsX64OS
+Source: "{#StagingDir}\driver\Bootloader_Install\x86\libusb0_x86.dll"; DestDir: "{sys}"; DestName: "libusb0.dll"; Flags: uninsneveruninstall restartreplace; Check: not Is64BitInstallMode
+; Sets up again the bootloader device nodes that were left without a driver
+; before libusb0.sys was there (see the script).
+Source: "reset-bootloader-devices.ps1"; DestDir: "{app}\driver"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -99,6 +123,9 @@ Filename: "{app}\driver\Driver_Install\dpinst32.exe"; Parameters: "/SW /SA"; Wor
 Filename: "{app}\driver\Bootloader_Install\dpscat.exe"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated
 Filename: "{app}\driver\Bootloader_Install\dpinst64.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
 Filename: "{app}\driver\Bootloader_Install\dpinst32.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Bootloader_Install"; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated; Check: not Is64BitInstallMode
+; A bootloader that an earlier install left without a driver (#457) gets one
+; now that libusb0.sys is in place.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\driver\reset-bootloader-devices.ps1"""; StatusMsg: "Installing USB driver: firmware update (bootloader)..."; Flags: runhidden waituntilterminated
 Filename: "{app}\driver\Gobindar_Install\dpscat.exe"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated
 Filename: "{app}\driver\Gobindar_Install\dpinst64.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
 Filename: "{app}\driver\Gobindar_Install\dpinst32.exe"; Parameters: "/SW /SA"; WorkingDir: "{app}\driver\Gobindar_Install"; StatusMsg: "Installing USB driver: board recovery..."; Flags: runhidden waituntilterminated; Check: not Is64BitInstallMode
