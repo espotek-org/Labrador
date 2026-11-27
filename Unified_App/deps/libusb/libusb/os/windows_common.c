@@ -614,6 +614,13 @@ static int windows_init(struct libusb_context *ctx)
 		goto init_exit;
 	}
 
+	// Every completion reaches the event thread through this one, so while
+	// it waits for a CPU no transfer can be resubmitted, and an isochronous
+	// stream loses frames once its queued transfers run out. It does next to
+	// nothing per completion, so run it ahead of normal-priority work.
+	if (!SetThreadPriority(priv->completion_port_thread, THREAD_PRIORITY_TIME_CRITICAL))
+		usbi_warn(ctx, "failed to raise the I/O completion thread's priority: %s", windows_error_str(0));
+
 	r = LIBUSB_SUCCESS;
 
 #if defined(LIBUSB_WINDOWS_HOTPLUG)

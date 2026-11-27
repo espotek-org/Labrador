@@ -9,6 +9,7 @@
 #include <thread>
 
 #include <SDL3/SDL_iostream.h>
+#include <SDL3/SDL_thread.h>
 #include "librador_platform.h"
 
 // ---------------------------------------------------------------------------
@@ -315,8 +316,30 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     ingest_cv.notify_one();
 }
 
+// Windows: the USB threads run ahead of normal-priority work.  A Windows 11
+// guest busy with its own background work (100% CPU and thousands of disk
+// transfers a second for minutes after an install) held the ingest thread up
+// for 6 to 24 s at normal priority, so its hand-off queue overflowed and iso6
+// came out of step, in every one of five 60 s streams; at these priorities
+// the same conditions cost nothing in four of five and 55 frames in the
+// fifth.  The event thread, which resubmits every transfer, goes to
+// time-critical, as does libusb's I/O completion thread (deps/libusb patch
+// 0002); the ingest thread, which does the per-frame work, to high, where it
+// still outranks normal work but can't take a core from the system.
+static void raise_usb_thread_priority(SDL_ThreadPriority priority, const char *thread){
+#ifdef _WIN32
+    if(!SDL_SetCurrentThreadPriority(priority)){
+        LIBRADOR_LOG(LOG_WARNING, "couldn't raise the %s thread's priority: %s\n", thread, SDL_GetError());
+    }
+#else
+    (void)priority;
+    (void)thread;
+#endif
+}
+
 void usbCallHandler::ingest_thread_function(){
     LIBRADOR_LOG(LOG_DEBUG, "ingest thread spawned\n");
+    raise_usb_thread_priority(SDL_THREAD_PRIORITY_HIGH, "ingest");
     while(true){
         std::deque<IngestItem> batch;
         {
@@ -430,6 +453,7 @@ std::atomic<uint32_t> g_ctrl_req_counts[256];
 
 void usbCallHandler::iso_polling_function(libusb_context *ctx){
     LIBRADOR_LOG(LOG_DEBUG, "iso_polling_function thread spawned\n");
+    raise_usb_thread_priority(SDL_THREAD_PRIORITY_TIME_CRITICAL, "USB event");
     struct timeval tv;
     tv.tv_sec = 1;
     tv.tv_usec = 0;//ISO_PACKETS_PER_CTX*4000;
