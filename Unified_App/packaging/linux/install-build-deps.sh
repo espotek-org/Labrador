@@ -27,6 +27,26 @@ case "$KIND" in
         ;;
 esac
 
+# Debian 11's long-term support ended in August 2026 and its suites moved to
+# archive.debian.org (deb.debian.org already answers 404 for the security
+# pool), so the Debian image's sources are pointed there.  Ubuntu 20.04's
+# archive is still on archive.ubuntu.com and ports.ubuntu.com.
+. /etc/os-release
+case "$ID $VERSION_ID" in
+    "ubuntu 20.04") ;;
+    "debian 11")
+        cat > /etc/apt/sources.list <<'EOF'
+deb http://archive.debian.org/debian bullseye main
+deb http://archive.debian.org/debian bullseye-updates main
+deb http://archive.debian.org/debian-security bullseye-security main
+EOF
+        ;;
+    *)
+        echo "unexpected build distro: $ID $VERSION_ID (expected Ubuntu 20.04 or Debian 11)" >&2
+        exit 1
+        ;;
+esac
+
 apt-get -o Acquire::Retries=3 update
 # ports.ubuntu.com has partial outages; retry the whole install
 # (fetched .debs stay cached, retries only pull the stragglers).
