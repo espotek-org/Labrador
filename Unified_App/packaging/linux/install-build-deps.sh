@@ -9,6 +9,8 @@
 set -euxo pipefail
 
 KIND=$1
+# The repository checkout this script is in.
+ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)
 export DEBIAN_FRONTEND=noninteractive
 
 PACKAGES=(build-essential git ca-certificates wget file pkg-config python3-pip
@@ -79,3 +81,15 @@ tar xzf libdecor-0.2.2.tar.gz
 cd libdecor-0.2.2
 meson setup build --prefix=/usr --buildtype=release -Ddemo=false -Dgtk=disabled
 ninja -C build install
+
+# The checkout is mounted into the container from the host, where it belongs
+# to the runner's user rather than root, and git refuses to read a repository
+# someone else owns ("detected dubious ownership").  CMake embeds the commit
+# in the app, reading it quietly, so a refusal would leave it empty, and
+# linuxdeploy labels the AppImage with it; so mark the checkout and its
+# submodules safe.
+git config --global --add safe.directory "$ROOT"
+git config -f "$ROOT/.gitmodules" --get-regexp '^submodule\..*\.path$' |
+    while read -r _ path; do
+        git config --global --add safe.directory "$ROOT/$path"
+    done
