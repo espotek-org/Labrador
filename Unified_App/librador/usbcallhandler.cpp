@@ -716,11 +716,13 @@ void usbCallHandler::queue_ingest(uint8_t kind, uint8_t ep_index, const unsigned
     {
         std::lock_guard<std::mutex> lock(ingest_mutex);
         // Backstop against an unbounded queue if the ingest thread dies:
-        // about 10 s of iso6 (seven items a millisecond).  Dropping items
-        // leaves iso6's endpoints out of step, so it must not be reached by
-        // an ingest thread that was only held up (a Linux VM held it up for
-        // about half a second, 3,234 items; this was 4,096).
-        if(ingest_queue.size() > 70000){
+        // about 60 s of iso6 (seven items a millisecond, some 70 MB).
+        // Dropping items leaves iso6's endpoints out of step, so it must not
+        // be reached by an ingest thread that was only held up: a Linux VM
+        // held it up for about half a second (3,234 items; this was 4,096),
+        // and a Windows guest busy with its own disk work for 9 to 12 s
+        // (this was 70,000, about 10 s).
+        if(ingest_queue.size() > 420000){
             // QA DIAGNOSTIC
             ingest_qa_dropped++;
             if(ingest_qa_dropped <= 5 || ingest_qa_dropped % 1000 == 0){
