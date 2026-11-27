@@ -1,4 +1,7 @@
 #include "usbcallhandler.h"
+#if defined(_WIN32) && (!defined(LIBUSB_API_VERSION) || LIBUSB_API_VERSION < 0x0100010C)
+#error "Windows builds need libusb_endpoint_set_raw_io(), from libusb 1.0.30 or later (the bundled copy)"
+#endif
 //#include <stdio.h>
 #include <cstring>
 
@@ -731,6 +734,27 @@ int usbCallHandler::start_streaming(){
         LIBRADOR_LOG(LOG_WARNING, "set_interface_alt_setting(%d,1) FAILED: %s\n", claimed_iface, libusb_error_name(error));
         return -4;
     }
+#ifdef _WIN32
+    if(active_transport == LABRADOR_TRANSPORT_BULK){
+        // RAW_IO: the driver (WinUSB, or libusbK.sys, which takes the same
+        // pipe policies) passes every queued bulk read straight to the USB
+        // stack.  Without it the driver queues them itself, and the pipe can
+        // sit idle between two reads while a completion and the next
+        // submission go round.  The board has to start each
+        // frame within 700 us of its SOF, so whenever that round trip is slow
+        // a frame is lost: in a Windows VM, 531 to 2,702 of 60,000 frames a
+        // minute without RAW_IO and none with it.  RAW_IO reads must be whole
+        // packets, which BULK_CTX_SIZE is.  (Don't call
+        // libusb_get_max_raw_io_transfer_size(): it crashes in the libusbK.dll
+        // 3.0.7 the driver packages install.)
+        static_assert(BULK_CTX_SIZE % 64 == 0, "RAW_IO bulk reads must be whole 64-byte packets");
+        error = libusb_endpoint_set_raw_io(handle, AIO_EP_BULK, 1);
+        if(error){
+            LIBRADOR_LOG(LOG_WARNING, "endpoint_set_raw_io(0x%02x) FAILED: %s\n", AIO_EP_BULK, libusb_error_name(error));
+            return -5;
+        }
+    }
+#endif
 
     alloc_iso_transfers();
     return submit_iso_transfers();

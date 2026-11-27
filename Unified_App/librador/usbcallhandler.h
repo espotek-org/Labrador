@@ -67,7 +67,8 @@ extern "C"
 #define AIO_BULK_PAYLOAD_XFER 768
 #define MAX_DATA_ENDPOINTS 6
 // Bulk URB queue depth: the host controller keeps draining the pipe into
-// pre-queued kernel buffers even while the app's event thread is busy, so
+// pre-queued kernel buffers even while the app's event thread is busy (on
+// Windows only with RAW_IO, which start_streaming() sets), so
 // this is the stall runway protecting the device's 1 ms drain deadline
 // (ADC overwrites its double buffer every 2 ms).  16 x 16 KB = 256 KB =
 // ~340 ms at full rate.
