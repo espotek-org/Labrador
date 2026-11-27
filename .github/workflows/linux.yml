@@ -1,16 +1,21 @@
 # Build + package the Unified_App (SDL3/ImGui) Linux artifacts: AppImage and
-# .deb for x86_64 and arm64 (Raspberry Pi), each carrying the GUI, the headless
-# labrador-cli, the firmware hex, udev rules, icon and .desktop entry. Also a
-# Raspberry-Pi GLES2 compile check.
+# .deb for x86_64, arm64 (Raspberry Pi) and i386 (32-bit PCs), each carrying
+# the GUI, the headless labrador-cli, the firmware hex, udev rules, icon and
+# .desktop entry. Also a Raspberry-Pi GLES2 compile check.
 #
-# Both package jobs build inside an ubuntu:20.04 container so the binaries'
-# glibc floor is 2.31 (Ubuntu 20.04+ / Debian 11+ / Pi OS bullseye+).  20.04
-# ships wayland 1.18, SDL3's minimum, so the Wayland backend stays enabled --
-# libdecor (not packaged on 20.04) is built from source, and SDL dlopens it at
-# runtime like the rest of the Wayland stack.  The AppImage binary statically
-# links libstdc++/libgcc (so the host's C++ runtime version is irrelevant) and
-# libusb; the .deb stays fully dynamic and lets dpkg manage its dependencies.
-# Reusable (called by continuous.yml) and directly dispatchable. Uploads
+# Every arch runs the same recipe, the scripts in Unified_App/packaging/linux/
+# (install-build-deps.sh, then build-appimage.sh or build-deb.sh), as root in
+# a glibc 2.31 container, so the binaries' glibc floor is 2.31 (Ubuntu 20.04+
+# / Debian 11+ / Pi OS bullseye+).  x86_64 and arm64 build in ubuntu:20.04,
+# whose wayland 1.18 is SDL3's minimum, so the Wayland backend stays enabled
+# (libdecor, not packaged on 20.04, is built from source, and SDL dlopens it
+# at runtime like the rest of the Wayland stack).  i386 builds in Debian 11
+# (i386/debian:bullseye), which has the same glibc and wayland, because
+# Ubuntu 20.04 has no i386 release.  The AppImage binary statically links
+# libstdc++/libgcc (so the host's C++ runtime version is irrelevant) and
+# libusb; the .deb stays fully dynamic and lets dpkg manage its
+# dependencies.
+# Reusable (called by qa-release.yml) and directly dispatchable. Uploads
 # asset-appimage-<arch> and asset-deb-<arch>.
 name: Build Linux
 
@@ -36,172 +41,29 @@ jobs:
         include:
           - os: ubuntu-22.04
             arch: x86_64
-            ldarch: x86_64
           - os: ubuntu-22.04-arm
             arch: arm64
-            ldarch: aarch64
     runs-on: ${{ matrix.os }}
     container: ubuntu:20.04
-    env:
-      APPIMAGE_EXTRACT_AND_RUN: 1
-      DEBIAN_FRONTEND: noninteractive
     steps:
-      # Ordered before checkout: actions/checkout needs git inside the
-      # container (and the default working-directory only exists after it).
-      - name: Install dependencies
+      # actions/checkout needs git inside the container to check out the
+      # submodules (and the default working-directory only exists after it).
+      - name: Install git
         working-directory: /
         run: |
           apt-get -o Acquire::Retries=3 update
-          # ports.ubuntu.com has partial outages; retry the whole install
-          # (fetched .debs stay cached, retries only pull the stragglers).
-          ok=""
-          for i in 1 2 3; do
-            if apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget bzip2 file \
-              pkg-config python3-pip \
-              libgl1-mesa-dev libegl1-mesa-dev \
-              libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-              libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-              libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev; then
-              ok=1; break
-            fi
-            echo "apt-get install failed (attempt $i); retrying"
-            sleep 20
-            apt-get -o Acquire::Retries=3 update || true
-          done
-          test -n "$ok"
-          # 20.04's cmake (3.16) and meson (0.53) are too old; ninja to match.
-          pip3 install "cmake>=3.22,<4" ninja meson
+          DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y git ca-certificates
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Not packaged on 20.04.  SDL compiles Wayland CSD support against these
-      # headers and dlopens libdecor-0.so.0 from the host at runtime, so the
-      # build products themselves never link it.
-      - name: Build libdecor
-        working-directory: /
-        run: |
-          set -euxo pipefail
-          wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
-          tar xzf libdecor-0.2.2.tar.gz
-          cd libdecor-0.2.2
-          meson setup build --prefix=/usr --buildtype=release -Ddemo=false -Dgtk=disabled
-          ninja -C build install
+      - name: Install build dependencies
+        run: packaging/linux/install-build-deps.sh appimage
 
-      # Static libusb for the self-contained AppImage binary. --disable-udev:
-      # hotplug via netlink and sysfs enumeration, no libudev dependency.
-      - name: Build static libusb
-        run: |
-          set -euxo pipefail
-          wget -nv https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2
-          tar xjf libusb-1.0.29.tar.bz2
-          cd libusb-1.0.29
-          ./configure --prefix="$PWD/../libusb-static" --disable-udev \
-            --enable-static --disable-shared
-          make -j"$(nproc)"
-          make install
-
-      - name: Build
-        run: |
-          export PKG_CONFIG_PATH="$PWD/libusb-static/lib/pkgconfig"
-          cmake --preset appimage -DLABRADOR_VERSION=2.0.${{ github.run_number }}
-          cmake --build --preset appimage
-
-      # Unit test for the in-app flasher's command splitting (#450); links the
-      # static libusb built above.
-      - name: Test libdfuprog
-        working-directory: libdfuprog/tests
-        env:
-          PKG_CONFIG_PATH: ${{ github.workspace }}/Unified_App/libusb-static/lib/pkgconfig
-        run: make test
-
-      - name: Verify portability
-        run: |
-          set -euxo pipefail
-          # The GUI and labrador-cli ship in the same AppImage, so both must
-          # meet the floors.
-          for BIN in build/appimage/labrador build/appimage/cli/labrador-cli; do
-            # glibc floor must stay at the container's 2.31.
-            objdump -p "$BIN" | grep NEEDED
-            MAX=$(objdump -T "$BIN" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -Vu | tail -1)
-            echo "$BIN max glibc symbol: $MAX"
-            test "$(printf '%s\nGLIBC_2.31\n' "$MAX" | sort -V | tail -1)" = "GLIBC_2.31"
-            # C++ runtime and libusb are baked in, not dynamic dependencies.
-            if objdump -p "$BIN" | grep -E 'NEEDED.*(libstdc\+\+|libgcc_s|libusb)'; then
-              echo "ERROR: unexpected dynamic dependency in $BIN" >&2
-              exit 1
-            fi
-          done
-          # Both video backends (and libdecor CSD support) must be compiled in.
-          CFG=$(find build/appimage -name SDL_build_config.h | head -1)
-          grep -q "#define SDL_VIDEO_DRIVER_WAYLAND 1" "$CFG"
-          grep -q "#define SDL_VIDEO_DRIVER_X11 1" "$CFG"
-          grep -q "#define HAVE_LIBDECOR_H 1" "$CFG"
-
-      - name: Assemble AppDir
-        run: |
-          set -euxo pipefail
-          APPDIR=AppDir
-          rm -rf "$APPDIR"
-          mkdir -p "$APPDIR/usr/bin/assets" \
-                   "$APPDIR/usr/lib/udev/rules.d" \
-                   "$APPDIR/usr/share/applications" \
-                   "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
-                   "$APPDIR/apprun-hooks"
-          cp build/appimage/labrador "$APPDIR/usr/bin/labrador"
-          # labrador-cli sits beside the GUI; the zz-labrador-cli.sh AppRun hook
-          # routes `<AppImage> cli ...` (or an ARGV0 of labrador-cli) to it.
-          cp build/appimage/cli/labrador-cli "$APPDIR/usr/bin/labrador-cli"
-          # SDL_GetBasePath() resolves /proc/self/exe -> usr/bin, so assets live
-          # there, shared by both binaries (the CLI's update-firmware flashes
-          # the same hex the GUI does).
-          cp -r assets/. "$APPDIR/usr/bin/assets/"
-          mkdir -p "$APPDIR/usr/bin/assets/firmware"
-          cp firmware/*.hex "$APPDIR/usr/bin/assets/firmware/"
-          cp packaging/69-labrador.rules "$APPDIR/usr/lib/udev/rules.d/"
-          cp packaging/espotek-labrador.desktop "$APPDIR/usr/share/applications/"
-          cp packaging/icon256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png"
-          cp packaging/linux/apprun-hooks/*.sh "$APPDIR/apprun-hooks/"
-          chmod +x "$APPDIR/apprun-hooks/"*.sh
-
-      - name: Build AppImage
-        run: |
-          set -euxo pipefail
-          LD=linuxdeploy-${{ matrix.ldarch }}.AppImage
-          wget -N -nv "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/${LD}"
-          chmod +x "$LD"
-          export LINUXDEPLOY_OUTPUT_APP_NAME=Labrador
-          export LINUXDEPLOY_OUTPUT_VERSION=$(git rev-parse --short HEAD)
-          "./$LD" --appdir=AppDir \
-            --executable=AppDir/usr/bin/labrador \
-            --desktop-file=AppDir/usr/share/applications/espotek-labrador.desktop \
-            --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png \
-            --output=appimage
-          mv Labrador*.AppImage "Labrador-for-Linux-${{ matrix.arch }}.AppImage"
-
-      # The CLI needs no display, so it can exercise the finished AppImage here
-      # (APPIMAGE_EXTRACT_AND_RUN: no FUSE in the container).  update-firmware
-      # with no board must get as far as looking for one, which proves it found
-      # the bundled hex under usr/bin/assets.
-      - name: Smoke test labrador-cli in the AppImage
-        run: |
-          set -euxo pipefail
-          IMG="./Labrador-for-Linux-${{ matrix.arch }}.AppImage"
-          "$IMG" cli --help
-          "$IMG" cli help capture
-          "$IMG" cli help update-firmware
-          if "$IMG" cli update-firmware >cli.log 2>&1; then
-            echo "ERROR: update-firmware succeeded with no board attached" >&2
-            exit 1
-          fi
-          cat cli.log
-          grep -q "no Labrador board found" cli.log
-          # Invoked through a symlink named labrador-cli the AppImage runtime
-          # sets ARGV0 to that name and the hook routes to the CLI as well.
-          ln -sf "$IMG" labrador-cli
-          ./labrador-cli --help | grep -q "command-line tools for the EspoTek Labrador"
+      - name: Build, check and smoke-test the AppImage
+        run: packaging/linux/build-appimage.sh ${{ matrix.arch }} 2.0.${{ github.run_number }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -217,150 +79,34 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            arch: amd64
-            name: x86_64
+            arch: x86_64
           - os: ubuntu-22.04-arm
             arch: arm64
-            name: arm64
     runs-on: ${{ matrix.os }}
     container: ubuntu:20.04
-    env:
-      DEBIAN_FRONTEND: noninteractive
     steps:
-      - name: Install dependencies
+      - name: Install git
         working-directory: /
         run: |
           apt-get -o Acquire::Retries=3 update
-          # ports.ubuntu.com has partial outages; retry the whole install
-          # (fetched .debs stay cached, retries only pull the stragglers).
-          ok=""
-          for i in 1 2 3; do
-            if apt-get -o Acquire::Retries=3 install -y build-essential git ca-certificates wget \
-              pkg-config python3-pip \
-              libusb-1.0-0-dev libgl1-mesa-dev libegl1-mesa-dev \
-              libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-              libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
-              libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libdbus-1-dev; then
-              ok=1; break
-            fi
-            echo "apt-get install failed (attempt $i); retrying"
-            sleep 20
-            apt-get -o Acquire::Retries=3 update || true
-          done
-          test -n "$ok"
-          pip3 install "cmake>=3.22,<4" ninja meson
+          DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y git ca-certificates
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Same source-built libdecor as the AppImage job: SDL needs the headers
-      # to compile Wayland CSD support, then dlopens it from the host.
-      - name: Build libdecor
-        working-directory: /
-        run: |
-          set -euxo pipefail
-          wget -nv https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/0.2.2/libdecor-0.2.2.tar.gz
-          tar xzf libdecor-0.2.2.tar.gz
-          cd libdecor-0.2.2
-          meson setup build --prefix=/usr --buildtype=release -Ddemo=false -Dgtk=disabled
-          ninja -C build install
+      - name: Install build dependencies
+        run: packaging/linux/install-build-deps.sh deb
 
-      - name: Build
-        run: |
-          cmake --preset linux -DLABRADOR_VERSION=2.0.${{ github.run_number }}
-          cmake --build --preset linux
-
-      - name: Build .deb
-        run: |
-          set -euxo pipefail
-          VER="2.0.${{ github.run_number }}"
-          PKG=pkgroot
-          rm -rf "$PKG"
-          mkdir -p "$PKG/DEBIAN" \
-                   "$PKG/usr/lib/labrador/assets" \
-                   "$PKG/usr/bin" \
-                   "$PKG/lib/udev/rules.d" \
-                   "$PKG/usr/share/applications" \
-                   "$PKG/usr/share/icons/hicolor/256x256/apps"
-          # Real binary + assets in a private dir; /usr/bin/labrador is a symlink.
-          # SDL_GetBasePath() resolves /proc/self/exe to the real dir, so assets
-          # are found next to the binary at /usr/lib/labrador/assets.
-          install -m 0755 build/linux/labrador "$PKG/usr/lib/labrador/labrador"
-          # labrador-cli lives beside the GUI so both find the same assets
-          # (its update-firmware flashes the bundled hex); the /usr/bin
-          # symlink puts it on PATH.
-          install -m 0755 build/linux/cli/labrador-cli "$PKG/usr/lib/labrador/labrador-cli"
-          cp -r assets/. "$PKG/usr/lib/labrador/assets/"
-          mkdir -p "$PKG/usr/lib/labrador/assets/firmware"
-          cp firmware/*.hex "$PKG/usr/lib/labrador/assets/firmware/"
-          ln -s ../lib/labrador/labrador "$PKG/usr/bin/labrador"
-          ln -s ../lib/labrador/labrador-cli "$PKG/usr/bin/labrador-cli"
-          cp packaging/69-labrador.rules "$PKG/lib/udev/rules.d/"
-          cp packaging/espotek-labrador.desktop "$PKG/usr/share/applications/"
-          cp packaging/icon256.png "$PKG/usr/share/icons/hicolor/256x256/apps/espotek-labrador.png"
-
-          INSTALLED_KB=$(du -sk "$PKG/usr" | cut -f1)
-          cat > "$PKG/DEBIAN/control" <<EOF
-          Package: espotek-labrador
-          Version: ${VER}
-          Section: electronics
-          Priority: optional
-          Architecture: ${{ matrix.arch }}
-          Maintainer: Chris Esposito <admin@espotek.com>
-          Installed-Size: ${INSTALLED_KB}
-          Depends: libc6, libstdc++6, libusb-1.0-0, libgl1, libopengl0, libx11-6
-          Homepage: https://espotek.com
-          Description: driver and GUI for EspoTek Labrador
-           The EspoTek Labrador is an open-source board that turns your PC, Raspberry
-           Pi, or Android smartphone into a full-featured electronics lab bench,
-           complete with oscilloscope, signal generator, and more.
-           .
-           This package contains the SDL3/ImGui unified GUI, the headless
-           labrador-cli tool (triggered captures to CSV, firmware updates) and the
-           firmware images both flash to the board.
-          EOF
-
-          cat > "$PKG/DEBIAN/postinst" <<'EOF'
-          #!/bin/sh
-          set -e
-          if command -v udevadm >/dev/null 2>&1; then
-              udevadm control --reload-rules || true
-              udevadm trigger --subsystem-match=usb || true
-          fi
-          EOF
-          chmod 0755 "$PKG/DEBIAN/postinst"
-
-          dpkg-deb --root-owner-group --build "$PKG" "Labrador-for-Linux-${{ matrix.name }}.deb"
-          dpkg-deb --info "Labrador-for-Linux-${{ matrix.name }}.deb"
-
-      # Install the package into the build container (root, no udev, so the
-      # postinst's udevadm calls are skipped) and run the CLI from PATH.
-      # update-firmware with no board must get as far as looking for one,
-      # which proves /usr/bin/labrador-cli -> /usr/lib/labrador resolves the
-      # bundled hex.
-      - name: Smoke test labrador-cli from the installed .deb
-        run: |
-          set -euxo pipefail
-          dpkg -i "Labrador-for-Linux-${{ matrix.name }}.deb"
-          command -v labrador-cli
-          labrador-cli --help
-          labrador-cli help capture
-          labrador-cli help update-firmware
-          if labrador-cli update-firmware >cli.log 2>&1; then
-            echo "ERROR: update-firmware succeeded with no board attached" >&2
-            exit 1
-          fi
-          cat cli.log
-          grep -q "no Labrador board found" cli.log
-          test -f /usr/lib/labrador/assets/firmware/labrafirm_000C_03.hex
+      - name: Build and smoke-test the .deb
+        run: packaging/linux/build-deb.sh ${{ matrix.arch }} 2.0.${{ github.run_number }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: asset-deb-${{ matrix.name }}
-          path: Unified_App/Labrador-for-Linux-${{ matrix.name }}.deb
+          name: asset-deb-${{ matrix.arch }}
+          path: Unified_App/Labrador-for-Linux-${{ matrix.arch }}.deb
           compression-level: 0
           if-no-files-found: error
 
