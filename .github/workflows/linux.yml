@@ -110,6 +110,53 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  # i386 runs the same scripts, but in a container started with docker run
+  # from the host: a `container:` job can't be 32-bit, because the runner
+  # mounts its own x86_64 node into the container for JavaScript actions
+  # (checkout, upload-artifact) and an i386 userland can't run it.  So the
+  # host checks out and uploads.  linux32 makes uname -m report i686, which
+  # configure, CMake and linuxdeploy go by.
+  build-i386:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: appimage
+            artifact: asset-appimage-i386
+            file: Labrador-for-Linux-i386.AppImage
+          - package: deb
+            artifact: asset-deb-i386
+            file: Labrador-for-Linux-i386.deb
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # The checkout belongs to the runner's user, not the container's root,
+      # so git needs it marked safe (the submodules too, hence "*") before
+      # CMake and linuxdeploy can read the commit.
+      - name: Build, check and smoke-test the ${{ matrix.package }} in i386 Debian 11
+        run: |
+          docker run --rm --platform linux/386 \
+            -v "$GITHUB_WORKSPACE:/w" -w /w/Unified_App \
+            i386/debian:bullseye \
+            linux32 bash -c '
+              set -euxo pipefail
+              packaging/linux/install-build-deps.sh ${{ matrix.package }}
+              git config --global --add safe.directory "*"
+              packaging/linux/build-${{ matrix.package }}.sh i386 2.0.${{ github.run_number }}
+            '
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: Unified_App/${{ matrix.file }}
+          compression-level: 0
+          if-no-files-found: error
+
   # Not released: validates the Raspberry Pi 3 (GLES 2.0) renderer keeps compiling.
   build-pi-gles2-check:
     runs-on: ubuntu-24.04-arm
