@@ -1257,6 +1257,14 @@ void usbCallHandler::alloc_iso_transfers(){
             abort();
         }
         LIBRADOR_LOG(LOG_WARNING, "bulk transfers of %d bytes (%d x %d queued)\n", bulk_xfer, NUM_BULK_CTX, bulk_xfer);
+        if(const char *raw = getenv("LIBRADOR_BULK_RAW_IO")){
+            int supported = libusb_endpoint_supports_raw_io(handle, AIO_EP_BULK);
+            int max_size = libusb_get_max_raw_io_transfer_size(handle, AIO_EP_BULK);
+            int err = libusb_endpoint_set_raw_io(handle, AIO_EP_BULK, atoi(raw));
+            LIBRADOR_LOG(LOG_WARNING, "bulk RAW_IO=%s: supported %d, max raw transfer %d, set: %s\n",
+                         raw, supported, max_size, libusb_error_name(err));
+            if(err != LIBUSB_SUCCESS) abort();
+        }
         for(int n=0;n<NUM_BULK_CTX;n++){
             bulkCtx[n] = libusb_alloc_transfer(0);
             // Timeout 0: with a deep queue the tail URBs legitimately wait
