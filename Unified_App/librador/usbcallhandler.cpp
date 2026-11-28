@@ -496,7 +496,13 @@ usbCallHandler::~usbCallHandler(){
         LIBRADOR_LOG(LOG_DEBUG, "Libusb exited\n");
     }
 
+    // The decoder reads the two 375 kS/s buffers, so it goes first. Nothing writes the
+    // buffers any more: teardown_connection() joined the USB and ingest threads, and the
+    // DAQ thread was joined above.
     delete m_i2c_decoder;
+    delete internal_o1_buffer_375_CHA;
+    delete internal_o1_buffer_375_CHB;
+    delete internal_o1_buffer_750;
     LIBRADOR_LOG(LOG_DEBUG, "librador USB call handler deleted\n");
 }
 

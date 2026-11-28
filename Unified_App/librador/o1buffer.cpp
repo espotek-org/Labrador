@@ -30,6 +30,7 @@ o1buffer::o1buffer(double sps)
 o1buffer::~o1buffer(){
     free(buffer);
     free(buffer_paused);
+    free(buffer_daq);
     free(m_is_triggered);
     delete m_uart_decoder;
 }
