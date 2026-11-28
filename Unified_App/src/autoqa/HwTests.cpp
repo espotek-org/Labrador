@@ -510,8 +510,7 @@ class Suite
     }
 
     void checkWave(TestContext& ctx, const std::string& label, const Capture& c, int ch,
-                   const std::string& title, bool check_shape = true, bool shows_lost_frames = true,
-                   std::optional<double> shape_limit = std::nullopt)
+                   const std::string& title, bool check_shape = true, bool shows_lost_frames = true)
     {
         const SignalSpec& spec = c.spec[ch - 1];
         const SignalOutput& out = c.out[ch - 1];
@@ -542,8 +541,10 @@ class Suite
         ctx.measure(label + " high level", "V", fit.high_v, out.v_max, out.v_max - hi_tol, out.v_max + hi_tol);
         if (check_shape)
         {
+            // The limit is the shape's own allowance plus the noise an input is allowed
+            // (tol::NOISE_RMS_V), as a fraction of this signal's swing: see tol::shapeResidual.
             ctx.measure(label + " shape residual", "fraction", fit.residual_fraction, std::nullopt,
-                        std::nullopt, shape_limit.value_or(shapeLimit(spec.wave)));
+                        std::nullopt, tol::shapeResidual(shapeLimit(spec.wave), swing));
             double nearest = INFINITY;
             const char* nearest_name = "";
             for (const Wave w : WAVES)
@@ -1073,7 +1074,7 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w,
     ctx.measure("slope of the fitted " + std::string(waveName(w)) + " at that crossing (sets the limit above; not judged)",
                 "V/s", slope);
     ctx.measure(std::string(waveName(w)) + " fit residual", "fraction", fit.residual_fraction, std::nullopt,
-                std::nullopt, shapeLimit(w));
+                std::nullopt, tol::shapeResidual(shapeLimit(w), out[ch - 1].v_max - out[ch - 1].v_min));
     ctx.measure("frames dropped while waiting", "", static_cast<double>(res.frames_dropped));
 
     Plot plot("capture trigger ch" + std::to_string(ch) + ":" + edge + ":" + num(level) + " on SG" +
@@ -1213,14 +1214,7 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, 
     const SignalSpec b = SignalSpec::periodic(Wave::Triangle, hz == BASE_HZ ? 2 * hz : hz, 1.5, 0.8);
     const Capture c = measure(ctx, t, a, b);
     checkWave(ctx, "CH1", c, 1, t + ": SG1 " + a.text() + " -> CH1");
-    // The triangle at twice the base frequency (4474 Hz) has half the generator steps and half
-    // the samples in a period, and its corners are rounder: over 250 clean captures (at 4 kHz
-    // and at 4474 Hz) its residual read 1.8 to 3.4 %, against the 0.9 to 1.8 % of the 831 and
-    // 2237 Hz triangles that tol::SHAPE_TRIANGLE (3 %) was set by. It is allowed twice that
-    // limit, still a tenth of what a capture broken by lost frames reads, and it must still
-    // fit better than the other shapes.
-    checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2", true, true,
-              hz == BASE_HZ ? std::optional<double>(2 * tol::SHAPE_TRIANGLE) : std::nullopt);
+    checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2");
     if (gates_soak)
         m_runner.setCondition("transport_" + t, true);
 }
@@ -1252,10 +1246,21 @@ void Suite::transportRestarts(TestContext& ctx, const std::string& t)
             const std::string name = label + ": CH" + std::to_string(ch);
             ctx.measure(name + " frequency", "Hz", stats.periodic ? stats.frequency_hz : NAN, out.frequency_hz,
                         out.frequency_hz * (1 - tol::FREQUENCY), out.frequency_hz * (1 + tol::FREQUENCY));
+            // An input that came up flat is said to be flat, as in checkWave; nothing fits it.
+            const double swing = out.v_max - out.v_min;
+            ctx.measure(name + " swing", "Vpp", stats.vpp, swing, 0.1 * swing);
+            if (stats.vpp < 0.1 * swing)
+            {
+                char flat[200];
+                std::snprintf(flat, sizeof flat, "%s is flat at %.3f V where SG%d should drive %s between %.3f and %.3f V",
+                              name.c_str(), stats.mean_v, ch, waveName(c.spec[ch - 1].wave), out.v_min, out.v_max);
+                ctx.note(flat);
+                continue;
+            }
             const WaveFit fit = fitWave(c.spec[ch - 1].wave, out.frequency_hz, tol::FREQUENCY, c.samples(ch),
                                         c.window.sample_rate_hz, 0);
             ctx.measure(name + " shape residual", "fraction", fit.residual_fraction, std::nullopt, std::nullopt,
-                        shapeLimit(c.spec[ch - 1].wave));
+                        tol::shapeResidual(shapeLimit(c.spec[ch - 1].wave), swing));
         }
     }
 }

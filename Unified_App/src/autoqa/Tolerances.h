@@ -62,6 +62,16 @@ constexpr double SQUARE_DUTY = 0.02;
 // which is why the limit applies to the median slice.
 constexpr double NOISE_RMS_V = 0.030;
 
+// The limit on a waveform's shape residual: the shape's own allowance (SHAPE_*) plus the noise
+// an input is allowed to carry (NOISE_RMS_V), as a fraction of the signal's swing. The SHAPE_*
+// figures alone were set on 2 Vpp signals from one generator, and left a smaller signal no room
+// for the noise the noise floor test accepts: the 1.5 Vpp triangles of the transport tests
+// (831 Hz, and 4 kHz or 4474 Hz) read 0.9 to 3.4 % over some 400 captures that had lost
+// nothing, against SHAPE_TRIANGLE's 3 %, the noise on that input (20 to 37 mV RMS over a
+// window) being 1.3 to 2.5 % of their swing. With this they are allowed 5 %, a 2 Vpp triangle
+// 4.5 % and a 2 Vpp sine 7.5 %. A capture broken by lost frames reads 55-180 %.
+constexpr double shapeResidual(double shape, double swing_v) { return shape + NOISE_RMS_V / swing_v; }
+
 // Crosstalk: idle input's AC RMS over the driven input's, 6 Vpp at 2 kHz, gain 4.
 // Square edges couple as single-sample spikes: 1.3-2.7 %; a sine 1.1-1.5 %.
 constexpr double CROSSTALK_SQUARE = 0.05;
