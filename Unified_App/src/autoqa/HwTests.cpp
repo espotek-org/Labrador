@@ -447,19 +447,19 @@ class Suite
     void boardPresent(TestContext& ctx);
     void wiring(TestContext& ctx, int ch);
     void noise(TestContext& ctx, int ch);
-    void wave(TestContext& ctx, int ch, Wave w, double f);
-    void bigSine(TestContext& ctx, int ch, double f);
+    void wave(TestContext& ctx, int ch, Wave w, double hz);
+    void bigSine(TestContext& ctx, int ch, double hz);
     void dcLevels(TestContext& ctx);
-    void gain(TestContext& ctx, double g, double f);
+    void gain(TestContext& ctx, double g, double hz);
     void sweep(TestContext& ctx, double f);
-    void modeScope1(TestContext& ctx, double f);
-    void mode750k(TestContext& ctx, double f);
+    void modeScope1(TestContext& ctx, double hz);
+    void mode750k(TestContext& ctx, double hz);
     void isolation(TestContext& ctx, int src, Wave w);
-    void trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double f);
-    void triggerPlacement(TestContext& ctx, double f);
+    void trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double hz);
+    void triggerPlacement(TestContext& ctx, double hz);
     void triggerTimeout(TestContext& ctx);
     void triggerDc(TestContext& ctx);
-    void transportMeasure(TestContext& ctx, const std::string& t, double f, bool gates_soak);
+    void transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak);
     void transportSoak(TestContext& ctx, const std::string& t);
     void firmwareRoundTrip(TestContext& ctx);
     void ensureBundledFirmware(TestContext& ctx);
@@ -550,9 +550,9 @@ void Suite::noise(TestContext& ctx, int ch)
                 parked - tol::level(parked, 4), parked + tol::level(parked, 4));
 }
 
-void Suite::wave(TestContext& ctx, int ch, Wave w, double f)
+void Suite::wave(TestContext& ctx, int ch, Wave w, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(w, f, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(w, hz, 2, 0.5);
     const std::string name = std::string("sg") + std::to_string(ch) + "_" + waveName(w);
     const Capture c = ch == 1 ? measure(ctx, name, spec, SignalSpec::off())
                               : measure(ctx, name, SignalSpec::off(), spec);
@@ -561,9 +561,9 @@ void Suite::wave(TestContext& ctx, int ch, Wave w, double f)
               "SG" + std::to_string(ch) + " " + spec.text() + " -> CH" + std::to_string(ch) + ", gain 4");
 }
 
-void Suite::bigSine(TestContext& ctx, int ch, double f)
+void Suite::bigSine(TestContext& ctx, int ch, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, f, 6, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 6, 0.5);
     const Capture c = ch == 1 ? measure(ctx, "big", spec, SignalSpec::off(), 2)
                               : measure(ctx, "big", SignalSpec::off(), spec, 2);
     ctx.measure("PSU", "V", c.psu_v, 8.0);
@@ -643,21 +643,21 @@ void Suite::dcLevels(TestContext& ctx)
 // One 2 kHz sine per scope gain, filling a good part of that gain's input range
 // (1.65 V +/- 23.65 V / gain) without clipping. The generators cannot go below
 // about 0.06 V or above 9.6 V, so the low gains' ranges are only partly used.
-SignalSpec gainSignal(double g, double f)
+SignalSpec gainSignal(double g, double hz)
 {
-    if (g == 64) return SignalSpec::periodic(Wave::Sine, f, 0.4, 1.45);  // range 1.28-2.02 V
-    if (g == 32) return SignalSpec::periodic(Wave::Sine, f, 0.9, 1.2);   // 0.91-2.39 V
-    if (g == 16) return SignalSpec::periodic(Wave::Sine, f, 1.8, 0.75);  // 0.17-3.13 V
-    if (g == 8) return SignalSpec::periodic(Wave::Sine, f, 2.8, 0.3);    // -1.31-4.61 V
-    if (g == 4) return SignalSpec::periodic(Wave::Sine, f, 5, 0.5);      // -4.26-7.56 V
-    if (g == 2) return SignalSpec::periodic(Wave::Sine, f, 6, 0.5);      // -10.2-13.5 V
-    if (g == 1 || g == 0.5) return SignalSpec::periodic(Wave::Sine, f, 8, 0.5);
+    if (g == 64) return SignalSpec::periodic(Wave::Sine, hz, 0.4, 1.45);  // range 1.28-2.02 V
+    if (g == 32) return SignalSpec::periodic(Wave::Sine, hz, 0.9, 1.2);   // 0.91-2.39 V
+    if (g == 16) return SignalSpec::periodic(Wave::Sine, hz, 1.8, 0.75);  // 0.17-3.13 V
+    if (g == 8) return SignalSpec::periodic(Wave::Sine, hz, 2.8, 0.3);    // -1.31-4.61 V
+    if (g == 4) return SignalSpec::periodic(Wave::Sine, hz, 5, 0.5);      // -4.26-7.56 V
+    if (g == 2) return SignalSpec::periodic(Wave::Sine, hz, 6, 0.5);      // -10.2-13.5 V
+    if (g == 1 || g == 0.5) return SignalSpec::periodic(Wave::Sine, hz, 8, 0.5);
     throw std::logic_error("no signal for gain " + num(g));
 }
 
-void Suite::gain(TestContext& ctx, double g, double f)
+void Suite::gain(TestContext& ctx, double g, double hz)
 {
-    const SignalSpec spec = gainSignal(g, f);
+    const SignalSpec spec = gainSignal(g, hz);
     const Capture whole = measure(ctx, "gain_" + num(g), spec, spec, g, ScopeMode::Ch1Ch2, GAIN_WINDOW_S);
     const double lsb = tol::lsbV(g);
     const double rate = whole.window.sample_rate_hz;
@@ -720,18 +720,18 @@ void Suite::sweep(TestContext& ctx, double f)
     }
 }
 
-void Suite::modeScope1(TestContext& ctx, double f)
+void Suite::modeScope1(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, f, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     const Capture c = measure(ctx, "scope1", spec, SignalSpec::off(), 4, ScopeMode::Ch1);
     ctx.measure("sample rate", "S/s", c.window.sample_rate_hz, 375000, 375000, 375000);
     ctx.measureText("CH2 streamed", c.window.ch2.empty() ? "no" : "yes", "no");
     checkWave(ctx, "CH1", c, 1, "scope1: SG1 " + spec.text() + " -> CH1");
 }
 
-void Suite::mode750k(TestContext& ctx, double f)
+void Suite::mode750k(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, f, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     const Capture c = measure(ctx, "scope1_750k", spec, SignalSpec::off(), 4, ScopeMode::Ch1Fast);
     ctx.measure("sample rate", "S/s", c.window.sample_rate_hz, 750000, 750000, 750000);
     ctx.measureText("CH2 streamed", c.window.ch2.empty() ? "no" : "yes", "no");
@@ -773,9 +773,9 @@ void Suite::isolation(TestContext& ctx, int src, Wave w)
                                  std::to_string(src) + " swings 6 V");
 }
 
-void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double f)
+void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(w, f, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(w, hz, 2, 0.5);
     DeviceSession& s = session();
     applyPsu(PSU_MIN_V);
     SignalOutput out[2] = {applySignal(1, ch == 1 ? spec : SignalSpec::off()),
@@ -860,9 +860,9 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w,
                                  " edge should cross the dotted level at t=0");
 }
 
-void Suite::triggerPlacement(TestContext& ctx, double f)
+void Suite::triggerPlacement(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, f, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     DeviceSession& s = session();
     applyPsu(PSU_MIN_V);
     applySignal(1, spec);
@@ -935,7 +935,7 @@ void Suite::triggerDc(TestContext& ctx)
 // condition the soak and the 831 Hz measure need. At 2 kHz the triangle runs at twice the
 // sine's frequency, which tells the inputs apart; at 831 Hz both run at exactly 831 Hz and the
 // wave shapes tell them apart.
-void Suite::transportMeasure(TestContext& ctx, const std::string& t, double f, bool gates_soak)
+void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak)
 {
     m_session.reset();
     m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, parseTransport(t));
@@ -959,8 +959,8 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t, double f, b
     // Both inputs at once, with smooth waves: a square's edges couple into the
     // other input as single-sample spikes, and one landing on the sine's
     // mid-level crossing adds a false crossing (seen: 2990 Hz read for 2 kHz).
-    const SignalSpec a = SignalSpec::periodic(Wave::Sine, f, 2, 0.5);
-    const SignalSpec b = SignalSpec::periodic(Wave::Triangle, f == BASE_HZ ? 2 * f : f, 1.5, 0.8);
+    const SignalSpec a = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
+    const SignalSpec b = SignalSpec::periodic(Wave::Triangle, hz == BASE_HZ ? 2 * hz : hz, 1.5, 0.8);
     const Capture c = measure(ctx, t, a, b);
     checkWave(ctx, "CH1", c, 1, t + ": SG1 " + a.text() + " -> CH1");
     checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2");
