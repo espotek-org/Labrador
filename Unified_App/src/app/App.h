@@ -31,8 +31,11 @@ class App : public AppBase
     // isolated file, and the QA drives the app frame by frame until it calls
     // finishAutoQa. Call before Run().
     void attachAutoQa(autoqa::AutoQa* qa);
-    // Stop using USB for the rest of the run (the QA's no-board screenshots).
+    // Stop using USB (the QA's no-board screenshots) until enableUsb().
     void disableUsb();
+    // Use USB again after disableUsb(): the next iteration of a repeated --auto-qa run
+    // takes its board screenshots with the board connected again.
+    void enableUsb();
     // Show a side-panel page in layouts that have one (desktop, tablet).
     void showSidePanelPage(int page);
     // End the run with this exit code.

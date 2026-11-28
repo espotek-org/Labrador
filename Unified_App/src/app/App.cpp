@@ -753,6 +753,13 @@ void App::disableUsb()
     m_device_present = false;
 }
 
+void App::enableUsb()
+{
+    // librador stays initialised while USB is off (the QA's workers restore its session),
+    // so pollDevice finds and connects the board again from the next frame.
+    m_no_usb = false;
+}
+
 void App::showSidePanelPage(int page)
 {
     if (m_active_frontend)
