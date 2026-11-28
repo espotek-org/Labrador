@@ -56,7 +56,10 @@ constexpr double SHAPE_SQUARE = 0.14;
 // Square duty cycle from the mid-level crossings: measured 0.493-0.498.
 constexpr double SQUARE_DUTY = 0.02;
 
-// Noise with both generators parked (0.06 V), gain 4: 11.8-15.2 mV RMS.
+// Noise floor with both generators parked (0.06 V), gain 4: the median AC RMS of 5 ms slices.
+// Whole-window RMS on the reference board: CH1 12.6-18.1 mV over 36 runs; CH2 19.8-36.9 mV
+// over 115 (median 25.0), lifted and spread by bursts it picks up from outside the board,
+// which is why the limit applies to the median slice.
 constexpr double NOISE_RMS_V = 0.030;
 
 // Crosstalk: idle input's AC RMS over the driven input's, 6 Vpp at 2 kHz, gain 4.

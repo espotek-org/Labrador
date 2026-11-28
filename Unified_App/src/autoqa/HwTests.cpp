@@ -59,10 +59,17 @@ constexpr int SOAK_INTERRUPTIONS_ALLOWED_VM = 7;
 constexpr double SOAK_BROKEN_LOSS = 0.05;
 // After an interrupted window the stream gets this long to realign before the next window.
 constexpr double SOAK_RECOVERY_S = 1.0;
+// How many times in a row hw.transport.<t>.restarts_831hz opens a transport. iso6 used to
+// start with its endpoints out of step on five starts in eight (FINDINGS.md of the QA
+// server), which a suite that opens each transport once or twice can pass by luck.
+constexpr int TRANSPORT_RESTARTS = 8;
 // The hardware sessions pass librador's debug messages to the log (the iso6 realignment
 // among them, without which a misaligned stream on a test machine fails invisibly).
 constexpr bool LIBRADOR_DEBUG_LOG = true;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
+// The noise floor tests capture this long and judge the median of slices this long.
+constexpr double NOISE_WINDOW_S = 0.5;
+constexpr double NOISE_SLICE_S = 0.005;
 // Below this a lost 1 ms frame moves a waveform by under a tenth of a period whatever the
 // frequency, so the sweep's lowest points cannot show one.
 constexpr double SWEEP_SHOWS_LOST_FRAMES_FROM_HZ = 100;
@@ -578,6 +585,7 @@ class Suite
     void triggerTimeout(TestContext& ctx);
     void triggerDc(TestContext& ctx);
     void transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak);
+    void transportRestarts(TestContext& ctx, const std::string& t);
     void transportSoak(TestContext& ctx, const std::string& t);
     bool soakWindowClean(const StreamCheckResult& r, const SignalOutput out[2]);
     void recordSoakWindow(TestContext& ctx, const StreamCheckResult& r, const SignalOutput out[2]);
@@ -658,11 +666,36 @@ void Suite::wiring(TestContext& ctx, int ch)
 void Suite::noise(TestContext& ctx, int ch)
 {
     const Capture c = measure(ctx, "parked", SignalSpec::off(), SignalSpec::off(), 4,
-                              ScopeMode::Ch1Ch2, 0.1);
+                              ScopeMode::Ch1Ch2, NOISE_WINDOW_S);
     const ChannelStats& s = c.stats[ch - 1];
     const double parked = c.out[ch - 1].v_min;
-    ctx.measure("CH" + std::to_string(ch) + " AC RMS", "V", s.rms_ac_v, std::nullopt, std::nullopt,
-                tol::NOISE_RMS_V);
+    // The noise floor is the typical slice's AC RMS, not the whole window's: an input can
+    // pick up short bursts from outside the board (on the QA tester CH2 gets about 7 ms of
+    // one every 102.4 ms, a Wi-Fi beacon), which say nothing about the scope's front end and
+    // put the whole window's RMS anywhere from 20 to 37 mV. The median slice ignores them;
+    // the whole window and the noisiest slice are recorded beside it.
+    const std::vector<double>& y = c.samples(ch);
+    const size_t per_slice = static_cast<size_t>(std::llround(NOISE_SLICE_S * c.window.sample_rate_hz));
+    std::vector<double> slice_rms;
+    for (size_t begin = 0; begin + per_slice <= y.size(); begin += per_slice)
+    {
+        double sum = 0, squares = 0;
+        for (size_t i = begin; i < begin + per_slice; i++)
+        {
+            sum += y[i];
+            squares += y[i] * y[i];
+        }
+        const double mean = sum / static_cast<double>(per_slice);
+        slice_rms.push_back(std::sqrt(std::max(0.0, squares / static_cast<double>(per_slice) - mean * mean)));
+    }
+    if (slice_rms.size() < 10)
+        throw std::logic_error("noise: the window holds fewer than 10 slices");
+    std::sort(slice_rms.begin(), slice_rms.end());
+    const std::string name = "CH" + std::to_string(ch);
+    ctx.measure(name + " noise floor (median AC RMS of " + num(NOISE_SLICE_S * 1000) + " ms slices)", "V",
+                slice_rms[slice_rms.size() / 2], std::nullopt, std::nullopt, tol::NOISE_RMS_V);
+    ctx.measure(name + " noisiest slice's AC RMS (bursts from outside the board; not judged)", "V", slice_rms.back());
+    ctx.measure(name + " AC RMS of the whole " + num(NOISE_WINDOW_S) + " s window (not judged)", "V", s.rms_ac_v);
     ctx.measure("CH" + std::to_string(ch) + " mean (generator parked)", "V", s.mean_v, parked,
                 parked - tol::level(parked, 4), parked + tol::level(parked, 4));
 }
@@ -1087,6 +1120,41 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, 
         m_runner.setCondition("transport_" + t, true);
 }
 
+// A stream must come up right every time it is started, not only the first time. Each start
+// opens a new session on the transport and measures both inputs at 831 Hz: a start whose
+// endpoints are out of step, or whose frames are lost, reads a wrong frequency or a broken
+// shape, as it does in hw.transport.<t>.measure_831hz.
+void Suite::transportRestarts(TestContext& ctx, const std::string& t)
+{
+    const SignalSpec a = SignalSpec::periodic(Wave::Sine, ODD_HZ, 2, 0.5);
+    const SignalSpec b = SignalSpec::periodic(Wave::Triangle, ODD_HZ, 1.5, 0.8);
+    for (int start = 1; start <= TRANSPORT_RESTARTS; start++)
+    {
+        m_status("hw.transport." + t + ".restarts_831hz: start " + std::to_string(start) + " of " +
+                 std::to_string(TRANSPORT_RESTARTS));
+        m_session.reset();
+        m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, parseTransport(t));
+        const std::string label = "start " + std::to_string(start);
+        ctx.measureText(label + ": transport", transportName(m_session->activeTransport()), t);
+        const Capture c = measure(ctx, t + "_start" + std::to_string(start), a, b);
+        const FrameStats& f = c.window.frames;
+        ctx.measure(label + ": USB frames lost or corrupt in the judged window", "",
+                    static_cast<double>(f.dropped + f.bad_checksum), 0, std::nullopt, 0);
+        for (int ch = 1; ch <= 2; ch++)
+        {
+            const SignalOutput& out = c.out[ch - 1];
+            const ChannelStats& stats = c.stats[ch - 1];
+            const std::string name = label + ": CH" + std::to_string(ch);
+            ctx.measure(name + " frequency", "Hz", stats.periodic ? stats.frequency_hz : NAN, out.frequency_hz,
+                        out.frequency_hz * (1 - tol::FREQUENCY), out.frequency_hz * (1 + tol::FREQUENCY));
+            const WaveFit fit = fitWave(c.spec[ch - 1].wave, out.frequency_hz, tol::FREQUENCY, c.samples(ch),
+                                        c.window.sample_rate_hz, 0);
+            ctx.measure(name + " shape residual", "fraction", fit.residual_fraction, std::nullopt, std::nullopt,
+                        shapeLimit(c.spec[ch - 1].wave));
+        }
+    }
+}
+
 void Suite::transportSoak(TestContext& ctx, const std::string& t)
 {
     m_session.reset();
@@ -1432,6 +1500,11 @@ std::vector<HwTest> Suite::catalogue(Level level)
             "USB transport " + ts + ": an 831 Hz sine on CH1 and an 831 Hz triangle on CH2",
             {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
             [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, ODD_HZ, false); });
+        add("hw.transport." + ts + ".restarts_831hz",
+            "USB transport " + ts + ": " + std::to_string(TRANSPORT_RESTARTS) +
+                " streams started one after another all come up clean, with 831 Hz on both inputs",
+            {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
+            [ts](Suite& s, TestContext& c) { s.transportRestarts(c, ts); });
         add("hw.transport." + ts + ".soak",
             "USB transport " + ts + ": " + soak_length + " with no lost, corrupt or late frames",
             {"board", "transport_" + ts}, [ts](Suite& s, TestContext& c) { s.transportSoak(c, ts); });
