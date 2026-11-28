@@ -104,5 +104,9 @@ if labrador-cli update-firmware >cli.log 2>&1; then
 fi
 cat cli.log
 grep -q "no Labrador board found" cli.log
-test -f /usr/lib/labrador/assets/firmware/labrafirm_000C_03.hex
+# The package must carry the board's (variant 3) firmware that the tree has, whatever its
+# version, rather than a file name that goes stale when the firmware is bumped.
+FW=$(cd firmware && ls labrafirm_*_03.hex)
+test "$(echo "$FW" | wc -l)" -eq 1
+test -f "/usr/lib/labrador/assets/firmware/$FW"
 echo "::endgroup::"
