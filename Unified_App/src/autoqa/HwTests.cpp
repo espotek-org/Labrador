@@ -369,6 +369,30 @@ class Suite
         return rc;
     }
 
+    // Fails a test whose triggered capture returned `rc`. When no trigger came in time (-5)
+    // it first records what the trigger input carried straight afterwards, because the two
+    // causes look the same from outside: the generator's signal was not there, or it was and
+    // the capture missed it.
+    [[noreturn]] void failCapture(TestContext& ctx, const std::string& name, int rc, int ch)
+    {
+        std::string seen;
+        if (rc == -5)
+        {
+            const SampleWindow w = session().acquire(0.02);
+            const std::vector<double>& y = ch == 1 ? w.ch1 : w.ch2;
+            const ChannelStats st = analyseChannel(y, w.sample_rate_hz, scopeLsbVolts(4));
+            const std::string csv = ctx.path("captures", name + "_after_timeout.csv");
+            {
+                std::ofstream out(ctx.absolute(csv), std::ios::binary | std::ios::trunc);
+                writeSamplesCsv(out, w.ch1, w.ch2, w.sample_rate_hz, 0);
+            }
+            ctx.artifact(csv, "csv", name + ": both inputs for 20 ms straight after the capture timed out");
+            seen = "; straight afterwards CH" + std::to_string(ch) + " read " + num(st.min_v) + " to " + num(st.max_v) +
+                   " V" + (st.periodic ? " at " + num(st.frequency_hz) + " Hz" : ", with no periodic signal");
+        }
+        ctx.fail(name + ": librador_capture_around_trigger returned " + std::to_string(rc) + seen);
+    }
+
     // The wait after spoilt capture number `attempt` (1-based), before the next one.
     static void waitBeforeRetry(int attempt)
     {
@@ -942,7 +966,7 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w,
     librador_capture_result res;
     const int rc = captureAroundTrigger(ctx, "trigger", req, res);
     if (rc != 0)
-        ctx.fail("librador_capture_around_trigger returned " + std::to_string(rc));
+        failCapture(ctx, "trigger", rc, ch);
     checkLostFrameShift(ctx, ch, out[ch - 1], true);
     const double rate = res.sample_rate_hz;
     const int expected_n = static_cast<int>(std::lround((req.pre_s + req.post_s) * rate));
@@ -1035,7 +1059,7 @@ void Suite::triggerPlacement(TestContext& ctx, double hz)
         librador_capture_result res;
         const int rc = captureAroundTrigger(ctx, cs.name, req, res);
         if (rc != 0)
-            ctx.fail(std::string(cs.name) + ": librador_capture_around_trigger returned " + std::to_string(rc));
+            failCapture(ctx, cs.name, rc, 1);
         const int n = static_cast<int>(std::lround((cs.pre + cs.post) * res.sample_rate_hz));
         const int pre = static_cast<int>(std::lround(cs.pre * res.sample_rate_hz));
         ctx.measure(std::string(cs.name) + ": samples", "", static_cast<double>(res.ch1.size()), n, n, n);
