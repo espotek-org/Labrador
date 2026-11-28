@@ -198,6 +198,7 @@ public:
     void setI2cIsDecoding(bool new_decode_on);
     bool isoThreadIsActive();
     void teardown_connection();        // stop iso thread, free transfers, close handle
+    bool device_answers();             // the board behind `handle` still answers a standard request
     int init_libusb();
     // Transport selection.  Must be set before connecting; AUTO resolves to
     // the platform default (macOS: bulk; win64: iso6; win32/linux/android:
