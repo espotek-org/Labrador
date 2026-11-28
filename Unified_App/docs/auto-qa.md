@@ -7,7 +7,8 @@ writes a full QA report:
 labrador --auto-qa <out_dir>
 ```
 
-It needs no QA build (no ImGui Test Engine) and no other program: hardware
+Options choose a quicker or more thorough run, a subset of the tests, and a
+number of repeats (see "Choosing what runs"). It needs no QA build (no ImGui Test Engine) and no other program: hardware
 loopback tests through librador, a screenshot tour of the app's own UI and,
 last, a firmware round trip through the DFU bootloader all run in-process. The
 exit status is 0 only if every test passed (skipped tests do not count
@@ -33,8 +34,17 @@ or the AppImage itself.
 ## What it guarantees
 
 - `<out_dir>/progress.log` is created before the window opens, and gets a
-  flushed, timestamped line for every phase and every test (`n/m id: status`)
-  throughout. A release without `--auto-qa` exits 2 with "unknown option" on
+  flushed, timestamped line for every phase and every test
+  (`n/m id: status (t s)`, where m is the number of planned test executions
+  over all iterations) throughout, and with a repeat a line `iteration k/n` at
+  the start of each iteration. A test that reports its progress while it runs
+  (the soaks: seconds streamed of the total, frames ok, bad and dropped; the
+  firmware round trip: which step it is on) also writes that progress there
+  whenever 20 s have passed without a line, so a soak never goes 30 s without
+  one. Only progress the test itself reports is written, so a test that hangs
+  still leaves the log silent, which the QA server takes for a hang after 10
+  minutes. The first report.json, with the whole plan and no results, is
+  written before the first test starts. A release without `--auto-qa` exits 2 with "unknown option" on
   stderr instead (every unknown argument is an error), and an older release
   that ignored arguments would simply open its window and never create
   progress.log.
@@ -46,6 +56,96 @@ or the AppImage itself.
   finishes by checking that and flashing the bundled image back if needed.
 - Nothing is timed in frames: every wait is wall-clock, so slow software GL
   only makes the run longer.
+
+## Choosing what runs
+
+```sh
+labrador --auto-qa <out_dir> [--auto-qa-level quick|standard|thorough]
+                             [--auto-qa-tests <item>[,<item>...]]
+                             [--auto-qa-repeat <n>]
+labrador --auto-qa-list      [the same three options]
+```
+
+With none of the options a run holds every test of the `standard` level once,
+which is exactly the suite in the tables below, in that order and with those
+ids. Only such a run, at `standard` or `thorough` with no selection and no
+repeat, counts as a release test; anything narrower is for chasing a failure.
+The options are valid only with `--auto-qa` or `--auto-qa-list`.
+
+**Levels.** Every test has a minimum level, `quick` < `standard` < `thorough`,
+and a run at a level holds the tests whose minimum is at or below it. A level
+can also set a test's parameters: at `thorough` each transport soak streams for
+300 s instead of 60 s, and its title says so. The assignment lives in
+`QUICK_TESTS` and `THOROUGH_TESTS` in `src/autoqa/Plan.cpp`, so moving a test
+between levels means moving its id from one list to another (an id there that
+names no test stops the app).
+
+- `quick` (29 tests, a few minutes): `hw.board.present`, both `hw.wiring`
+  tests, both `hw.noise` tests, the eight `hw.siggen.chN.<wave>_831hz`,
+  `hw.siggen.dc_levels`, `hw.gain.x0_5_831hz`, `hw.gain.x4_831hz`,
+  `hw.gain.x64_831hz`, `hw.trigger.ch1_rising_831hz`,
+  `hw.trigger.ch2_rising_square_831hz`, `hw.transport.<t>.measure` and
+  `.measure_831hz` for bulk, iso1 and iso6, and four screenshots: desktop,
+  compact and mobile in Classic Dark with the board, and desktop with USB off.
+- `standard`: every other test, the firmware round trip included.
+- `thorough`: no extra tests yet, only the 300 s soaks.
+
+The whole 831 Hz battery belongs to `standard` (a hard requirement of the
+project owner): no `_831hz` test may be thorough-only, and the app refuses to
+start if one is listed under `THOROUGH_TESTS`. `quick` draws its waveform tests
+from the 831 Hz versions.
+
+**Selection.** `--auto-qa-tests` takes up to 20 comma-separated items, each
+matching `[a-z0-9_*][a-z0-9_.*-]{0,79}`:
+
+- an item without `*` selects the test with that id and every test whose id
+  starts with `<item>.`, so `hw.gain` selects the 16 gain tests, `hw.gain.x64`
+  only `hw.gain.x64` (not `hw.gain.x64_831hz`), `gui` every screenshot and
+  `firmware` the round trip;
+- an item with `*` is a glob over the whole id, `*` matching any run of
+  characters, dots included: `*_831hz` selects the 831 Hz battery (28 tests),
+  `gui*.noboard` the five shots with USB off.
+
+Only tests of the run's level can be selected. The tests a selected test
+depends on are added automatically, in their normal place: each test declares
+the conditions it needs and the ones it establishes, and every test that
+establishes a needed condition joins the plan, transitively. Today `board`
+comes from `hw.board.present`, `sg1_ch1` and `sg2_ch2` from `hw.wiring.sg1`
+and `hw.wiring.sg2`, and `transport_<t>` from `hw.transport.<t>.measure`. So
+`hw.transport.iso6.soak` runs after `hw.board.present`, both wiring tests and
+`hw.transport.iso6.measure`, and any board-connected screenshot after
+`hw.board.present`. Tests always run in the suite's order, whatever order the
+items came in, and a phase with nothing planned is skipped.
+
+**Repeat.** `--auto-qa-repeat <n>` (1 to 200) runs the planned tests n times
+in one process and one report. Each iteration is exactly what a single run
+does and starts from the state the first one did: conditions unmet again, the
+hardware tests' device session dropped (a transport test leaves one on its own
+transport behind), USB switched back on if the screenshot tour had switched it
+off, and the long first-shot settle again. Ids do not change; every result
+carries its `iteration`. With n above 1 the files of iteration k go one level
+down, `plots/iter<k>/`, `captures/iter<k>/` and `screenshots/iter<k>/`; with
+n = 1 the paths are those of a plain run. The exit status is 0 only if every
+test of every iteration passed.
+
+**Usage errors** print one line on stderr and exit 2 before `<out_dir>`,
+progress.log or a window exists: an option without `--auto-qa` or
+`--auto-qa-list`, an option without its value or given twice, an unknown
+level, a malformed selection, an item that matches no test of the level (the
+message names the level, since the test may exist at a higher one) and a
+repeat that is not a whole number from 1 to 200.
+
+**`--auto-qa-list`** prints the plan the same options would run, as one JSON
+object on stdout, and exits 0. It opens no window, touches no board or
+settings and creates nothing:
+
+```json
+{"schema_version": 3, "level": "standard", "selection": ["hw.gain.x64"], "repeat": 1,
+ "planned": [{"id": "hw.board.present", "group": "hw", "title": "...", "level": "quick",
+              "iteration": 1, "prerequisite": true}, "..."]}
+```
+
+`planned` is the same list report.json carries (below).
 
 ## Phases and tests
 
@@ -75,7 +175,7 @@ expected waveform (green dashed) over it.
 | `hw.trigger.no_false_trigger_on_dc` | a DC level sitting on the trigger level, with hysteresis, never triggers on noise |
 | `hw.transport.{bulk,iso1,iso6}.measure` | the session really uses the transport asked for (librador allows only bulk on macOS, so the iso tests skip there) and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2 at once (smooth waves, because a square's edges couple into the other input as spikes that can fake a crossing); its result gates the soak and the `_831hz` measure |
 | `hw.transport.{bulk,iso1,iso6}.measure_831hz` | once the transport's measure has passed, an 831 Hz sine on CH1 and an 831 Hz triangle on CH2, told apart by their shapes |
-| `hw.transport.{bulk,iso1,iso6}.soak` | a 60 s stream with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2: no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period on either input more than 5 % off the median. These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
+| `hw.transport.{bulk,iso1,iso6}.soak` | a 60 s stream (300 s at the `thorough` level) with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2: no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period on either input more than 5 % off the median. These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
 | `firmware.round_trip` | flashes the bundled `labrafirm_0007_02.hex` (librador reports 1, "runs other firmware", and the board 0x0007 variant 2), then the release's bundled image back (0x000c variant 3 here), then checks the board streams. Both directions jump to the DFU bootloader and re-enumerate, which is what USB passthrough and Windows driver binding tend to break. It skips when the board stores calibration, because the DFU erase would wipe it. |
 
 **Phase 2 of 3, in the frame loop.** The app gets its USB session back and, with
@@ -103,8 +203,9 @@ passthrough on macOS hosts has aborted there), so a failure costs only its own
 result, not the screenshot tour.
 
 `report.json` is rewritten after every test with `"complete": false` until the
-run finishes (schema 2; schema 1 wrote it once, at the end), so a crash, a killed process or a dead VM still leaves
-everything recorded up to that point.
+run finishes (since schema 2; schema 1 wrote it once, at the end), so a crash, a killed process or a dead VM still leaves
+everything recorded up to that point. With a repeat, each iteration runs the
+three phases in turn before the next iteration starts.
 
 Each shot checks the app's status line (layout, theme, text size, board
 `streaming` or `usb-disabled`, no safety-mode, uninitialised-board or flashing
@@ -155,10 +256,18 @@ would otherwise read as a wrong shape.
 <out_dir>/screenshots/     the screenshot tour (PNG)
 ```
 
-### report.json (schema_version 2)
+With `--auto-qa-repeat` above 1, the last three each hold an `iter<k>/`
+directory per iteration instead.
+
+### report.json (schema_version 3)
 
 ```json
-{"schema_version": 2,
+{"schema_version": 3,
+ "level": "standard",
+ "selection": null,
+ "repeat": 1,
+ "planned": [{"id": "hw.board.present", "group": "hw", "title": "...", "level": "quick",
+              "iteration": 1, "prerequisite": false}],
  "suite": {"name": "labrador --auto-qa", "commit": "<sha the build was configured from, or null>"},
  "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000D_03.hex"},
  "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "..."},
@@ -166,7 +275,7 @@ would otherwise read as a wrong shape.
  "complete": true,
  "result": "pass|fail",
  "counts": {"pass": 0, "fail": 0, "skip": 0, "error": 0},
- "tests": [{"id": "hw.siggen.ch1.sine_2237hz", "group": "hw", "title": "...", "status": "pass|fail|skip|error",
+ "tests": [{"id": "hw.siggen.ch1.sine_2237hz", "iteration": 1, "group": "hw", "title": "...", "status": "pass|fail|skip|error",
             "duration_s": 1.2, "message": "why it failed or skipped, plus notes such as lost USB frames",
             "measurements": [{"name": "CH1 frequency", "unit": "Hz", "value": 2236.9, "expected": 2237, "min": 2234.8, "max": 2239.2}],
             "artifacts": [{"path": "plots/hw_siggen_ch1_sine_2237hz_CH1.png", "kind": "png", "caption": "..."}]}],
@@ -174,6 +283,19 @@ would otherwise read as a wrong shape.
                   "path": "screenshots/gui.desktop_1280x720.classic-dark.scope.text100.board.png",
                   "caption": "...", "expect": "what a correct render shows"}]}
 ```
+
+Schema 3 adds the plan to schema 2. `level`, `selection` (null for every test
+of the level, else the items as given, in order) and `repeat` are the run's
+options. `planned` holds every test execution the run set out to do, in
+execution order, and is complete in the first report.json (written before the
+first test, with `"tests": []`); `prerequisite` is true for an entry that is
+there only because a selected test needs it, and `level` is the test's minimum
+level. Each entry of `tests` matches one `planned` entry by `id` and
+`iteration`; the only results outside `planned` are `hw.suite` and
+`firmware.suite`, recorded when a phase's worker thread stopped early, so a
+run's progress is `len(tests)` of `len(planned)`. `counts` covers every result
+of every iteration, and `screenshots` lists every shot of every iteration
+(with a repeat, their paths tell the iterations apart).
 
 Paths are relative to `<out_dir>`. Groups are `hw`, `firmware` and `gui`.
 `app.version` is `LABRADOR_VERSION` from the build (CI passes `2.0.<run>`;

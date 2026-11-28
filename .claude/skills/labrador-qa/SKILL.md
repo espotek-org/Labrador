@@ -263,6 +263,26 @@ code: `src/autoqa/` with the measurement code shared with labrador-cli in
 tests skip there. It takes no lock on the board; wrap it in whatever lock
 the machine uses when VMs or other runs share the board.
 
+To chase a failure without sitting through the whole suite, narrow and
+repeat the run:
+
+```sh
+labrador --auto-qa-list --auto-qa-tests hw.transport.iso6.soak     # the plan as JSON, opens nothing
+labrador --auto-qa /tmp/qa-run --auto-qa-tests hw.gain.x64_831hz --auto-qa-repeat 10
+labrador --auto-qa /tmp/qa-run --auto-qa-level quick                # 29 tests, a few minutes
+labrador --auto-qa /tmp/qa-run --auto-qa-level thorough             # 300 s soaks
+```
+
+`--auto-qa-tests` takes ids, dotted prefixes (`hw.gain`, `gui`, `firmware`)
+and `*` globs (`*_831hz`), and adds the tests they depend on
+(`hw.board.present`, the wiring tests, a transport's measure) by itself.
+`--auto-qa-repeat n` runs the plan n times in one report, every result tagged
+with its `iteration` and its files under `iter<k>/`. Only a run at
+`standard` or `thorough` with no selection and no repeat counts as a release
+test. Levels, the selection rules and report schema 3 (`planned`, so a
+server can show "37 of 96"): `Unified_App/docs/auto-qa.md`, "Choosing what
+runs".
+
 ## Reporting
 
 Summarise as: suites run + pass/fail counts, screenshots reviewed (matrix
