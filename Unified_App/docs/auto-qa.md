@@ -61,19 +61,20 @@ expected waveform (green dashed) over it.
 | `hw.board.present` | a board is attached and runs the firmware this release bundles; records the default USB transport and whether calibration is stored on it |
 | `hw.wiring.sg1`, `hw.wiring.sg2` | SG1 alone makes CH1 swing (at least 1 V of a 2 Vpp sine) while CH2 stays at the noise floor, and the reverse; a channel at the noise floor fails as "loopback not wired", a signal on the wrong input as swapped wires, and either way the tests needing that loopback fail with that reason |
 | `hw.noise.ch1`, `ch2` | AC RMS with both generators parked (about 0.06 V), and the parked level |
-| `hw.siggen.chN.{sine,square,triangle,sawtooth}_2khz` | one generator at a time, 2 kHz, 0.5-2.5 V at gain 4: librador's realised frequency and DAC levels against the request, the measured frequency against the realised one, the low and high levels of a least-squares fit of the ideal shape, the fit's residual, that the expected shape fits better than the other three, and the square's duty cycle |
-| `hw.siggen.chN.sine_6vpp_x3` | a 0.5-6.5 V sine through the generators' x3 output stage, which needs the PSU raised to 8 V, so this also shows the PSU setting takes effect |
+| `hw.siggen.chN.{sine,square,triangle,sawtooth}_2237hz`, `..._831hz` | one generator at a time, 2237 Hz and again at exactly 831 Hz, 0.5-2.5 V at gain 4 (neither period fits the 375-sample USB frame evenly, so a lost, repeated or shifted frame shows up in the fit, where at 2 kHz it would read as a clean capture): librador's realised frequency and DAC levels against the request, the measured frequency against the realised one, the low and high levels of a least-squares fit of the ideal shape, the fit's residual, that the expected shape fits better than the other three, and the square's duty cycle |
+| `hw.siggen.chN.sine_6vpp_x3`, `sine_6vpp_x3_831hz` | a 0.5-6.5 V sine, at 2237 Hz and at 831 Hz, through the generators' x3 output stage, which needs the PSU raised to 8 V, so this also shows the PSU setting takes effect |
 | `hw.siggen.dc_levels` | DC at 0.25, 0.5, 1, 2, 3, 4 and 6 V on both generators, read on both inputs, plus each channel's gain (slope) and offset, plotted against the limits |
-| `hw.gain.x0_5` ... `x64` | for each of the eight scope gains, a 2 kHz sine filling most of that gain's input range on both inputs: unclipped, levels, frequency and shape |
+| `hw.gain.x0_5` ... `x64`, `hw.gain.x0_5_831hz` ... `x64_831hz` | for each of the eight scope gains, a 2237 Hz sine (831 Hz for the `_831hz` tests) filling most of that gain's input range on both inputs: unclipped, levels, frequency and shape |
 | `hw.sweep.f10hz` ... `f50000hz` | a 2 Vpp sine at 10, 50, 100, 354.1, 1000, 2000, 5000, 10000, 20000 and 50000 Hz on each generator in turn: frequency, levels and (up to 20 kHz) shape |
-| `hw.mode.scope1` | CH1-only mode streams 375 kS/s and no CH2 |
-| `hw.mode.scope1_750k` | CH1-only 750 kS/s mode with a 10 kHz sine |
-| `hw.isolation.sgA_to_chB.{sine,square}` | a 6 Vpp sine or square on one generator, the other parked: the idle input's AC RMS as a fraction of the driven one's |
-| `hw.trigger.ch1_rising`, `ch1_falling`, `ch2_rising_square`, `ch2_falling_triangle` | librador's triggered capture: sample count, pre-trigger count, the samples either side of the level, and that the fitted generator waveform crosses the level in the right direction within 3 samples of t = 0 |
-| `hw.trigger.placement` | all-post-trigger, mostly pre-trigger and 1.5 s windows: sample counts and the samples at the trigger |
+| `hw.mode.scope1`, `hw.mode.scope1_831hz` | CH1-only mode streams 375 kS/s and no CH2, with a 2237 Hz sine and with an 831 Hz one |
+| `hw.mode.scope1_750k`, `hw.mode.scope1_750k_831hz` | CH1-only 750 kS/s mode with a 10 kHz sine and with an 831 Hz one |
+| `hw.isolation.sgA_to_chB.{sine,square}` | a 6 Vpp 2237 Hz sine or square on one generator, the other parked: the idle input's AC RMS as a fraction of the driven one's |
+| `hw.trigger.ch1_rising`, `ch1_falling`, `ch2_rising_square`, `ch2_falling_triangle`, each also as `..._831hz` | librador's triggered capture of a 2237 Hz wave (831 Hz for the `_831hz` tests): sample count, pre-trigger count, the samples either side of the level, and that the fitted generator waveform crosses the level in the right direction within 3 samples of t = 0 |
+| `hw.trigger.placement`, `hw.trigger.placement_831hz` | on a 2237 Hz sine (831 Hz for the `_831hz` test), all-post-trigger, mostly pre-trigger and 1.5 s windows: sample counts and the samples at the trigger |
 | `hw.trigger.timeout_unreachable` | a level above the signal times out after the 2 s timeout |
 | `hw.trigger.no_false_trigger_on_dc` | a DC level sitting on the trigger level, with hysteresis, never triggers on noise |
-| `hw.transport.{bulk,iso1,iso6}.measure` | the session really uses the transport asked for (librador allows only bulk on macOS, so the iso tests skip there) and measures a 2 kHz sine on CH1 and a 4 kHz triangle on CH2 at once (smooth waves, because a square's edges couple into the other input as spikes that can fake a crossing) |
+| `hw.transport.{bulk,iso1,iso6}.measure` | the session really uses the transport asked for (librador allows only bulk on macOS, so the iso tests skip there) and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2 at once (smooth waves, because a square's edges couple into the other input as spikes that can fake a crossing); its result gates the soak and the `_831hz` measure |
+| `hw.transport.{bulk,iso1,iso6}.measure_831hz` | once the transport's measure has passed, an 831 Hz sine on CH1 and an 831 Hz triangle on CH2, told apart by their shapes |
 | `hw.transport.{bulk,iso1,iso6}.soak` | a 60 s stream with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2: no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period on either input more than 5 % off the median. These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
 | `firmware.round_trip` | flashes the bundled `labrafirm_0007_02.hex` (librador reports 1, "runs other firmware", and the board 0x0007 variant 2), then the release's bundled image back (0x000c variant 3 here), then checks the board streams. Both directions jump to the DFU bootloader and re-enumerate, which is what USB passthrough and Windows driver binding tend to break. It skips when the board stores calibration, because the DFU erase would wipe it. |
 
@@ -165,10 +166,10 @@ would otherwise read as a wrong shape.
  "complete": true,
  "result": "pass|fail",
  "counts": {"pass": 0, "fail": 0, "skip": 0, "error": 0},
- "tests": [{"id": "hw.siggen.ch1.sine_2khz", "group": "hw", "title": "...", "status": "pass|fail|skip|error",
+ "tests": [{"id": "hw.siggen.ch1.sine_2237hz", "group": "hw", "title": "...", "status": "pass|fail|skip|error",
             "duration_s": 1.2, "message": "why it failed or skipped, plus notes such as lost USB frames",
-            "measurements": [{"name": "CH1 frequency", "unit": "Hz", "value": 1999.9, "expected": 2000, "min": 1998, "max": 2002}],
-            "artifacts": [{"path": "plots/hw_siggen_ch1_sine_2khz_CH1.png", "kind": "png", "caption": "..."}]}],
+            "measurements": [{"name": "CH1 frequency", "unit": "Hz", "value": 2236.9, "expected": 2237, "min": 2234.8, "max": 2239.2}],
+            "artifacts": [{"path": "plots/hw_siggen_ch1_sine_2237hz_CH1.png", "kind": "png", "caption": "..."}]}],
  "screenshots": [{"id": "gui.desktop_1280x720.classic-dark.scope.text100.board",
                   "path": "screenshots/gui.desktop_1280x720.classic-dark.scope.text100.board.png",
                   "caption": "...", "expect": "what a correct render shows"}]}
