@@ -169,7 +169,7 @@ expected waveform (green dashed) over it.
 | `hw.mode.scope1`, `hw.mode.scope1_831hz` | CH1-only mode streams 375 kS/s and no CH2, with a 2237 Hz sine and with an 831 Hz one |
 | `hw.mode.scope1_750k`, `hw.mode.scope1_750k_831hz` | CH1-only 750 kS/s mode with a 10477 Hz sine and with an 831 Hz one |
 | `hw.isolation.sgA_to_chB.{sine,square}` | a 6 Vpp 2237 Hz sine or square on one generator, the other parked: the idle input's AC RMS as a fraction of the driven one's |
-| `hw.trigger.ch1_rising`, `ch1_falling`, `ch2_rising_square`, `ch2_falling_triangle`, each also as `..._831hz` | librador's triggered capture of a 2237 Hz wave (831 Hz for the `_831hz` tests): sample count, pre-trigger count, the samples either side of the level, and that the fitted generator waveform crosses the level in the right direction within 3 samples of t = 0 |
+| `hw.trigger.ch1_rising`, `ch1_falling`, `ch2_rising_square`, `ch2_falling_triangle`, each also as `..._831hz` | librador's triggered capture of a 2237 Hz wave (831 Hz for the `_831hz` tests): sample count, pre-trigger count, the samples either side of the level, and that the fitted generator waveform crosses the level in the right direction within 3 samples of t = 0 (or, on a gentle slope, within the time the waveform takes to cover 0.1 V of input noise) |
 | `hw.trigger.placement`, `hw.trigger.placement_831hz` | on a 2237 Hz sine (831 Hz for the `_831hz` test), all-post-trigger, mostly pre-trigger and 1.5 s windows: sample counts and the samples at the trigger |
 | `hw.trigger.timeout_unreachable` | a level above the signal times out after the 2 s timeout |
 | `hw.trigger.no_false_trigger_on_dc` | a DC level sitting on the trigger level, with hysteresis, never triggers on noise |
@@ -231,6 +231,7 @@ holds them with their derivations.
 | Channel gain (slope of DC readings vs set level) | 0.968-1.03 | 0.94-1.06 |
 | Shape: RMS of samples minus the fitted ideal shape (frequency free within 0.1 %), over the fitted swing | worst on clean captures: sine 2.9 % (20 kHz; 1.4 % at 2 kHz), triangle 1.3 %, sawtooth 4.5 %, square 6.7 % (single-sample spikes at the edges) | sine 6 %, triangle 3 %, sawtooth 9 %, square 14 %, and the expected shape must fit best of the four |
 | Square duty cycle | 0.493-0.498 | 0.48-0.52 |
+| Triggered capture: where the fitted waveform crosses the level, against the trigger sample | a trigger fires at the first sample to reach the level, so input noise brings it forward by its peak over the slope: within 3 samples on steep edges; on CH2's 831 Hz triangle (8.9 mV a sample) 2 of 30 repeats were 3.0 and 8.8 samples early, the worst 78 mV of noise | 3 samples, or the time the waveform takes to cover 0.1 V where that is longer |
 | Noise floor, generators parked, gain 4 (median AC RMS of 5 ms slices) | whole-window RMS: CH1 12.6-18.1 mV over 36 runs; CH2 19.8-36.9 mV over 115, lifted by bursts from outside the board (a Wi-Fi beacon every 102.4 ms on the QA tester) | 30 mV |
 | Crosstalk into the idle input, 6 Vpp at 2 kHz | sine 1.1-1.5 %, square 1.3-2.7 % of the driven RMS | sine 3 %, square 5 % |
 | Stream | a healthy link loses nothing | 0 bad, 0 dropped, 0 period anomalies, rate within 0.5 %, pause at most 0.25 s |

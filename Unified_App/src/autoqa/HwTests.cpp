@@ -1002,8 +1002,18 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w,
         prev = v;
     }
     const char* edge = rising ? "rising" : "falling";
+    // How far from t = 0 the crossing may be: three samples, or on a gentle slope the time the
+    // waveform takes to cover the input's noise. The trigger fires at the first sample to
+    // reach the level, so noise brings it forward by its peak over the slope: on an 831 Hz
+    // triangle (8.9 mV a sample) CH2's bursts on the QA tester moved it up to 9 samples.
+    const double half_sample = 0.5 / rate;
+    const double slope = std::isnan(nearest) ? NAN
+        : std::fabs(fit.at(w, nearest + half_sample) - fit.at(w, nearest - half_sample)) / (2 * half_sample);
+    const double allowed = std::isnan(slope) ? 3 / rate : std::max(3 / rate, tol::TRIGGER_NOISE_V / slope);
     ctx.measure(std::string(edge) + " level crossing of the fitted " + waveName(w) + " nearest t=0", "s",
-                nearest, 0.0, -3 / rate, 3 / rate);
+                nearest, 0.0, -allowed, allowed);
+    ctx.measure("slope of the fitted " + std::string(waveName(w)) + " at that crossing (sets the limit above; not judged)",
+                "V/s", slope);
     ctx.measure(std::string(waveName(w)) + " fit residual", "fraction", fit.residual_fraction, std::nullopt,
                 std::nullopt, shapeLimit(w));
     ctx.measure("frames dropped while waiting", "", static_cast<double>(res.frames_dropped));

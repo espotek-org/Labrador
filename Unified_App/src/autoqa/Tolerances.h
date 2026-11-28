@@ -80,6 +80,14 @@ constexpr double MAX_STALL_S = 0.25;  // bulk transfers land every 20-40 ms
 // gave 0.995.
 constexpr double LOST_FRAME_SHIFT_MIN = 0.1;
 
+// Triggered captures: the fitted waveform must cross the level within three samples of the
+// trigger, or within the time the waveform takes to cover this much noise where that is
+// longer. A trigger fires at the first sample to reach the level, so noise on the input
+// brings it forward by up to its peak. 0.1 V is about twice the noisiest 5 ms slice's RMS
+// on the reference board's CH2 (52 mV, bursts from outside the board); the worst trigger
+// seen in 30 repeats was 78 mV early, on an 831 Hz triangle rising 8.9 mV a sample.
+constexpr double TRIGGER_NOISE_V = 0.1;
+
 // One 8-bit DAC step below 3.2 V, three times that through the x3 stage.
 inline double dacStepV(double peak_v)
 {
