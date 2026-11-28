@@ -221,6 +221,8 @@ public:
     // bootloader (0x2fe4) and Gobindar (0xa000) devices independently.
     // Returns true if any of the three is attached.
     bool desktop_device_present_ex(bool* app_mode_out, bool* bootloader_mode_out, bool* gobindar_mode_out);
+    // Whether the bootloader's device, once listed, can be opened yet.
+    bool desktop_bootloader_openable();
     int desktop_connect();
     void desktop_disconnect();
     int desktop_flash_firmware(const char* hex_path);  // blocking, seconds
