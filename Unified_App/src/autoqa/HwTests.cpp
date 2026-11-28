@@ -494,6 +494,21 @@ class Suite
     // Frequency, fitted levels and (unless check_shape is false) shape of
     // generator `ch` as seen on input `ch`, plus a plot. `shows_lost_frames` is false only
     // for the sweep's low points (checkLostFrameShift).
+    // How badly another wave shape fits the samples, for the comparison with the expected one.
+    // fitWave throws when no upright wave of that shape fits at all, which for this comparison
+    // is an answer, the worst one: that shape is not what the input carries.
+    static double residualOrNoFit(Wave w, double frequency_hz, const std::vector<double>& y, double rate)
+    {
+        try
+        {
+            return fitWave(w, frequency_hz, tol::FREQUENCY, y, rate, 0).residual_fraction;
+        }
+        catch (const std::runtime_error&)
+        {
+            return INFINITY;
+        }
+    }
+
     void checkWave(TestContext& ctx, const std::string& label, const Capture& c, int ch,
                    const std::string& title, bool check_shape = true, bool shows_lost_frames = true)
     {
@@ -503,6 +518,23 @@ class Suite
         checkFrequency(ctx, label, spec, out, c.stats[ch - 1]);
         const std::vector<double>& y = c.samples(ch);
         const double rate = c.window.sample_rate_hz;
+        // An input that shows no waveform at all is said to be flat, with its level, and nothing
+        // is fitted to it. (A fresh bulk session once started with CH2 at the top of its range
+        // for a whole window while CH1 was right; the fits turned that into the error "no
+        // upright square fits the samples".)
+        const ChannelStats& stats = c.stats[ch - 1];
+        const double swing = out.v_max - out.v_min;
+        ctx.measure(label + " swing", "Vpp", stats.vpp, swing, 0.1 * swing);
+        if (stats.vpp < 0.1 * swing)
+        {
+            char flat[240];
+            std::snprintf(flat, sizeof flat,
+                          "%s is flat at %.3f V where SG%d should drive %s between %.3f and %.3f V: the "
+                          "generator's output is not running, or the input is stuck",
+                          label.c_str(), stats.mean_v, ch, waveName(spec.wave), out.v_min, out.v_max);
+            ctx.note(flat);
+            return;
+        }
         const WaveFit fit = fitWave(spec.wave, out.frequency_hz, tol::FREQUENCY, y, rate, 0);
         const double lo_tol = tol::level(out.v_min, c.gain), hi_tol = tol::level(out.v_max, c.gain);
         ctx.measure(label + " low level", "V", fit.low_v, out.v_min, out.v_min - lo_tol, out.v_min + lo_tol);
@@ -517,7 +549,7 @@ class Suite
             {
                 if (w == spec.wave)
                     continue;
-                const double r = fitWave(w, out.frequency_hz, tol::FREQUENCY, y, rate, 0).residual_fraction;
+                const double r = residualOrNoFit(w, out.frequency_hz, y, rate);
                 if (r < nearest)
                 {
                     nearest = r;
