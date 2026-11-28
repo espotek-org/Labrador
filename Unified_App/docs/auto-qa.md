@@ -112,9 +112,20 @@ the conditions it needs and the ones it establishes, and every test that
 establishes a needed condition joins the plan, transitively. Today `board`
 comes from `hw.board.present`, `sg1_ch1` and `sg2_ch2` from `hw.wiring.sg1`
 and `hw.wiring.sg2`, and `transport_<t>` from `hw.transport.<t>.measure`. So
-`hw.transport.iso6.soak` runs after `hw.board.present`, both wiring tests and
+`hw.gain.x64` runs after `hw.board.present` and both wiring tests,
+`hw.transport.iso6.soak` after `hw.board.present` and
 `hw.transport.iso6.measure`, and any board-connected screenshot after
-`hw.board.present`. Tests always run in the suite's order, whatever order the
+`hw.board.present`.
+
+The transport tests need the board but not the wiring tests' conditions. The
+wiring tests measure over the default transport, and when their capture has
+lost USB frames in every try they fail saying the loopback could not be
+checked, since a corrupt stream can put one input's samples on the other.
+The tests that need the loopback over that transport then fail with that
+reason, while each `hw.transport.<t>.measure` opens its own transport and
+measures both loopbacks over it, so the report still shows which transports
+work. A wiring fault found on a clean capture (not wired, swapped, shorted)
+stops the transport tests as well. Tests always run in the suite's order, whatever order the
 items came in, and a phase with nothing planned is skipped.
 
 **Repeat.** `--auto-qa-repeat <n>` (1 to 200) runs the planned tests n times

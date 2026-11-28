@@ -624,6 +624,10 @@ class Suite
     std::vector<HwTest> m_tests;
     std::unique_ptr<DeviceSession> m_session;
     bool m_calibration_stored = false;
+    // What hw.wiring found wrong with the loopback on a capture it could trust; empty while the
+    // loopback is right, or unknown. The hw.transport tests don't wait for hw.wiring's verdict
+    // (it is made over the default transport, which may be the broken one), but they stop on this.
+    std::string m_wiring_fault;
 };
 
 // ---------------------------------------------------------------------------
@@ -661,6 +665,25 @@ void Suite::wiring(TestContext& ctx, int ch)
     ctx.measure("CH" + std::to_string(other) + " AC RMS (should stay at the noise floor)", "V",
                 idle.rms_ac_v, std::nullopt, std::nullopt, 0.1);
     const std::string cond = "sg" + std::to_string(ch) + "_ch" + std::to_string(ch);
+    // A window that still lost frames after every retake can't say where the wires go: lost
+    // frames are filled with repeats, and iso6 endpoints out of step put one input's samples
+    // on the other. (A Windows 7 VM whose iso6 stream lost most of its frames was reported
+    // as "the loopback wires look swapped".) That is a fault of the stream. The tests that
+    // need the loopback over this transport can't run, and the hw.transport tests, which
+    // each open their own transport, show which transports work.
+    const FrameStats& f = c.window.frames;
+    const unsigned long long lost = f.dropped + f.bad_checksum;
+    if (lost && (driven.vpp < 1.0 || idle.rms_ac_v > 0.1))
+    {
+        const std::string reason =
+            "the SG" + std::to_string(ch) + "->CH" + std::to_string(ch) + " loopback could not be checked: " +
+            std::to_string(lost) + " of " + std::to_string(f.ok + lost) +
+            " USB frames were lost or corrupt in the window, in each of " + std::to_string(MEASURE_TRIES) +
+            " tries, over the default transport (" + transportName(session().activeTransport()) +
+            "); the hw.transport tests show which transports work";
+        m_runner.setCondition(cond, false, reason);
+        ctx.fail(reason);
+    }
     if (driven.vpp < 1.0)
     {
         char reason[200];
@@ -673,13 +696,15 @@ void Suite::wiring(TestContext& ctx, int ch)
                           "CH%d reads the noise floor (Vpp %.3f V) while SG%d drives 2 Vpp: the "
                           "SG%d->CH%d loopback is not wired",
                           ch, driven.vpp, ch, ch, ch);
-        m_runner.setCondition(cond, false, std::string("needs the SG->CH loopback: ") + reason);
+        m_wiring_fault = std::string("needs the SG->CH loopback: ") + reason;
+        m_runner.setCondition(cond, false, m_wiring_fault);
         ctx.fail(reason);
     }
     if (idle.rms_ac_v > 0.1)
     {
         const std::string reason = "SG" + std::to_string(ch) + " also appears on CH" +
                                    std::to_string(other) + ": the inputs look shorted together";
+        m_wiring_fault = reason;
         m_runner.setCondition(cond, false, reason);
         ctx.fail(reason);
     }
@@ -1122,6 +1147,12 @@ void Suite::triggerDc(TestContext& ctx)
 // 831 Hz and the wave shapes tell them apart.
 void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak)
 {
+    if (!m_wiring_fault.empty())
+    {
+        if (gates_soak)
+            m_runner.setCondition("transport_" + t, false, m_wiring_fault);
+        ctx.fail(m_wiring_fault);
+    }
     m_session.reset();
     m_session = std::make_unique<DeviceSession>(LIBRADOR_DEBUG_LOG, parseTransport(t));
     const std::string active = transportName(m_session->activeTransport());
@@ -1523,21 +1554,25 @@ std::vector<HwTest> Suite::catalogue(Level level)
         [](Suite& s, TestContext& c) { s.triggerTimeout(c); });
     add("hw.trigger.no_false_trigger_on_dc", "A DC level on the trigger level does not trigger on noise", sg1,
         [](Suite& s, TestContext& c) { s.triggerDc(c); });
+    // The transport tests need the board and not hw.wiring's conditions: those are measured over
+    // the default transport, and when that one is the broken transport these tests are what
+    // shows it. Each measures both loopbacks over its own transport (and stops on a wiring
+    // fault hw.wiring was able to establish, m_wiring_fault).
     for (const char* t : TRANSPORTS)
     {
         const std::string ts = t;
         provide("hw.transport." + ts + ".measure",
                 "USB transport " + ts + ": connects and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2",
-                both, {"transport_" + ts},
+                board, {"transport_" + ts},
                 [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, BASE_HZ, true); });
         add("hw.transport." + ts + ".measure_831hz",
             "USB transport " + ts + ": an 831 Hz sine on CH1 and an 831 Hz triangle on CH2",
-            {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
+            {"board", "transport_" + ts},
             [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, ODD_HZ, false); });
         add("hw.transport." + ts + ".restarts_831hz",
             "USB transport " + ts + ": " + std::to_string(TRANSPORT_RESTARTS) +
                 " streams started one after another all come up clean, with 831 Hz on both inputs",
-            {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
+            {"board", "transport_" + ts},
             [ts](Suite& s, TestContext& c) { s.transportRestarts(c, ts); });
         add("hw.transport." + ts + ".soak",
             "USB transport " + ts + ": " + soak_length + " with no lost, corrupt or late frames",
@@ -1562,6 +1597,7 @@ void Suite::startIteration()
 {
     m_session.reset();
     m_calibration_stored = false;
+    m_wiring_fault.clear();
 }
 
 void Suite::run(const std::vector<PlannedTest>& planned)
