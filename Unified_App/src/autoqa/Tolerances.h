@@ -71,6 +71,12 @@ constexpr double CHANNEL_GAIN = 0.06;
 constexpr double SAMPLE_RATE = 0.005; // delivered vs nominal
 constexpr double MAX_STALL_S = 0.25;  // bulk transfers land every 20-40 ms
 
+// A waveform test's frequency must put a lost 1 ms USB frame at least this far from a whole
+// number of periods, or the lost frame would not show: 2237 Hz (realised 2239.6 Hz) gives
+// 0.24 of a period and 831 Hz (realised 829.6 Hz) 0.83, where 2 kHz (realised 1994.7 Hz)
+// gave 0.995.
+constexpr double LOST_FRAME_SHIFT_MIN = 0.1;
+
 // One 8-bit DAC step below 3.2 V, three times that through the x3 stage.
 inline double dacStepV(double peak_v)
 {

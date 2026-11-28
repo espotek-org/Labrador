@@ -741,6 +741,14 @@ void AutoQa::writeReport(bool complete)
         json.field("os_version", osVersion());
         json.field("arch", archName());
         json.field("hostname", hostName());
+        // Whether a hypervisor runs this machine: the stream soaks allow a virtual machine
+        // interruptions that real hardware may not have (HwTests.cpp, transportSoak).
+        json.field("virtual_machine", m_machine.virtual_machine);
+        json.key("hypervisor");
+        if (m_machine.hypervisor.empty())
+            json.null();
+        else
+            json.value(m_machine.hypervisor);
         json.endObject();
         json.field("started_at", m_started_at);
         json.field("finished_at", isoNow());

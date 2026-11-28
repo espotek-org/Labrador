@@ -1,5 +1,6 @@
 #include "autoqa/HwTests.h"
 
+#include "autoqa/Environment.h"
 #include "autoqa/Plot.h"
 #include "autoqa/Tolerances.h"
 #include "platform/paths.h"
@@ -24,6 +25,7 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 namespace autoqa
 {
@@ -33,14 +35,37 @@ using Wave = SignalSpec::Wave;
 
 constexpr double SETTLE_S = 0.5;          // after configuring the generators and scope
 constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
-// Windows a measurement takes before judging one that had lost or corrupt USB frames.
-constexpr int MEASURE_TRIES = 3;
-constexpr double SOAK_SECONDS = 60;
-constexpr double THOROUGH_SOAK_SECONDS = 300; // a run at the thorough level
+// Captures a measurement takes before judging one that had lost or corrupt USB frames, and
+// the wait before the second (doubled before each one after: 0.2, 0.4, 0.8 s). The waits
+// matter in a virtual machine, where the hypervisor can leave the board unserviced for up to
+// about a second: three captures straight after each other all fell inside one such pause.
+constexpr int MEASURE_TRIES = 4;
+constexpr double MEASURE_RETRY_WAIT_S = 0.2;
+// A soak judges the running stream one window at a time. A level asks for a number of clean
+// windows; a window that is not clean is an interruption.
+constexpr double SOAK_WINDOW_S = 60;
+constexpr int SOAK_WINDOWS = 1;
+constexpr int THOROUGH_SOAK_WINDOWS = 5; // a run at the thorough level
+// Real hardware polls the board on the USB controller's own schedule, so a soak there allows
+// no interruption. A hypervisor services a passed-through device in software and now and
+// then leaves it unserviced for 0.1 to 0.9 s (on the QA tester about once in three or four
+// minutes of streaming, FINDINGS.md), which costs an isochronous stream its frames however
+// good the app is. In a virtual machine a soak therefore allows this many interrupted
+// windows before it has its clean ones; each is recorded. A stream that keeps losing frames
+// never has a clean window and fails as before.
+constexpr int SOAK_INTERRUPTIONS_ALLOWED_VM = 7;
+// A window that lost more than this share of its frames is a broken link, not an
+// interruption, and ends the soak at once.
+constexpr double SOAK_BROKEN_LOSS = 0.05;
+// After an interrupted window the stream gets this long to realign before the next window.
+constexpr double SOAK_RECOVERY_S = 1.0;
 // The hardware sessions pass librador's debug messages to the log (the iso6 realignment
 // among them, without which a misaligned stream on a test machine fails invisibly).
 constexpr bool LIBRADOR_DEBUG_LOG = true;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
+// Below this a lost 1 ms frame moves a waveform by under a tenth of a period whatever the
+// frequency, so the sweep's lowest points cannot show one.
+constexpr double SWEEP_SHOWS_LOST_FRAMES_FROM_HZ = 100;
 // The gain tests capture this long and judge each input on its longest stretch
 // of undisturbed periods, which must be at least GAIN_MIN_STRETCH_S.
 constexpr double GAIN_WINDOW_S = 0.25;
@@ -261,10 +286,22 @@ struct HwTest
     TestFn fn;
 };
 
-// How long each transport soak streams at a level: thorough runs the long soak.
-double soakSeconds(Level level)
+// How many clean windows each transport soak needs at a level: thorough runs the long soak.
+int soakWindows(Level level)
 {
-    return level == Level::Thorough ? THOROUGH_SOAK_SECONDS : SOAK_SECONDS;
+    return level == Level::Thorough ? THOROUGH_SOAK_WINDOWS : SOAK_WINDOWS;
+}
+
+// What a lost 1 ms USB frame does to a waveform of this frequency: the fraction of a period
+// by which everything after it is out of place (0 to 1). Near 0 or 1 the lost frame is
+// invisible, which is how 1 kHz and 2 kHz signals passed with half their frames missing.
+// The frequency to give is the one the generator really makes: a request for 997 Hz is
+// realised as 997.34 Hz, a period of exactly 376 samples, and hides a lost frame as well as
+// 1 kHz does.
+double lostFrameShift(double realised_hz)
+{
+    const double periods_per_frame = realised_hz / 1000.0;
+    return periods_per_frame - std::floor(periods_per_frame);
 }
 
 // One Suite serves a whole run (every iteration, both the hardware phase and the firmware
@@ -273,8 +310,8 @@ class Suite
 {
   public:
     Suite(Runner& runner, std::string out_dir, Level level, std::function<void(const std::string&)> status)
-        : m_runner(runner), m_out(std::move(out_dir)), m_status(std::move(status)), m_soak_s(soakSeconds(level)),
-          m_tests(catalogue(level))
+        : m_runner(runner), m_out(std::move(out_dir)), m_status(std::move(status)),
+          m_soak_windows(soakWindows(level)), m_machine(detectMachine()), m_tests(catalogue(level))
     {
     }
 
@@ -295,6 +332,42 @@ class Suite
         return *m_session;
     }
 
+    std::string machineText() const
+    {
+        if (!m_machine.virtual_machine)
+            return "real hardware";
+        return m_machine.hypervisor.empty() ? "virtual machine" : "virtual machine (" + m_machine.hypervisor + ")";
+    }
+
+    // librador's triggered capture, taken again (as measure() does) when USB frames were lost
+    // or corrupt while it waited or recorded: the trigger tests judge where the trigger landed,
+    // and a window with a repeated frame in it says nothing about that.
+    int captureAroundTrigger(TestContext& ctx, const std::string& name, const librador_capture_request& req,
+                             librador_capture_result& res)
+    {
+        int spoilt = 0;
+        int rc;
+        for (int attempt = 1;; attempt++)
+        {
+            res = librador_capture_result();
+            rc = librador_capture_around_trigger(&req, &res);
+            if (rc != 0 || (res.frames_dropped == 0 && res.frames_bad_checksum == 0) || attempt == MEASURE_TRIES)
+                break;
+            spoilt++;
+            waitBeforeRetry(attempt);
+        }
+        if (spoilt)
+            ctx.note(name + ": " + std::to_string(spoilt) + " earlier capture" + (spoilt == 1 ? " was" : "s were") +
+                     " taken again for lost or corrupt USB frames");
+        return rc;
+    }
+
+    // The wait after spoilt capture number `attempt` (1-based), before the next one.
+    static void waitBeforeRetry(int attempt)
+    {
+        std::this_thread::sleep_for(std::chrono::duration<double>(MEASURE_RETRY_WAIT_S * (1 << (attempt - 1))));
+    }
+
     Capture measure(TestContext& ctx, const std::string& name, const SignalSpec& sg1,
                     const SignalSpec& sg2, double gain = 4, ScopeMode mode = ScopeMode::Ch1Ch2,
                     double seconds = 0.05)
@@ -309,9 +382,10 @@ class Suite
         c.out[0] = applySignal(1, sg1);
         c.out[1] = applySignal(2, sg2);
         s.configureScope(mode, gain, SETTLE_S);
-        // A window with lost or corrupt USB frames is captured again, up to MEASURE_TRIES times:
-        // these tests judge the analog path, and the hw.transport tests judge the stream. A
-        // stream fault that spoils every window still fails here (the last window is judged).
+        // A window with lost or corrupt USB frames is captured again, up to MEASURE_TRIES times
+        // with a growing wait between them: these tests judge the analog path, and the
+        // hw.transport tests judge the stream. A stream fault that spoils every window still
+        // fails here (the last window is judged).
         int spoilt = 0;
         for (int attempt = 1;; attempt++)
         {
@@ -320,6 +394,7 @@ class Suite
             if ((f.dropped == 0 && f.bad_checksum == 0) || attempt == MEASURE_TRIES)
                 break;
             spoilt++;
+            waitBeforeRetry(attempt);
         }
         if (spoilt)
             ctx.note(name + ": " + std::to_string(spoilt) + " earlier window" + (spoilt == 1 ? " was" : "s were") +
@@ -371,13 +446,29 @@ class Suite
                     real * (1 - tol::FREQUENCY), real * (1 + tol::FREQUENCY));
     }
 
+    // How far a lost USB frame would move generator `ch`'s waveform. The waveform tests are
+    // there to show lost frames among other things, so for them (judged) the shift must be
+    // well clear of a whole period; the lowest sweep points cannot avoid a small one.
+    void checkLostFrameShift(TestContext& ctx, int ch, const SignalOutput& out, bool judged)
+    {
+        const double shift = lostFrameShift(out.frequency_hz);
+        const std::string name = "SG" + std::to_string(ch) + " shift a lost 1 ms USB frame would cause";
+        if (judged)
+            ctx.measure(name + " (near 0 or 1 would hide it)", "period", shift, std::nullopt,
+                        tol::LOST_FRAME_SHIFT_MIN, 1 - tol::LOST_FRAME_SHIFT_MIN);
+        else
+            ctx.measure(name + " (not judged: under one tenth of a period at this frequency)", "period", shift);
+    }
+
     // Frequency, fitted levels and (unless check_shape is false) shape of
-    // generator `ch` as seen on input `ch`, plus a plot.
+    // generator `ch` as seen on input `ch`, plus a plot. `shows_lost_frames` is false only
+    // for the sweep's low points (checkLostFrameShift).
     void checkWave(TestContext& ctx, const std::string& label, const Capture& c, int ch,
-                   const std::string& title, bool check_shape = true)
+                   const std::string& title, bool check_shape = true, bool shows_lost_frames = true)
     {
         const SignalSpec& spec = c.spec[ch - 1];
         const SignalOutput& out = c.out[ch - 1];
+        checkLostFrameShift(ctx, ch, out, shows_lost_frames);
         checkFrequency(ctx, label, spec, out, c.stats[ch - 1]);
         const std::vector<double>& y = c.samples(ch);
         const double rate = c.window.sample_rate_hz;
@@ -488,13 +579,16 @@ class Suite
     void triggerDc(TestContext& ctx);
     void transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak);
     void transportSoak(TestContext& ctx, const std::string& t);
+    bool soakWindowClean(const StreamCheckResult& r, const SignalOutput out[2]);
+    void recordSoakWindow(TestContext& ctx, const StreamCheckResult& r, const SignalOutput out[2]);
     void firmwareRoundTrip(TestContext& ctx);
     void ensureBundledFirmware(TestContext& ctx);
 
     Runner& m_runner;
     std::string m_out;
     std::function<void(const std::string&)> m_status;
-    double m_soak_s;
+    int m_soak_windows;
+    Machine m_machine;
     std::vector<HwTest> m_tests;
     std::unique_ptr<DeviceSession> m_session;
     bool m_calibration_stored = false;
@@ -519,6 +613,7 @@ void Suite::boardPresent(TestContext& ctx)
     ctx.measureText("default USB transport", transportName(s.activeTransport()));
     m_calibration_stored = s.calibration().stored;
     ctx.measureText("calibration stored on the board", m_calibration_stored ? "yes" : "no");
+    ctx.measureText("machine (a virtual machine's soaks may be interrupted, real hardware's may not)", machineText());
     m_runner.setCondition("board", true);
 }
 
@@ -738,7 +833,7 @@ void Suite::sweep(TestContext& ctx, double f)
                                   : measure(ctx, name, SignalSpec::off(), spec, 4, ScopeMode::Ch1Ch2, seconds);
         checkWave(ctx, "CH" + std::to_string(ch), c, ch,
                   num(f) + " Hz sine on SG" + std::to_string(ch) + ", CH" + std::to_string(ch),
-                  f <= MAX_SHAPE_FREQUENCY_HZ);
+                  f <= MAX_SHAPE_FREQUENCY_HZ, f >= SWEEP_SHOWS_LOST_FRAMES_FROM_HZ);
     }
 }
 
@@ -812,9 +907,10 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w,
     req.post_s = 0.004;
     req.timeout_s = 10;
     librador_capture_result res;
-    const int rc = librador_capture_around_trigger(&req, &res);
+    const int rc = captureAroundTrigger(ctx, "trigger", req, res);
     if (rc != 0)
         ctx.fail("librador_capture_around_trigger returned " + std::to_string(rc));
+    checkLostFrameShift(ctx, ch, out[ch - 1], true);
     const double rate = res.sample_rate_hz;
     const int expected_n = static_cast<int>(std::lround((req.pre_s + req.post_s) * rate));
     const int expected_pre = static_cast<int>(std::lround(req.pre_s * rate));
@@ -904,7 +1000,7 @@ void Suite::triggerPlacement(TestContext& ctx, double hz)
         req.post_s = cs.post;
         req.timeout_s = 10;
         librador_capture_result res;
-        const int rc = librador_capture_around_trigger(&req, &res);
+        const int rc = captureAroundTrigger(ctx, cs.name, req, res);
         if (rc != 0)
             ctx.fail(std::string(cs.name) + ": librador_capture_around_trigger returned " + std::to_string(rc));
         const int n = static_cast<int>(std::lround((cs.pre + cs.post) * res.sample_rate_hz));
@@ -1004,20 +1100,87 @@ void Suite::transportSoak(TestContext& ctx, const std::string& t)
     const SignalOutput out[2] = {applySignal(1, a), applySignal(2, b)};
     m_session->configureScope(ScopeMode::Ch1Ch2, 4, SETTLE_S);
     const bool check[2] = {true, true};
-    const StreamCheckResult r = runStreamCheck(*m_session, m_soak_s, check, 4,
-                                               [&](const std::string& line) { m_status("soak " + t + ": " + line); });
-    const std::string json_path = ctx.path("captures", "stream_test.json");
+    // The stream is judged one window at a time and runs on between them, so after an
+    // interruption the next window also shows whether the stream recovered by itself.
+    const int allowed = m_machine.virtual_machine ? SOAK_INTERRUPTIONS_ALLOWED_VM : 0;
+    const double expected_frames = std::round(SOAK_WINDOW_S * 1000);
+    int clean = 0, interrupted = 0;
+    bool broken = false;
+    StreamCheckResult last; // recorded below: the window that completed the soak, or the one that ended it
+    for (int window = 1; clean < m_soak_windows && interrupted <= allowed && !broken; window++)
     {
-        std::ofstream f(ctx.absolute(json_path), std::ios::binary | std::ios::trunc);
-        JsonWriter json(f);
-        json.beginObject();
-        json.field("transport", t);
-        r.writeJson(json);
-        json.endObject();
-        json.finish();
+        const std::string label = "soak " + t + " window " + std::to_string(window);
+        if (interrupted)
+            // The window before was interrupted: the stream gets a moment to realign before
+            // it is judged again.
+            std::this_thread::sleep_for(std::chrono::duration<double>(SOAK_RECOVERY_S));
+        try
+        {
+            last = runStreamCheck(*m_session, SOAK_WINDOW_S, check, 4,
+                                  [&](const std::string& line) { m_status(label + ": " + line); });
+        }
+        catch (const std::runtime_error& e)
+        {
+            // The check gives up when the stream restarts or stops carrying the signals it
+            // follows, which an interruption can cause. Where interruptions are allowed that
+            // is one more of them; where the soak is over, it is the soak's error.
+            interrupted++;
+            if (interrupted > allowed)
+                throw;
+            ctx.note("window " + std::to_string(window) + " was interrupted: " + e.what());
+            continue;
+        }
+        const bool ok = soakWindowClean(last, out);
+        const std::string json_path = ctx.path("captures", "stream_test_w" + std::to_string(window) + ".json");
+        {
+            std::ofstream f(ctx.absolute(json_path), std::ios::binary | std::ios::trunc);
+            JsonWriter json(f);
+            json.beginObject();
+            json.field("transport", t);
+            json.field("window", window);
+            json.field("clean", ok);
+            last.writeJson(json);
+            json.endObject();
+            json.finish();
+        }
+        ctx.artifact(json_path, "json", "stream check result, window " + std::to_string(window) +
+                                            (ok ? " (clean)" : " (interrupted)"));
+        if (ok)
+        {
+            clean++;
+            continue;
+        }
+        interrupted++;
+        const uint64_t lost = last.frames.bad_checksum + last.frames.dropped;
+        broken = static_cast<double>(lost) > SOAK_BROKEN_LOSS * expected_frames;
+        ctx.note("window " + std::to_string(window) + " was interrupted: " + std::to_string(lost) +
+                 " frames lost or corrupt, longest pause " + num(std::round(last.max_stall_s * 1000) / 1000) + " s" +
+                 (broken ? "; over " + num(SOAK_BROKEN_LOSS * 100) + "% of a window lost is a broken link, so the soak stopped"
+                         : ""));
     }
-    ctx.artifact(json_path, "json", "stream check result");
-    const double expected_frames = std::round(m_soak_s * 1000);
+    recordSoakWindow(ctx, last, out);
+    ctx.measureText("machine", machineText());
+    ctx.measure("clean " + num(SOAK_WINDOW_S) + " s windows", "", clean, m_soak_windows, m_soak_windows);
+    ctx.measure("windows interrupted by lost, corrupt or late frames (a virtual machine is allowed " +
+                    std::to_string(SOAK_INTERRUPTIONS_ALLOWED_VM) + ", real hardware none)",
+                "", interrupted, 0, std::nullopt, allowed);
+}
+
+// Whether a window meets every limit recordSoakWindow sets, found by recording it into a
+// scratch result.
+bool Suite::soakWindowClean(const StreamCheckResult& r, const SignalOutput out[2])
+{
+    TestResult scratch;
+    TestContext probe(scratch, m_out, std::string());
+    recordSoakWindow(probe, r, out);
+    return std::all_of(scratch.measurements.begin(), scratch.measurements.end(),
+                       [](const Measurement& m) { return m.inLimits(); });
+}
+
+// One window's measurements, each with the limit a clean window meets.
+void Suite::recordSoakWindow(TestContext& ctx, const StreamCheckResult& r, const SignalOutput out[2])
+{
+    const double expected_frames = std::round(SOAK_WINDOW_S * 1000);
     ctx.measure("frames received intact", "", static_cast<double>(r.frames.ok), expected_frames,
                 std::round(expected_frames * 0.99));
     ctx.measure("frames with a bad checksum", "", static_cast<double>(r.frames.bad_checksum), 0, std::nullopt, 0);
@@ -1164,7 +1327,10 @@ std::vector<HwTest> Suite::catalogue(Level level)
     };
     const auto add = [&provide](const std::string& id, const std::string& title, const std::vector<std::string>& needs,
                                 TestFn fn) { provide(id, title, needs, {}, std::move(fn)); };
-    const double soak_s = soakSeconds(level);
+    const int soak_windows = soakWindows(level);
+    const std::string soak_length = soak_windows == 1 ? "a " + num(SOAK_WINDOW_S) + " s stream"
+                                                      : std::to_string(soak_windows) + " streams of " +
+                                                            num(SOAK_WINDOW_S) + " s";
 
     const std::vector<std::string> board = {"board"};
     // "board" first, so a missing board is what an unmet test reports.
@@ -1212,7 +1378,11 @@ std::vector<HwTest> Suite::catalogue(Level level)
             "Scope gain x" + num(g) + ": an 831 Hz sine filling most of the range reads back right on both inputs", both,
             [g](Suite& s, TestContext& c) { s.gain(c, g, ODD_HZ); });
     }
-    for (const double f : {10.0, 50.0, 100.0, 354.1, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0})
+    // From 113 Hz up each point is chosen by the frequency the generator really makes, so that
+    // a lost USB frame moves the waveform by a good part of a period (checkLostFrameShift
+    // holds them to it). The round figures they replaced (1, 2, 5, 10, 20 and 50 kHz) are
+    // all realised within a sample or two of a whole number of periods per frame.
+    for (const double f : {10.0, 50.0, 113.0, 354.1, 1250.0, 1789.0, 5477.0, 10477.0, 19433.0, 49487.0})
     {
         add("hw.sweep.f" + idNum(f) + "hz", "Frequency sweep: " + num(f) + " Hz sine on each generator in turn, frequency, levels and shape",
             both, [f](Suite& s, TestContext& c) { s.sweep(c, f); });
@@ -1221,8 +1391,8 @@ std::vector<HwTest> Suite::catalogue(Level level)
         [](Suite& s, TestContext& c) { s.modeScope1(c, BASE_HZ); });
     add("hw.mode.scope1_831hz", "Scope mode scope1 (CH1 only, 375 kS/s) with an 831 Hz sine", sg1,
         [](Suite& s, TestContext& c) { s.modeScope1(c, ODD_HZ); });
-    add("hw.mode.scope1_750k", "Scope mode scope1-750k (CH1 only, 750 kS/s) with a 10 kHz sine", sg1,
-        [](Suite& s, TestContext& c) { s.mode750k(c, 10000); });
+    add("hw.mode.scope1_750k", "Scope mode scope1-750k (CH1 only, 750 kS/s) with a 10477 Hz sine", sg1,
+        [](Suite& s, TestContext& c) { s.mode750k(c, 10477); });
     add("hw.mode.scope1_750k_831hz", "Scope mode scope1-750k (CH1 only, 750 kS/s) with an 831 Hz sine", sg1,
         [](Suite& s, TestContext& c) { s.mode750k(c, ODD_HZ); });
     for (const Wave w : {Wave::Sine, Wave::Square})
@@ -1263,7 +1433,7 @@ std::vector<HwTest> Suite::catalogue(Level level)
             {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
             [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, ODD_HZ, false); });
         add("hw.transport." + ts + ".soak",
-            "USB transport " + ts + ": " + num(soak_s) + " s stream with no lost, corrupt or late frames",
+            "USB transport " + ts + ": " + soak_length + " with no lost, corrupt or late frames",
             {"board", "transport_" + ts}, [ts](Suite& s, TestContext& c) { s.transportSoak(c, ts); });
     }
     add("firmware.round_trip", "Flash firmware 0x0007, then the bundled image back, through the DFU bootloader",

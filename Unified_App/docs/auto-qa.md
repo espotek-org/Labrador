@@ -74,8 +74,8 @@ The options are valid only with `--auto-qa` or `--auto-qa-list`.
 
 **Levels.** Every test has a minimum level, `quick` < `standard` < `thorough`,
 and a run at a level holds the tests whose minimum is at or below it. A level
-can also set a test's parameters: at `thorough` each transport soak streams for
-300 s instead of 60 s, and its title says so. The assignment lives in
+can also set a test's parameters: at `thorough` each transport soak needs five
+clean 60 s windows instead of one, and its title says so. The assignment lives in
 `QUICK_TESTS` and `THOROUGH_TESTS` in `src/autoqa/Plan.cpp`, so moving a test
 between levels means moving its id from one list to another (an id there that
 names no test stops the app).
@@ -88,7 +88,7 @@ names no test stops the app).
   `.measure_831hz` for bulk, iso1 and iso6, and four screenshots: desktop,
   compact and mobile in Classic Dark with the board, and desktop with USB off.
 - `standard`: every other test, the firmware round trip included.
-- `thorough`: no extra tests yet, only the 300 s soaks.
+- `thorough`: no extra tests yet, only the five-window soaks.
 
 The whole 831 Hz battery belongs to `standard` (a hard requirement of the
 project owner): no `_831hz` test may be thorough-only, and the app refuses to
@@ -165,9 +165,9 @@ expected waveform (green dashed) over it.
 | `hw.siggen.chN.sine_6vpp_x3`, `sine_6vpp_x3_831hz` | a 0.5-6.5 V sine, at 2237 Hz and at 831 Hz, through the generators' x3 output stage, which needs the PSU raised to 8 V, so this also shows the PSU setting takes effect |
 | `hw.siggen.dc_levels` | DC at 0.25, 0.5, 1, 2, 3, 4 and 6 V on both generators, read on both inputs, plus each channel's gain (slope) and offset, plotted against the limits |
 | `hw.gain.x0_5` ... `x64`, `hw.gain.x0_5_831hz` ... `x64_831hz` | for each of the eight scope gains, a 2237 Hz sine (831 Hz for the `_831hz` tests) filling most of that gain's input range on both inputs: unclipped, levels, frequency and shape |
-| `hw.sweep.f10hz` ... `f50000hz` | a 2 Vpp sine at 10, 50, 100, 354.1, 1000, 2000, 5000, 10000, 20000 and 50000 Hz on each generator in turn: frequency, levels and (up to 20 kHz) shape |
+| `hw.sweep.f10hz` ... `f49487hz` | a 2 Vpp sine at 10, 50, 113, 354.1, 1250, 1789, 5477, 10477, 19433 and 49487 Hz on each generator in turn: frequency, levels and (up to 20 kHz) shape. From 113 Hz up the points are chosen by the frequency the generator really makes, so that a lost USB frame shows (see "Frequencies that show a lost frame") |
 | `hw.mode.scope1`, `hw.mode.scope1_831hz` | CH1-only mode streams 375 kS/s and no CH2, with a 2237 Hz sine and with an 831 Hz one |
-| `hw.mode.scope1_750k`, `hw.mode.scope1_750k_831hz` | CH1-only 750 kS/s mode with a 10 kHz sine and with an 831 Hz one |
+| `hw.mode.scope1_750k`, `hw.mode.scope1_750k_831hz` | CH1-only 750 kS/s mode with a 10477 Hz sine and with an 831 Hz one |
 | `hw.isolation.sgA_to_chB.{sine,square}` | a 6 Vpp 2237 Hz sine or square on one generator, the other parked: the idle input's AC RMS as a fraction of the driven one's |
 | `hw.trigger.ch1_rising`, `ch1_falling`, `ch2_rising_square`, `ch2_falling_triangle`, each also as `..._831hz` | librador's triggered capture of a 2237 Hz wave (831 Hz for the `_831hz` tests): sample count, pre-trigger count, the samples either side of the level, and that the fitted generator waveform crosses the level in the right direction within 3 samples of t = 0 |
 | `hw.trigger.placement`, `hw.trigger.placement_831hz` | on a 2237 Hz sine (831 Hz for the `_831hz` test), all-post-trigger, mostly pre-trigger and 1.5 s windows: sample counts and the samples at the trigger |
@@ -175,7 +175,7 @@ expected waveform (green dashed) over it.
 | `hw.trigger.no_false_trigger_on_dc` | a DC level sitting on the trigger level, with hysteresis, never triggers on noise |
 | `hw.transport.{bulk,iso1,iso6}.measure` | the session really uses the transport asked for (librador allows only bulk on macOS, so the iso tests skip there) and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2 at once (smooth waves, because a square's edges couple into the other input as spikes that can fake a crossing); its result gates the soak and the `_831hz` measure |
 | `hw.transport.{bulk,iso1,iso6}.measure_831hz` | once the transport's measure has passed, an 831 Hz sine on CH1 and an 831 Hz triangle on CH2, told apart by their shapes |
-| `hw.transport.{bulk,iso1,iso6}.soak` | a 60 s stream (300 s at the `thorough` level) with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2: no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period on either input more than 5 % off the median. These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
+| `hw.transport.{bulk,iso1,iso6}.soak` | a stream with a 354.1 Hz sine on SG1 and a 1234.5 Hz triangle on SG2, judged in 60 s windows while it keeps running. A clean window has no frames with a bad checksum, none dropped, at least 99 % of the expected frames, the delivered sample rate within 0.5 %, no pause over 0.25 s, and no period off the median on both inputs at once. The soak needs one clean window (five at the `thorough` level). On real hardware the first window that is not clean fails it. In a virtual machine up to seven windows may be interrupted before the clean ones, each recorded in the result, because a hypervisor now and then leaves a passed-through board unserviced for a fraction of a second; a window that lost over 5 % of its frames is a broken link and fails the soak at once (see "Virtual machines"). These frequencies' periods are not a whole fraction of the 375-sample USB frame, so a lost or repeated frame shifts the waveform and is caught even if no counter notices. |
 | `firmware.round_trip` | flashes the bundled `labrafirm_0007_02.hex` (librador reports 1, "runs other firmware", and the board 0x0007 variant 2), then the release's bundled image back (0x000c variant 3 here), then checks the board streams. Both directions jump to the DFU bootloader and re-enumerate, which is what USB passthrough and Windows driver binding tend to break. It skips when the board stores calibration, because the DFU erase would wipe it. |
 
 **Phase 2 of 3, in the frame loop.** The app gets its USB session back and, with
@@ -237,14 +237,50 @@ holds them with their derivations.
 Captures broken by lost USB frames give shape residuals of 55-180 % and
 frequencies off by a factor of two, so a lossy link fails the affected tests
 on its own, and each such test also notes how many frames were lost in its
-window. Three measured effects shaped the tests rather than the limits: with
+window. A capture that had lost or corrupt frames is taken again, up to four
+times with waits of 0.2, 0.4 and 0.8 s between them, and the last one is
+judged: these tests judge the analog path and the trigger, and the
+`hw.transport` tests judge the stream. Three measured effects shaped the tests
+rather than the limits: with
 both generators running, one generator's DAC steps couple into the other input
 above about 10 kHz, so the per-waveform and sweep tests drive one generator at
 a time; above 20 kHz the scope sees fewer than 19 samples per period and a sine
-fits as well as a triangle, so the 50 kHz point checks frequency and levels
+fits as well as a triangle, so the 49487 Hz point checks frequency and levels
 only; and the fit lets frequency float within the frequency tolerance, because
 a generator's few hundred ppm of offset, accumulated over a thousand periods,
 would otherwise read as a wrong shape.
+
+### Frequencies that show a lost frame
+
+The scope streams in 1 ms USB frames, and librador fills a lost frame with a
+repeat of the one before, so everything after it is out of place by one frame.
+How visible that is depends on the waveform: the shift is the fractional part
+of (frequency / 1000) periods, and near 0 or 1 the waveform lands back on
+itself. What counts is the frequency the generator really makes. Its timer and
+the scope's ADC share one clock, so a request is rounded to whole timer ticks:
+2 kHz becomes 1994.68 Hz, a period of exactly 188 samples and a shift of 0.995,
+and even 997 Hz becomes 997.34 Hz, exactly 376 samples. 2237 Hz becomes
+2239.64 Hz (a shift of 0.24) and 831 Hz becomes 829.65 Hz (0.83).
+
+Every waveform test records this shift for its generator from the frequency
+librador reports, and fails if it is under 0.1 or over 0.9, so a frequency that
+would hide lost frames cannot come back unnoticed. The sweep's 10 and 50 Hz
+points are recorded without a limit: below 100 Hz the shift is under a tenth of
+a period whatever the frequency.
+
+### Virtual machines
+
+`hw.board.present` records whether the machine is real hardware or a virtual
+machine (the hypervisor-present bit of CPUID on x86, `kern.hv_vmm_present` on
+macOS; ARM Linux has neither and counts as real hardware), and report.json
+carries it as `platform.virtual_machine` and `platform.hypervisor`. Only the
+soaks treat the two differently. Real hardware polls the board on the USB
+controller's own schedule, so a clean stream there has no excuse. A hypervisor
+services a passed-through board in software, and when the host is busy it can
+leave the board unserviced for 0.1 to 0.9 s, which costs an isochronous stream
+its frames whatever the app does. A soak in a virtual machine may therefore
+have up to seven interrupted windows before its clean ones. A stream that keeps
+losing frames never has a clean window, and fails as it does on real hardware.
 
 ## Output
 
@@ -270,7 +306,8 @@ directory per iteration instead.
               "iteration": 1, "prerequisite": false}],
  "suite": {"name": "labrador --auto-qa", "commit": "<sha the build was configured from, or null>"},
  "app": {"version": "2.0.123", "labrador": "<argv[0]>", "labrador_cli": null, "firmware": "labrafirm_000D_03.hex"},
- "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "..."},
+ "platform": {"os": "macOS", "os_version": "14.7.6", "arch": "x86_64", "hostname": "...",
+              "virtual_machine": false, "hypervisor": null},
  "started_at": "2026-11-23T08:29:10Z", "finished_at": "2026-11-23T08:45:51Z",
  "complete": true,
  "result": "pass|fail",

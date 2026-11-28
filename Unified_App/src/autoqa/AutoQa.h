@@ -9,6 +9,7 @@
 // if every test passed. A run carries out a Plan: the options choose its tests and
 // how many times it repeats them, and each iteration goes through the three phases.
 
+#include "autoqa/Environment.h"
 #include "autoqa/Plan.h"
 #include "autoqa/Report.h"
 
@@ -97,6 +98,7 @@ class AutoQa
     std::string m_out;
     std::string m_exe;
     Plan m_plan;
+    Machine m_machine = detectMachine();
     std::string m_started_at;
     double m_t0;
     mutable std::mutex m_mutex; // progress.log, the status text and the heartbeat's clock
