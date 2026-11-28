@@ -1687,9 +1687,18 @@ void usbCallHandler::teardown_connection(){
     if(handle){
         if(claimed_iface >= 0){
             // Deselect the streaming alt setting so the device stops
-            // producing, then release.  Best effort - the device may
-            // already be gone.
-            libusb_set_interface_alt_setting(handle, claimed_iface, 0);
+            // producing, then release.  Only while the board still answers:
+            // when it has gone (unplugged, or sent to its bootloader for a
+            // firmware flash) the request could not reach it anyway, and
+            // libusb 1.0.25 and 1.0.26 must not be asked.  Their
+            // libusb_set_interface_alt_setting() unlocks the handle's mutex
+            // without having locked it when the device is detached, and the
+            // libusb_close() below then aborts the process on its
+            // pthread_mutex_destroy() assertion.  Those are the system libusb
+            // of Ubuntu 22.04 and Debian 12, which the .deb links.
+            if(device_answers()){
+                libusb_set_interface_alt_setting(handle, claimed_iface, 0);
+            }
             if(claimed_iface != 0 || !iface0_claimed){
                 libusb_release_interface(handle, claimed_iface);
             }
@@ -1704,6 +1713,23 @@ void usbCallHandler::teardown_connection(){
         handle = nullptr;
         LIBRADOR_LOG(LOG_DEBUG, "Device Closed\n");
     }
+}
+
+// Whether the board behind `handle` still answers a standard request
+// (GET_STATUS).  Once the kernel has disconnected a device every request on
+// its handle fails, whatever has since appeared on the same port, so this
+// tells a board that is still there from one that has left.
+bool usbCallHandler::device_answers(){
+    unsigned char status[2];
+    const int transferred = libusb_control_transfer(handle,
+        LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
+        LIBUSB_REQUEST_GET_STATUS, 0, 0, status, sizeof status, 250);
+    if(transferred != (int)sizeof status){
+        LIBRADOR_LOG(LOG_DEBUG, "the board no longer answers (%s); leaving its alt setting alone\n",
+            transferred < 0 ? libusb_error_name(transferred) : "short answer");
+        return false;
+    }
+    return true;
 }
 
 void usbCallHandler::free_transfers(){
