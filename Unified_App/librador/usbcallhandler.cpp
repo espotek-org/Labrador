@@ -1815,6 +1815,23 @@ bool usbCallHandler::desktop_device_present_ex(bool* app_mode_out, bool* bootloa
     return *app_mode_out || *bootloader_mode_out || *gobindar_mode_out;
 }
 
+// On Linux a device's node is listed before udev has applied the rule that
+// lets this user open it.  dfu-programmer run in that moment lists the
+// bootloader, fails to open it and reports "no device present", which is how
+// a firmware update failed a tenth of a second after the board re-enumerated.
+// So there the bootloader counts as arrived once it can be opened.  (Elsewhere
+// being listed is enough: Windows lists a device only once its driver is
+// bound, and the bootloader's driver there is not one libusb can always open.)
+bool usbCallHandler::desktop_bootloader_openable(){
+#ifdef __linux__
+    libusb_device_handle *bootloader = libusb_open_device_with_vid_pid(ctx, VID, LABRADOR_BOOTLOADER_PID);
+    if(!bootloader)
+        return false;
+    libusb_close(bootloader);
+#endif
+    return true;
+}
+
 int usbCallHandler::desktop_connect(){
     if(connected)
         return 1;
@@ -1848,11 +1865,15 @@ int usbCallHandler::desktop_flash_firmware(const char* hex_path){
     // the device once the OS has configured it, and on Windows that means
     // after PnP has bound libusb0.sys to the freshly appeared 03EB:2FE4
     // device - several seconds the first time a machine sees it - so allow
-    // well beyond the ~1 s the board itself needs (#450).
+    // well beyond the ~1 s the board itself needs (#450).  On Linux the wait
+    // also covers the moment between the device being listed and udev letting
+    // this user open it (desktop_bootloader_openable); a bootloader that is
+    // listed but never becomes openable still goes on to the erase, which
+    // then reports that it could not reach it.
     bool bootloader = false;
     for(int attempt = 0; attempt < 200; attempt++){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        if(desktop_device_present(&bootloader) && bootloader)
+        if(desktop_device_present(&bootloader) && bootloader && desktop_bootloader_openable())
             break;
     }
     if(!bootloader){
