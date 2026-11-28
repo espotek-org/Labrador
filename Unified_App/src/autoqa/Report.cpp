@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -84,32 +85,83 @@ void TestContext::artifact(const std::string& relative, const std::string& kind,
     m_result.artifacts.push_back({relative, kind, caption});
 }
 
+std::string TestContext::file(const std::string& subdir, const std::string& name) const
+{
+    const auto create = [this](const std::string& relative) {
+        const std::string dir = m_out_dir + "/" + relative;
+        if (!SDL_CreateDirectory(dir.c_str()))
+            throw std::runtime_error("cannot create " + dir + ": " + SDL_GetError());
+    };
+    create(subdir);
+    if (m_iteration_dir.empty())
+        return subdir + "/" + name;
+    const std::string relative = subdir + "/" + m_iteration_dir;
+    create(relative);
+    return relative + "/" + name;
+}
+
 std::string TestContext::path(const std::string& subdir, const std::string& suffix) const
 {
-    const std::string dir = m_out_dir + "/" + subdir;
-    if (!SDL_CreateDirectory(dir.c_str()))
-        throw std::runtime_error("cannot create " + dir + ": " + SDL_GetError());
     std::string slug = m_result.id;
     for (char& c : slug)
         if (c == '.')
             c = '_';
-    return subdir + "/" + slug + "_" + suffix;
+    return file(subdir, slug + "_" + suffix);
+}
+
+void Runner::declareCondition(const std::string& name, const std::string& unmet_reason, bool unmet_fails)
+{
+    if (!m_declared.emplace(name, Condition{false, unmet_reason}).second)
+        throw std::logic_error("condition " + name + " is declared twice");
+    m_unmet_fails[name] = unmet_fails;
+    m_conditions[name] = m_declared.at(name);
+}
+
+void Runner::startIteration(int iteration, int repeat)
+{
+    if (iteration < 1 || iteration > repeat)
+        throw std::logic_error("Runner::startIteration: iteration " + std::to_string(iteration) + " of " +
+                               std::to_string(repeat));
+    m_iteration = iteration;
+    m_iteration_dir = repeat > 1 ? "iter" + std::to_string(iteration) : std::string();
+    m_conditions = m_declared;
 }
 
 void Runner::setCondition(const std::string& name, bool ok, const std::string& reason)
 {
+    if (!m_running)
+        throw std::logic_error("Runner::setCondition(" + name + ") outside a running test");
+    const std::vector<std::string>& provides = m_running->provides;
+    if (std::find(provides.begin(), provides.end(), name) == provides.end())
+        throw std::logic_error(m_running->id + " sets the condition " + name + ", which its TestSpec does not provide");
+    if (!m_declared.count(name))
+        throw std::logic_error("condition " + name + " was never declared");
     m_conditions[name] = {ok, reason};
+}
+
+TestResult Runner::newResult(const std::string& id, const std::string& group, const std::string& title) const
+{
+    if (m_iteration < 1)
+        throw std::logic_error("a test ran before Runner::startIteration");
+    TestResult result;
+    result.id = id;
+    result.iteration = m_iteration;
+    result.group = group;
+    result.title = title;
+    return result;
 }
 
 bool Runner::preconditionsMet(TestResult& result, const std::vector<std::string>& needs)
 {
     for (const std::string& need : needs)
     {
-        const Condition& c = m_conditions.at(need); // every condition is declared up front
-        if (!c.ok)
+        const auto it = m_conditions.find(need);
+        if (it == m_conditions.end())
+            throw std::logic_error(result.id + " needs the condition " + need + ", which was never declared");
+        if (!it->second.ok)
         {
             result.status = m_unmet_fails.at(need) ? "fail" : "skip";
-            result.message = c.reason;
+            result.message = it->second.reason;
             return false;
         }
     }
@@ -145,20 +197,17 @@ void Runner::record(TestResult& result, TestContext* ctx)
         m_on_recorded();
 }
 
-void Runner::run(const std::string& id, const std::string& group, const std::string& title,
-                 const std::vector<std::string>& needs, const Fn& fn)
+void Runner::run(const TestSpec& spec, const Fn& fn)
 {
-    TestResult result;
-    result.id = id;
-    result.group = group;
-    result.title = title;
-    if (!preconditionsMet(result, needs))
+    TestResult result = newResult(spec.id, spec.group, spec.title);
+    if (!preconditionsMet(result, spec.needs))
     {
         record(result, nullptr);
         return;
     }
-    TestContext ctx(result, m_out_dir);
+    TestContext ctx(result, m_out_dir, m_iteration_dir);
     const double t0 = nowSeconds();
+    m_running = &spec;
     try
     {
         fn(ctx);
@@ -179,26 +228,34 @@ void Runner::run(const std::string& id, const std::string& group, const std::str
         result.status = "error";
         result.message = e.what();
     }
+    m_running = nullptr;
     result.duration_s = nowSeconds() - t0;
     record(result, &ctx);
 }
 
-TestContext* Runner::begin(const std::string& id, const std::string& group, const std::string& title,
-                           const std::vector<std::string>& needs)
+void Runner::recordFailure(const std::string& id, const std::string& group, const std::string& title,
+                           const std::string& message)
+{
+    TestResult result = newResult(id, group, title);
+    result.status = "fail";
+    result.message = message;
+    record(result, nullptr);
+}
+
+TestContext* Runner::begin(const TestSpec& spec)
 {
     if (m_open)
         throw std::logic_error("Runner::begin while " + m_open->id + " is still open");
-    TestResult result;
-    result.id = id;
-    result.group = group;
-    result.title = title;
-    if (!preconditionsMet(result, needs))
+    if (!spec.provides.empty())
+        throw std::logic_error("Runner::begin: " + spec.id + " provides conditions, which only run() can set");
+    TestResult result = newResult(spec.id, spec.group, spec.title);
+    if (!preconditionsMet(result, spec.needs))
     {
         record(result, nullptr);
         return nullptr;
     }
     m_open = result;
-    m_open_ctx.emplace(*m_open, m_out_dir);
+    m_open_ctx.emplace(*m_open, m_out_dir, m_iteration_dir);
     m_open_start = nowSeconds();
     return &*m_open_ctx;
 }
@@ -242,6 +299,7 @@ void writeTestJson(JsonWriter& json, const TestResult& t)
 {
     json.beginObject();
     json.field("id", t.id);
+    json.field("iteration", t.iteration);
     json.field("group", t.group);
     json.field("title", t.title);
     json.field("status", t.status);

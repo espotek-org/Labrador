@@ -1,9 +1,12 @@
 #pragma once
 
+#include "autoqa/Plan.h"
 #include "autoqa/Report.h"
 
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace autoqa
 {
@@ -15,15 +18,30 @@ namespace autoqa
 // Wiring assumed and verified by hw.wiring.*: SG1 drives scope input CH1, SG2
 // drives CH2. Every test sets the PSU, both generators and the scope itself, so
 // none depends on what an earlier one left behind.
-//
-// librador must be shut down (librador_exit) before this runs: the tests open
-// their own sessions, one per transport, and close them again.
-void runHardwareTests(Runner& runner, const std::string& out_dir,
-                      const std::function<void(const std::string&)>& status);
-// Needs runHardwareTests to have run first (it establishes the "board" condition).
-void runFirmwareRoundTrip(Runner& runner, const std::string& out_dir,
-                          const std::function<void(const std::string&)>& status);
 
-// Number of tests runHardwareTests and runFirmwareRoundTrip record (for "n/m" progress).
-int hardwareTestCount();
+// The hardware tests (group hw) and the firmware round trip (group firmware) in the
+// suite's order, with the parameters of a run at `level`. Needs no board.
+std::vector<TestSpec> hardwareTestSpecs(Level level);
+std::vector<TestSpec> firmwareTestSpecs(Level level);
+
+// Runs planned hardware and firmware tests. One object serves the whole run.
+class HardwareTests
+{
+  public:
+    // Declares the hardware tests' conditions on `runner`.
+    HardwareTests(Runner& runner, std::string out_dir, Level level, std::function<void(const std::string&)> status);
+    ~HardwareTests();
+
+    // Drops the device session and what was learnt about the board, so the next
+    // iteration starts where the first one did.
+    void startIteration();
+    // Runs these planned tests (all hw, or all firmware) in order on the calling thread.
+    // librador must be shut down (librador_exit) first: the tests open their own
+    // sessions, one per transport, and close them again.
+    void run(const std::vector<PlannedTest>& planned);
+
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+};
 } // namespace autoqa

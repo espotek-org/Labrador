@@ -258,13 +258,27 @@ static const char* archName()
 }
 
 // --- AutoQa --------------------------------------------------------------------
+std::vector<TestSpec> screenshotTestSpecs()
+{
+    std::vector<TestSpec> specs;
+    for (const Shot& shot : shotMatrix())
+        specs.push_back(TestSpec{shot.id(), "gui", "Screenshot: " + shot.caption(),
+                                 shot.board ? std::vector<std::string>{"board"} : std::vector<std::string>{}, {}});
+    return specs;
+}
+
+// While a worker test reports progress, a line of it goes to progress.log at least this
+// often (the QA server takes 10 minutes without a new line for a hang). Only progress the
+// test itself reports is logged, so a test that hangs still stops the log.
+static constexpr double HEARTBEAT_S = 20.0;
+
 static librador_host_hooks g_saved_hooks;
 static librador_logger_p g_saved_logger = nullptr;
 static void* g_saved_logger_userdata = nullptr;
 
-AutoQa::AutoQa(std::string out_dir, std::string exe_path)
-    : m_out(std::move(out_dir)), m_exe(std::move(exe_path)), m_started_at(isoNow()), m_t0(nowSeconds()),
-      m_runner(m_out, [this](const std::string& line) { log(line); })
+AutoQa::AutoQa(std::string out_dir, std::string exe_path, Plan plan)
+    : m_out(std::move(out_dir)), m_exe(std::move(exe_path)), m_plan(std::move(plan)), m_started_at(isoNow()),
+      m_t0(nowSeconds()), m_runner(m_out, [this](const std::string& line) { log(line); })
 {
     if (!SDL_CreateDirectory(m_out.c_str()))
         throw std::runtime_error("cannot create " + m_out + ": " + SDL_GetError());
@@ -273,6 +287,15 @@ AutoQa::AutoQa(std::string out_dir, std::string exe_path)
     if (!m_progress)
         throw std::runtime_error("cannot create " + progress);
     log(std::string("labrador --auto-qa ") + m_out + " (" + m_exe + ")");
+    std::string selection = "every test";
+    if (m_plan.options.selection)
+    {
+        selection.clear();
+        for (const std::string& item : *m_plan.options.selection)
+            selection += (selection.empty() ? "" : ",") + item;
+    }
+    log(std::string("level ") + levelName(m_plan.options.level) + ", " + selection + ", repeat " +
+        std::to_string(m_plan.options.repeat) + ": " + std::to_string(m_plan.entries.size()) + " planned tests");
 
     // The run must not depend on the caller's environment: the testing hooks the
     // app reads are cleared, and both generators start on so the board-connected
@@ -284,8 +307,12 @@ AutoQa::AutoQa(std::string out_dir, std::string exe_path)
     SDL_SetEnvironmentVariable(env, "LABRADOR_SG2", SG2_SIGNAL, true);
 
     m_shots = shotMatrix();
-    m_runner.setPlanned(hardwareTestCount() + static_cast<int>(m_shots.size()));
+    m_hw = std::make_unique<HardwareTests>(m_runner, m_out, m_plan.options.level,
+                                           [this](const std::string& s) { setStatus(s); });
+    m_runner.setPlanned(static_cast<int>(m_plan.entries.size()));
     m_runner.setOnRecorded([this]() { writeReport(false); });
+    // The whole plan is in report.json before the first test starts.
+    writeReport(false);
 }
 
 AutoQa::~AutoQa()
@@ -304,17 +331,31 @@ std::string AutoQa::settingsPath() const
 void AutoQa::log(const std::string& line)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+    const double now = nowSeconds();
+    m_last_line_t = now;
     char stamp[32];
-    std::snprintf(stamp, sizeof stamp, "[%7.1f s] ", nowSeconds() - m_t0);
+    std::snprintf(stamp, sizeof stamp, "[%7.1f s] ", now - m_t0);
     std::fprintf(m_progress, "%s%s\n", stamp, line.c_str());
     std::fflush(m_progress);
     std::printf("auto-qa %s%s\n", stamp, line.c_str());
     std::fflush(stdout);
 }
 
+void AutoQa::setStatus(const std::string& status)
+{
+    bool heartbeat;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_status = status;
+        heartbeat = nowSeconds() - m_last_line_t >= HEARTBEAT_S;
+    }
+    if (heartbeat)
+        log("  " + status);
+}
+
 std::string AutoQa::statusText() const
 {
-    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(m_mutex));
+    std::lock_guard<std::mutex> lock(m_mutex);
     return m_status;
 }
 
@@ -322,7 +363,7 @@ void AutoQa::frame(App& app)
 {
     switch (m_phase)
     {
-    case Phase::Start: startHardware(app); break;
+    case Phase::Start: startIteration(app); break;
     case Phase::Hardware:
         if (m_worker_done)
             finishHardware(app);
@@ -334,6 +375,41 @@ void AutoQa::frame(App& app)
         break;
     case Phase::Done: break;
     }
+}
+
+void AutoQa::startIteration(App& app)
+{
+    m_iteration++;
+    const int repeat = m_plan.options.repeat;
+    if (repeat > 1)
+        log("iteration " + std::to_string(m_iteration) + "/" + std::to_string(repeat));
+    // Every iteration starts from the state the first one started from.
+    m_runner.startIteration(m_iteration, repeat);
+    m_hw->startIteration();
+    if (m_usb_disabled)
+    {
+        app.enableUsb();
+        m_usb_disabled = false;
+    }
+    // After USB was off, the first board shot gives the app the long settle again.
+    m_board_seen_streaming = false;
+    m_iter_hw.clear();
+    m_iter_shots.clear();
+    m_iter_firmware.clear();
+    for (const PlannedTest& p : m_plan.entries)
+    {
+        if (p.iteration != m_iteration)
+            continue;
+        if (p.test.group == "hw")
+            m_iter_hw.push_back(p);
+        else if (p.test.group == "gui")
+            m_iter_shots.push_back(p);
+        else if (p.test.group == "firmware")
+            m_iter_firmware.push_back(p);
+        else
+            throw std::logic_error("planned test " + p.test.id + " has the unknown group " + p.test.group);
+    }
+    startHardware(app);
 }
 
 void AutoQa::startWorker(std::function<void()> work)
@@ -372,59 +448,89 @@ void AutoQa::restoreAppSession()
 
 void AutoQa::startHardware(App& app)
 {
-    (void)app;
+    if (m_iter_hw.empty())
+    {
+        log("phase 1/3: hardware tests: none planned, skipped");
+        startShots(app);
+        return;
+    }
     log("phase 1/3: hardware tests");
     m_phase = Phase::Hardware;
-    startWorker([this]() {
-        runHardwareTests(m_runner, m_out, [this](const std::string& s) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_status = s;
-        });
-    });
+    startWorker([this]() { m_hw->run(m_iter_hw); });
 }
 
 void AutoQa::finishHardware(App& app)
 {
     restoreAppSession();
     if (!m_worker_error.empty())
-        m_runner.run("hw.suite", "hw", "The hardware test sequence ran to the end", {},
-                     [this](TestContext& ctx) { ctx.fail("the hardware tests stopped early: " + m_worker_error); });
-    (void)app;
-    log("phase 2/3: screenshot tour (" + std::to_string(m_shots.size()) + " shots)");
+        m_runner.recordFailure("hw.suite", "hw", "The hardware test sequence ran to the end",
+                               "the hardware tests stopped early: " + m_worker_error);
+    startShots(app);
+}
+
+void AutoQa::startShots(App& app)
+{
+    if (m_iter_shots.empty())
+    {
+        log("phase 2/3: screenshot tour: none planned, skipped");
+        startFirmware(app);
+        return;
+    }
+    log("phase 2/3: screenshot tour (" + std::to_string(m_iter_shots.size()) + " shots)");
     m_phase = Phase::Shots;
+    m_shot = 0;
     m_step = ShotStep::Setup;
 }
 
 void AutoQa::startFirmware(App& app)
 {
-    (void)app;
+    if (m_iter_firmware.empty())
+    {
+        log("phase 3/3: firmware round trip: none planned, skipped");
+        finishIteration(app);
+        return;
+    }
     log("phase 3/3: firmware round trip");
     m_phase = Phase::Firmware;
-    startWorker([this]() {
-        runFirmwareRoundTrip(m_runner, m_out, [this](const std::string& s) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_status = s;
-        });
-    });
+    startWorker([this]() { m_hw->run(m_iter_firmware); });
 }
 
 void AutoQa::finishFirmware(App& app)
 {
     restoreAppSession();
     if (!m_worker_error.empty())
-        m_runner.run("firmware.suite", "firmware", "The firmware round trip ran to the end", {},
-                     [this](TestContext& ctx) { ctx.fail("the firmware round trip stopped early: " + m_worker_error); });
+        m_runner.recordFailure("firmware.suite", "firmware", "The firmware round trip ran to the end",
+                               "the firmware round trip stopped early: " + m_worker_error);
+    finishIteration(app);
+}
+
+void AutoQa::finishIteration(App& app)
+{
+    if (m_iteration < m_plan.options.repeat)
+    {
+        m_phase = Phase::Start; // the next frame starts the next iteration
+        return;
+    }
     finish(app);
+}
+
+const Shot& AutoQa::shotFor(const std::string& id) const
+{
+    for (const Shot& shot : m_shots)
+        if (shot.id() == id)
+            return shot;
+    throw std::logic_error("the plan holds " + id + ", which is not a screenshot of the tour");
 }
 
 void AutoQa::shotFrame(App& app)
 {
-    if (m_shot >= m_shots.size())
+    if (m_shot >= m_iter_shots.size())
     {
         startFirmware(app);
         return;
     }
-    const Shot& shot = m_shots[m_shot];
+    const PlannedTest& planned = m_iter_shots[m_shot];
+    const Shot& shot = shotFor(planned.test.id);
     switch (m_step)
     {
     case ShotStep::Setup:
@@ -434,8 +540,7 @@ void AutoQa::shotFrame(App& app)
             app.disableUsb();
             m_usb_disabled = true;
         }
-        if (!m_runner.begin(shot.id(), "gui", "Screenshot: " + shot.caption(),
-                            shot.board ? std::vector<std::string>{"board"} : std::vector<std::string>{}))
+        if (!m_runner.begin(planned.test))
         {
             m_shot++; // precondition unmet: recorded already
             return;
@@ -508,10 +613,8 @@ void AutoQa::shotFrame(App& app)
 void AutoQa::evaluateShot(App& app, TestContext& ctx, const Shot& shot, int w, int h,
                           const std::vector<unsigned char>& rgb)
 {
-    const std::string png = "screenshots/" + shot.id() + ".png";
-    if (!SDL_CreateDirectory((m_out + "/screenshots").c_str()))
-        throw std::runtime_error(std::string("cannot create screenshots/: ") + SDL_GetError());
-    writePngRgb(m_out + "/" + png, w, h, rgb);
+    const std::string png = ctx.file("screenshots", shot.id() + ".png");
+    writePngRgb(ctx.absolute(png), w, h, rgb);
     ctx.artifact(png, "png", shot.caption());
     m_screenshots.push_back({shot.id(), png, shot.caption(), shot.expect()});
 
@@ -593,7 +696,9 @@ void AutoQa::finish(App& app)
     log(line);
     for (const TestResult& t : m_runner.results())
         if (t.status == "fail" || t.status == "error")
-            log("  " + t.status + " " + t.id + ": " + t.message.substr(0, 300));
+            log("  " + t.status + " " + t.id +
+                (m_plan.options.repeat > 1 ? " (iteration " + std::to_string(t.iteration) + ")" : std::string()) + ": " +
+                t.message.substr(0, 300));
     m_phase = Phase::Done;
     app.finishAutoQa(fail == 0 && error == 0 ? 0 : 1);
 }
@@ -609,7 +714,10 @@ void AutoQa::writeReport(bool complete)
         std::ofstream file(tmp, std::ios::binary | std::ios::trunc);
         JsonWriter json(file);
         json.beginObject();
-        json.field("schema_version", 2); // 2: rewritten after every test, with "complete"
+        // 2: rewritten after every test, with "complete"; 3: the plan (level, selection,
+        // repeat, planned) and each result's iteration.
+        json.field("schema_version", 3);
+        writePlanJson(json, m_plan);
         json.key("suite").beginObject();
         json.field("name", "labrador --auto-qa");
         json.key("commit");

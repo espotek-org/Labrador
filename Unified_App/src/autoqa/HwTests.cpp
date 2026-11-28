@@ -36,6 +36,7 @@ constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
 // Windows a measurement takes before judging one that had lost or corrupt USB frames.
 constexpr int MEASURE_TRIES = 3;
 constexpr double SOAK_SECONDS = 60;
+constexpr double THOROUGH_SOAK_SECONDS = 300; // a run at the thorough level
 // The hardware sessions pass librador's debug messages to the log (the iso6 realignment
 // among them, without which a misaligned stream on a test machine fails invisibly).
 constexpr bool LIBRADOR_DEBUG_LOG = true;
@@ -252,16 +253,38 @@ struct Capture
     const std::vector<double>& samples(int ch) const { return ch == 1 ? window.ch1 : window.ch2; }
 };
 
+class Suite;
+using TestFn = std::function<void(Suite&, TestContext&)>;
+struct HwTest
+{
+    TestSpec spec;
+    TestFn fn;
+};
+
+// How long each transport soak streams at a level: thorough runs the long soak.
+double soakSeconds(Level level)
+{
+    return level == Level::Thorough ? THOROUGH_SOAK_SECONDS : SOAK_SECONDS;
+}
+
+// One Suite serves a whole run (every iteration, both the hardware phase and the firmware
+// round trip), so what hw.board.present learnt about the board reaches the round trip.
 class Suite
 {
   public:
-    Suite(Runner& runner, std::string out_dir, std::function<void(const std::string&)> status)
-        : m_runner(runner), m_out(std::move(out_dir)), m_status(std::move(status))
+    Suite(Runner& runner, std::string out_dir, Level level, std::function<void(const std::string&)> status)
+        : m_runner(runner), m_out(std::move(out_dir)), m_status(std::move(status)), m_soak_s(soakSeconds(level)),
+          m_tests(catalogue(level))
     {
     }
 
-    void run();
-    void runFirmware();
+    static std::vector<HwTest> catalogue(Level level);
+    static void declareConditions(Runner& runner);
+    // Back to the state the first iteration started from: no device session (a transport
+    // test leaves one on its own transport behind) and nothing known about the board.
+    void startIteration();
+    // Runs these planned tests in order, on the calling thread.
+    void run(const std::vector<PlannedTest>& planned);
 
   private:
     // --- helpers ---------------------------------------------------------
@@ -468,16 +491,11 @@ class Suite
     void firmwareRoundTrip(TestContext& ctx);
     void ensureBundledFirmware(TestContext& ctx);
 
-    void add(const std::string& id, const std::string& title, const std::vector<std::string>& needs,
-             const Runner::Fn& fn)
-    {
-        m_status(id);
-        m_runner.run(id, id.rfind("firmware.", 0) == 0 ? "firmware" : "hw", title, needs, fn);
-    }
-
     Runner& m_runner;
     std::string m_out;
     std::function<void(const std::string&)> m_status;
+    double m_soak_s;
+    std::vector<HwTest> m_tests;
     std::unique_ptr<DeviceSession> m_session;
     bool m_calibration_stored = false;
 };
@@ -986,7 +1004,7 @@ void Suite::transportSoak(TestContext& ctx, const std::string& t)
     const SignalOutput out[2] = {applySignal(1, a), applySignal(2, b)};
     m_session->configureScope(ScopeMode::Ch1Ch2, 4, SETTLE_S);
     const bool check[2] = {true, true};
-    const StreamCheckResult r = runStreamCheck(*m_session, SOAK_SECONDS, check, 4,
+    const StreamCheckResult r = runStreamCheck(*m_session, m_soak_s, check, 4,
                                                [&](const std::string& line) { m_status("soak " + t + ": " + line); });
     const std::string json_path = ctx.path("captures", "stream_test.json");
     {
@@ -999,7 +1017,7 @@ void Suite::transportSoak(TestContext& ctx, const std::string& t)
         json.finish();
     }
     ctx.artifact(json_path, "json", "stream check result");
-    const double expected_frames = std::round(SOAK_SECONDS * 1000);
+    const double expected_frames = std::round(m_soak_s * 1000);
     ctx.measure("frames received intact", "", static_cast<double>(r.frames.ok), expected_frames,
                 std::round(expected_frames * 0.99));
     ctx.measure("frames with a bad checksum", "", static_cast<double>(r.frames.bad_checksum), 0, std::nullopt, 0);
@@ -1068,6 +1086,7 @@ void Suite::firmwareRoundTrip(TestContext& ctx)
     try
     {
         // 1. Down to 0x0007: librador reports 1 (flashed, but not the firmware it streams from).
+        m_status("firmware.round_trip: flashing firmware 0x0007");
         {
             LibradorScope librador(&verbose, UsbTransport::Auto);
             const int connect = librador_connect();
@@ -1081,6 +1100,7 @@ void Suite::firmwareRoundTrip(TestContext& ctx)
                             version(0x0007, 2));
         }
         // 2. Back to the bundled image, the way the app's flash dialog does it.
+        m_status("firmware.round_trip: flashing the bundled firmware back");
         {
             LibradorScope librador(&verbose, UsbTransport::Auto);
             const int connect = librador_connect();
@@ -1094,6 +1114,7 @@ void Suite::firmwareRoundTrip(TestContext& ctx)
                             version(EXPECTED_FIRMWARE_VERSION, DEFINED_EXPECTED_VARIANT));
         }
         // 3. The re-flashed board streams.
+        m_status("firmware.round_trip: streaming from the re-flashed board");
         {
             DeviceSession s(false, UsbTransport::Auto);
             s.configureScope(ScopeMode::Ch1Ch2, 4, SETTLE_S);
@@ -1129,35 +1150,38 @@ void Suite::ensureBundledFirmware(TestContext& ctx)
                  "before further use");
 }
 
-void Suite::run()
+// Every hardware test and the firmware round trip, in the suite's fixed order, with the
+// parameters of a run at `level`. A test that establishes a condition says so here
+// (provide), because the plan adds a selected test's prerequisites from these declarations
+// before anything runs; the Runner refuses a condition set by a test that does not declare it.
+std::vector<HwTest> Suite::catalogue(Level level)
 {
+    std::vector<HwTest> tests;
+    const auto provide = [&tests](const std::string& id, const std::string& title, const std::vector<std::string>& needs,
+                                  const std::vector<std::string>& provides, TestFn fn) {
+        const std::string group = id.rfind("firmware.", 0) == 0 ? "firmware" : "hw";
+        tests.push_back({TestSpec{id, group, title, needs, provides}, std::move(fn)});
+    };
+    const auto add = [&provide](const std::string& id, const std::string& title, const std::vector<std::string>& needs,
+                                TestFn fn) { provide(id, title, needs, {}, std::move(fn)); };
+    const double soak_s = soakSeconds(level);
+
     const std::vector<std::string> board = {"board"};
     // "board" first, so a missing board is what an unmet test reports.
     const std::vector<std::string> sg1 = {"board", "sg1_ch1"}, sg2 = {"board", "sg2_ch2"},
                                    both = {"board", "sg1_ch1", "sg2_ch2"};
-    m_runner.setCondition("board", false, "no usable board (see hw.board.present)");
-    m_runner.setUnmetFails("board", true);
-    for (const char* c : {"sg1_ch1", "sg2_ch2"})
-    {
-        m_runner.setCondition(c, false, std::string("hw.wiring did not confirm the ") + c + " loopback");
-        m_runner.setUnmetFails(c, true);
-    }
-    for (const char* t : TRANSPORTS)
-    {
-        m_runner.setCondition(std::string("transport_") + t, false, std::string("hw.transport.") + t + ".measure did not pass");
-        m_runner.setUnmetFails(std::string("transport_") + t, false);
-    }
 
-    add("hw.board.present", "A Labrador board is attached, running the firmware this release needs", {},
-        [&](TestContext& c) { boardPresent(c); });
+    provide("hw.board.present", "A Labrador board is attached, running the firmware this release needs", {}, board,
+            [](Suite& s, TestContext& c) { s.boardPresent(c); });
     for (int ch = 1; ch <= 2; ch++)
-        add("hw.wiring.sg" + std::to_string(ch),
-            "SG" + std::to_string(ch) + " is looped back to scope input CH" + std::to_string(ch) + " and nowhere else",
-            board, [&, ch](TestContext& c) { wiring(c, ch); });
+        provide("hw.wiring.sg" + std::to_string(ch),
+                "SG" + std::to_string(ch) + " is looped back to scope input CH" + std::to_string(ch) + " and nowhere else",
+                board, {"sg" + std::to_string(ch) + "_ch" + std::to_string(ch)},
+                [ch](Suite& s, TestContext& c) { s.wiring(c, ch); });
     for (int ch = 1; ch <= 2; ch++)
         add("hw.noise.ch" + std::to_string(ch),
             "CH" + std::to_string(ch) + " noise floor with the generators parked (gain 4)", board,
-            [&, ch](TestContext& c) { noise(c, ch); });
+            [ch](Suite& s, TestContext& c) { s.noise(c, ch); });
     for (int ch = 1; ch <= 2; ch++)
     {
         for (const Wave w : WAVES)
@@ -1165,112 +1189,161 @@ void Suite::run()
             add("hw.siggen.ch" + std::to_string(ch) + "." + waveName(w) + "_2237hz",
                 "SG" + std::to_string(ch) + " " + waveName(w) + ", 2237 Hz, 0.5-2.5 V: frequency, levels and shape on CH" +
                     std::to_string(ch),
-                ch == 1 ? sg1 : sg2, [&, ch, w](TestContext& c) { wave(c, ch, w, BASE_HZ); });
+                ch == 1 ? sg1 : sg2, [ch, w](Suite& s, TestContext& c) { s.wave(c, ch, w, BASE_HZ); });
             add("hw.siggen.ch" + std::to_string(ch) + "." + waveName(w) + "_831hz",
                 "SG" + std::to_string(ch) + " " + waveName(w) + ", 831 Hz, 0.5-2.5 V: frequency, levels and shape on CH" +
                     std::to_string(ch),
-                ch == 1 ? sg1 : sg2, [&, ch, w](TestContext& c) { wave(c, ch, w, ODD_HZ); });
+                ch == 1 ? sg1 : sg2, [ch, w](Suite& s, TestContext& c) { s.wave(c, ch, w, ODD_HZ); });
         }
         add("hw.siggen.ch" + std::to_string(ch) + ".sine_6vpp_x3",
             "SG" + std::to_string(ch) + " 6 Vpp 2237 Hz sine through the x3 output stage (PSU raised to 8 V)",
-            ch == 1 ? sg1 : sg2, [&, ch](TestContext& c) { bigSine(c, ch, BASE_HZ); });
+            ch == 1 ? sg1 : sg2, [ch](Suite& s, TestContext& c) { s.bigSine(c, ch, BASE_HZ); });
         add("hw.siggen.ch" + std::to_string(ch) + ".sine_6vpp_x3_831hz",
             "SG" + std::to_string(ch) + " 6 Vpp 831 Hz sine through the x3 output stage (PSU raised to 8 V)",
-            ch == 1 ? sg1 : sg2, [&, ch](TestContext& c) { bigSine(c, ch, ODD_HZ); });
+            ch == 1 ? sg1 : sg2, [ch](Suite& s, TestContext& c) { s.bigSine(c, ch, ODD_HZ); });
     }
     add("hw.siggen.dc_levels", "DC levels 0.25-6 V on both generators read back on both inputs", both,
-        [&](TestContext& c) { dcLevels(c); });
+        [](Suite& s, TestContext& c) { s.dcLevels(c); });
     for (const double g : {0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0})
     {
         add("hw.gain.x" + idNum(g), "Scope gain x" + num(g) + ": a 2237 Hz sine filling most of the range reads back right on both inputs",
-            both, [&, g](TestContext& c) { gain(c, g, BASE_HZ); });
+            both, [g](Suite& s, TestContext& c) { s.gain(c, g, BASE_HZ); });
         add("hw.gain.x" + idNum(g) + "_831hz",
             "Scope gain x" + num(g) + ": an 831 Hz sine filling most of the range reads back right on both inputs", both,
-            [&, g](TestContext& c) { gain(c, g, ODD_HZ); });
+            [g](Suite& s, TestContext& c) { s.gain(c, g, ODD_HZ); });
     }
     for (const double f : {10.0, 50.0, 100.0, 354.1, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0})
     {
         add("hw.sweep.f" + idNum(f) + "hz", "Frequency sweep: " + num(f) + " Hz sine on each generator in turn, frequency, levels and shape",
-            both, [&, f](TestContext& c) { sweep(c, f); });
+            both, [f](Suite& s, TestContext& c) { s.sweep(c, f); });
     }
     add("hw.mode.scope1", "Scope mode scope1 (CH1 only, 375 kS/s) with a 2237 Hz sine", sg1,
-        [&](TestContext& c) { modeScope1(c, BASE_HZ); });
+        [](Suite& s, TestContext& c) { s.modeScope1(c, BASE_HZ); });
     add("hw.mode.scope1_831hz", "Scope mode scope1 (CH1 only, 375 kS/s) with an 831 Hz sine", sg1,
-        [&](TestContext& c) { modeScope1(c, ODD_HZ); });
+        [](Suite& s, TestContext& c) { s.modeScope1(c, ODD_HZ); });
     add("hw.mode.scope1_750k", "Scope mode scope1-750k (CH1 only, 750 kS/s) with a 10 kHz sine", sg1,
-        [&](TestContext& c) { mode750k(c, 10000); });
+        [](Suite& s, TestContext& c) { s.mode750k(c, 10000); });
     add("hw.mode.scope1_750k_831hz", "Scope mode scope1-750k (CH1 only, 750 kS/s) with an 831 Hz sine", sg1,
-        [&](TestContext& c) { mode750k(c, ODD_HZ); });
+        [](Suite& s, TestContext& c) { s.mode750k(c, ODD_HZ); });
     for (const Wave w : {Wave::Sine, Wave::Square})
         for (int src = 1; src <= 2; src++)
             add("hw.isolation.sg" + std::to_string(src) + "_to_ch" + std::to_string(src == 1 ? 2 : 1) + "." +
                     waveName(w),
                 std::string("Crosstalk from a 6 Vpp ") + waveName(w) + " on SG" + std::to_string(src) + " into the idle input",
-                both, [&, src, w](TestContext& c) { isolation(c, src, w); });
+                both, [src, w](Suite& s, TestContext& c) { s.isolation(c, src, w); });
     for (const double f : {BASE_HZ, ODD_HZ})
     {
         const std::string sfx = f == BASE_HZ ? "" : "_831hz";
         const std::string hz = f == BASE_HZ ? "2237 Hz" : "831 Hz";
         add("hw.trigger.ch1_rising" + sfx, "Trigger: CH1 rising through 1.5 V on a " + hz + " sine", sg1,
-            [&, f](TestContext& c) { trigger(c, 1, true, 1.5, Wave::Sine, f); });
+            [f](Suite& s, TestContext& c) { s.trigger(c, 1, true, 1.5, Wave::Sine, f); });
         add("hw.trigger.ch1_falling" + sfx, "Trigger: CH1 falling through 1.0 V on a " + hz + " sine", sg1,
-            [&, f](TestContext& c) { trigger(c, 1, false, 1.0, Wave::Sine, f); });
+            [f](Suite& s, TestContext& c) { s.trigger(c, 1, false, 1.0, Wave::Sine, f); });
         add("hw.trigger.ch2_rising_square" + sfx, "Trigger: CH2 rising through 1.5 V on a " + hz + " square", sg2,
-            [&, f](TestContext& c) { trigger(c, 2, true, 1.5, Wave::Square, f); });
+            [f](Suite& s, TestContext& c) { s.trigger(c, 2, true, 1.5, Wave::Square, f); });
         add("hw.trigger.ch2_falling_triangle" + sfx, "Trigger: CH2 falling through 2.0 V on a " + hz + " triangle", sg2,
-            [&, f](TestContext& c) { trigger(c, 2, false, 2.0, Wave::Triangle, f); });
+            [f](Suite& s, TestContext& c) { s.trigger(c, 2, false, 2.0, Wave::Triangle, f); });
         add("hw.trigger.placement" + sfx,
             "Trigger window placement on a " + hz + " sine: all-post, mostly-pre and long windows", sg1,
-            [&, f](TestContext& c) { triggerPlacement(c, f); });
+            [f](Suite& s, TestContext& c) { s.triggerPlacement(c, f); });
     }
     add("hw.trigger.timeout_unreachable", "A trigger level above the signal times out cleanly", sg1,
-        [&](TestContext& c) { triggerTimeout(c); });
+        [](Suite& s, TestContext& c) { s.triggerTimeout(c); });
     add("hw.trigger.no_false_trigger_on_dc", "A DC level on the trigger level does not trigger on noise", sg1,
-        [&](TestContext& c) { triggerDc(c); });
+        [](Suite& s, TestContext& c) { s.triggerDc(c); });
     for (const char* t : TRANSPORTS)
     {
         const std::string ts = t;
-        add("hw.transport." + ts + ".measure",
-            "USB transport " + ts + ": connects and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2", both,
-            [&, ts](TestContext& c) { transportMeasure(c, ts, BASE_HZ, true); });
+        provide("hw.transport." + ts + ".measure",
+                "USB transport " + ts + ": connects and measures a 2237 Hz sine on CH1 and a 4474 Hz triangle on CH2",
+                both, {"transport_" + ts},
+                [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, BASE_HZ, true); });
         add("hw.transport." + ts + ".measure_831hz",
             "USB transport " + ts + ": an 831 Hz sine on CH1 and an 831 Hz triangle on CH2",
             {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
-            [&, ts](TestContext& c) { transportMeasure(c, ts, ODD_HZ, false); });
+            [ts](Suite& s, TestContext& c) { s.transportMeasure(c, ts, ODD_HZ, false); });
         add("hw.transport." + ts + ".soak",
-            "USB transport " + ts + ": " + num(SOAK_SECONDS) + " s stream with no lost, corrupt or late frames",
-            {"board", "transport_" + ts}, [&, ts](TestContext& c) { transportSoak(c, ts); });
+            "USB transport " + ts + ": " + num(soak_s) + " s stream with no lost, corrupt or late frames",
+            {"board", "transport_" + ts}, [ts](Suite& s, TestContext& c) { s.transportSoak(c, ts); });
     }
+    add("firmware.round_trip", "Flash firmware 0x0007, then the bundled image back, through the DFU bootloader",
+        {"board"}, [](Suite& s, TestContext& c) { s.firmwareRoundTrip(c); });
+    return tests;
+}
+
+void Suite::declareConditions(Runner& runner)
+{
+    runner.declareCondition("board", "no usable board (see hw.board.present)", true);
+    for (const char* c : {"sg1_ch1", "sg2_ch2"})
+        runner.declareCondition(c, std::string("hw.wiring did not confirm the ") + c + " loopback", true);
+    for (const char* t : TRANSPORTS)
+        runner.declareCondition(std::string("transport_") + t,
+                                std::string("hw.transport.") + t + ".measure did not pass", false);
+}
+
+void Suite::startIteration()
+{
+    m_session.reset();
+    m_calibration_stored = false;
+}
+
+void Suite::run(const std::vector<PlannedTest>& planned)
+{
+    for (const PlannedTest& p : planned)
+    {
+        const auto it = std::find_if(m_tests.begin(), m_tests.end(),
+                                     [&p](const HwTest& t) { return t.spec.id == p.test.id; });
+        if (it == m_tests.end())
+            throw std::logic_error("the plan holds " + p.test.id + ", which is not a hardware or firmware test");
+        m_status(p.test.id);
+        const TestFn& fn = it->fn;
+        m_runner.run(p.test, [this, &fn](TestContext& c) { fn(*this, c); });
+    }
+    // The next phase, or the app, opens its own session.
     m_session.reset();
 }
 
-void Suite::runFirmware()
+std::vector<TestSpec> specsOfGroup(Level level, const std::string& group)
 {
-    // "board" was established by run(); the runner keeps its conditions.
-    add("firmware.round_trip", "Flash firmware 0x0007, then the bundled image back, through the DFU bootloader",
-        {"board"}, [&](TestContext& c) { firmwareRoundTrip(c); });
-    m_session.reset();
+    std::vector<TestSpec> specs;
+    for (const HwTest& t : Suite::catalogue(level))
+        if (t.spec.group == group)
+            specs.push_back(t.spec);
+    return specs;
 }
 } // namespace
 
-int hardwareTestCount()
+std::vector<TestSpec> hardwareTestSpecs(Level level)
 {
-    // board, wiring x2, noise x2, siggen 10, dc, gain 8, sweep 10, modes 2,
-    // isolation 4, triggers 7, transports 6, firmware 1
-    return 1 + 2 + 2 + 10 + 1 + 8 + 10 + 2 + 4 + 7 + 6 + 1;
+    return specsOfGroup(level, "hw");
 }
 
-void runHardwareTests(Runner& runner, const std::string& out_dir,
-                      const std::function<void(const std::string&)>& status)
+std::vector<TestSpec> firmwareTestSpecs(Level level)
 {
-    Suite suite(runner, out_dir, status);
-    suite.run();
+    return specsOfGroup(level, "firmware");
 }
 
-void runFirmwareRoundTrip(Runner& runner, const std::string& out_dir,
-                          const std::function<void(const std::string&)>& status)
+struct HardwareTests::Impl
 {
-    Suite suite(runner, out_dir, status);
-    suite.runFirmware();
+    Suite suite;
+};
+
+HardwareTests::HardwareTests(Runner& runner, std::string out_dir, Level level,
+                             std::function<void(const std::string&)> status)
+    : m_impl(new Impl{Suite(runner, std::move(out_dir), level, std::move(status))})
+{
+    Suite::declareConditions(runner);
+}
+
+HardwareTests::~HardwareTests() = default;
+
+void HardwareTests::startIteration()
+{
+    m_impl->suite.startIteration();
+}
+
+void HardwareTests::run(const std::vector<PlannedTest>& planned)
+{
+    m_impl->suite.run(planned);
 }
 } // namespace autoqa

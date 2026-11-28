@@ -2,6 +2,11 @@
 #include "platform/android_hooks.h"
 #ifndef __ANDROID__
 #include "autoqa/AutoQa.h"
+#include "autoqa/Plan.h"
+
+#include "JsonWriter.h"
+
+#include <sstream>
 #endif
 
 #ifndef __ANDROID__
@@ -65,6 +70,23 @@ static void attachParentConsole()
 }
 #endif
 
+#ifndef __ANDROID__
+// Prints the plan `--auto-qa-list` asked for as one JSON object, through the same stdout
+// as every other line the app prints (on Windows, the one attachParentConsole set up).
+static void printPlan(const autoqa::Plan& plan)
+{
+    std::ostringstream text;
+    JsonWriter json(text);
+    json.beginObject();
+    json.field("schema_version", 3);
+    autoqa::writePlanJson(json, plan);
+    json.endObject();
+    json.finish();
+    std::fputs(text.str().c_str(), stdout);
+    std::fflush(stdout);
+}
+#endif
+
 #ifdef __ANDROID__
 extern "C" __attribute__((visibility("default")))
 #endif
@@ -79,52 +101,110 @@ int main(int argc, char** argv)
     // Every argument must be understood: an unknown one is an error, so a caller
     // can tell a build that lacks an option (exit 2) from one that runs it.
     bool smoke = false;
+#ifndef __ANDROID__
     std::string auto_qa_dir;
+    bool auto_qa_list = false;
+    autoqa::Plan auto_qa_plan;
+#endif
 #ifdef LABRADOR_QA
     std::string qa_filter;
 #endif
-    for (int i = 1; i < argc; i++)
-    {
-        const std::string arg(argv[i]);
-        if (arg == "--smoke") // render 60 frames and exit (CI smoke test)
-            smoke = true;
 #ifndef __ANDROID__
-        else if (arg == "--auto-qa") // the whole QA, report in the directory given
-        {
+    // Usage errors (autoqa::UsageError) are found here, before an output directory,
+    // progress.log or a window exists: one line on stderr and exit 2.
+    try
+    {
+        autoqa::Options qa_options;
+        bool level_given = false, tests_given = false, repeat_given = false;
+        // The value after option argv[i], which must be there.
+        const auto valueOf = [&](int& i) -> std::string {
             if (i + 1 >= argc)
+                throw autoqa::UsageError(std::string(argv[i]) + " needs a value");
+            return argv[++i];
+        };
+        const auto once = [](bool& given, const char* option) {
+            if (given)
+                throw autoqa::UsageError(std::string(option) + " is given twice");
+            given = true;
+        };
+        bool auto_qa_given = false;
+#endif
+        for (int i = 1; i < argc; i++)
+        {
+            const std::string arg(argv[i]);
+            if (arg == "--smoke") // render 60 frames and exit (CI smoke test)
+                smoke = true;
+#ifndef __ANDROID__
+            else if (arg == "--auto-qa") // the QA, report in the directory given (docs/auto-qa.md)
             {
-                fprintf(stderr, "labrador: --auto-qa needs an output directory\n");
-                return 2;
+                once(auto_qa_given, "--auto-qa");
+                if (i + 1 >= argc)
+                    throw autoqa::UsageError("--auto-qa needs an output directory");
+                auto_qa_dir = argv[++i];
             }
-            auto_qa_dir = argv[++i];
-        }
+            else if (arg == "--auto-qa-list") // print the plan the options would run, as JSON
+                once(auto_qa_list, "--auto-qa-list");
+            else if (arg == "--auto-qa-level")
+            {
+                once(level_given, "--auto-qa-level");
+                qa_options.level = autoqa::parseLevel(valueOf(i));
+            }
+            else if (arg == "--auto-qa-tests")
+            {
+                once(tests_given, "--auto-qa-tests");
+                qa_options.selection = autoqa::parseSelection(valueOf(i));
+            }
+            else if (arg == "--auto-qa-repeat")
+            {
+                once(repeat_given, "--auto-qa-repeat");
+                qa_options.repeat = autoqa::parseRepeat(valueOf(i));
+            }
 #endif
 #ifdef LABRADOR_QA
-        // Headless UI test run (QA builds): --qa runs everything, or
-        // --qa=<filter> for a Test Engine filter like "gui" or "hw".
-        else if (arg == "--qa")
-            qa_filter = "all";
-        else if (arg.rfind("--qa=", 0) == 0)
-            qa_filter = arg.substr(5);
+            // Headless UI test run (QA builds): --qa runs everything, or
+            // --qa=<filter> for a Test Engine filter like "gui" or "hw".
+            else if (arg == "--qa")
+                qa_filter = "all";
+            else if (arg.rfind("--qa=", 0) == 0)
+                qa_filter = arg.substr(5);
 #endif
 #ifdef __APPLE__
-        // Finder adds a process serial number when it launches the bundle on
-        // older macOS releases (the app supports 10.13).
-        else if (arg.rfind("-psn_", 0) == 0)
-            continue;
+            // Finder adds a process serial number when it launches the bundle on
+            // older macOS releases (the app supports 10.13).
+            else if (arg.rfind("-psn_", 0) == 0)
+                continue;
 #endif
-        else
-        {
-            fprintf(stderr, "labrador: unknown option '%s'\n", arg.c_str());
-            return 2;
+            else
+            {
+                fprintf(stderr, "labrador: unknown option '%s'\n", arg.c_str());
+                return 2;
+            }
         }
+#ifndef __ANDROID__
+        if (auto_qa_given && auto_qa_list)
+            throw autoqa::UsageError("--auto-qa and --auto-qa-list cannot be used together");
+        if ((level_given || tests_given || repeat_given) && !auto_qa_given && !auto_qa_list)
+            throw autoqa::UsageError(std::string(level_given ? "--auto-qa-level" : tests_given ? "--auto-qa-tests"
+                                                                                               : "--auto-qa-repeat") +
+                                     " is only valid with --auto-qa or --auto-qa-list");
+        if (auto_qa_given || auto_qa_list)
+            auto_qa_plan = autoqa::makePlan(qa_options);
+    }
+    catch (const autoqa::UsageError& e)
+    {
+        fprintf(stderr, "labrador: %s\n", e.what());
+        return 2;
+    }
+    if (auto_qa_list)
+    {
+        printPlan(auto_qa_plan);
+        return 0;
     }
 
-#ifndef __ANDROID__
     // progress.log exists before any window does: the QA server watches for it.
     std::unique_ptr<autoqa::AutoQa> auto_qa;
     if (!auto_qa_dir.empty())
-        auto_qa = std::make_unique<autoqa::AutoQa>(auto_qa_dir, argv[0]);
+        auto_qa = std::make_unique<autoqa::AutoQa>(auto_qa_dir, argv[0], std::move(auto_qa_plan));
 #endif
     App app;
     if (smoke)
