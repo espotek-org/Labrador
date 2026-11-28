@@ -90,11 +90,15 @@ jobs:
         with:
           msystem: MINGW64
           update: false
+          # git: CMake reads the commit --auto-qa reports with `git rev-parse HEAD`, and the
+          # MSYS2 shell sees only MSYS2's own packages, so without it the x64 build reported
+          # "commit": null.
           install: >-
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
+            git
 
       - name: Download x86 exes
         uses: actions/download-artifact@v4
