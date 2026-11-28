@@ -510,7 +510,8 @@ class Suite
     }
 
     void checkWave(TestContext& ctx, const std::string& label, const Capture& c, int ch,
-                   const std::string& title, bool check_shape = true, bool shows_lost_frames = true)
+                   const std::string& title, bool check_shape = true, bool shows_lost_frames = true,
+                   std::optional<double> shape_limit = std::nullopt)
     {
         const SignalSpec& spec = c.spec[ch - 1];
         const SignalOutput& out = c.out[ch - 1];
@@ -542,7 +543,7 @@ class Suite
         if (check_shape)
         {
             ctx.measure(label + " shape residual", "fraction", fit.residual_fraction, std::nullopt,
-                        std::nullopt, shapeLimit(spec.wave));
+                        std::nullopt, shape_limit.value_or(shapeLimit(spec.wave)));
             double nearest = INFINITY;
             const char* nearest_name = "";
             for (const Wave w : WAVES)
@@ -1212,7 +1213,14 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, 
     const SignalSpec b = SignalSpec::periodic(Wave::Triangle, hz == BASE_HZ ? 2 * hz : hz, 1.5, 0.8);
     const Capture c = measure(ctx, t, a, b);
     checkWave(ctx, "CH1", c, 1, t + ": SG1 " + a.text() + " -> CH1");
-    checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2");
+    // The triangle at twice the base frequency (4474 Hz) has half the generator steps and half
+    // the samples in a period, and its corners are rounder: over 250 clean captures (at 4 kHz
+    // and at 4474 Hz) its residual read 1.8 to 3.4 %, against the 0.9 to 1.8 % of the 831 and
+    // 2237 Hz triangles that tol::SHAPE_TRIANGLE (3 %) was set by. It is allowed twice that
+    // limit, still a tenth of what a capture broken by lost frames reads, and it must still
+    // fit better than the other shapes.
+    checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2", true, true,
+              hz == BASE_HZ ? std::optional<double>(2 * tol::SHAPE_TRIANGLE) : std::nullopt);
     if (gates_soak)
         m_runner.setCondition("transport_" + t, true);
 }
