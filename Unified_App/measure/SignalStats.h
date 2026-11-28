@@ -15,6 +15,16 @@ double scopeLsbVolts(double gain);
 // noise around the level is not mistaken for edges. Fed sample by sample so a
 // stream can be scanned in chunks; positions are fractional sample indices,
 // linearly interpolated between the two samples either side of the level.
+//
+// One sample below that level is not enough when the signal is slow: an input can
+// carry single-sample spikes of several ADC steps, and one of them just after a
+// slow edge has crossed the level would count as the signal having come back down,
+// so the next sample would count as a second crossing (an 831 Hz triangle then
+// reads 850 Hz, one cycle in 41 too many). A signal whose last period was at least
+// SLOW_PERIOD_SAMPLES long spends several samples of every cycle below that level,
+// so it must be seen there twice in a row. A faster one may have a single sample
+// there, and is taken at its word as before; so is everything until two crossings
+// have given a period.
 class RisingCrossings
 {
   public:
@@ -30,7 +40,15 @@ class RisingCrossings
     bool m_armed = false;
     bool m_have_previous = false;
     double m_previous = 0;
+    int m_below = 0;               // samples in a row below level - hysteresis
+    bool m_have_crossing = false;
+    uint64_t m_last_crossing = 0;  // index of the last crossing's sample
+    uint64_t m_period = 0;         // samples between the last two crossings; 0 until there are two
 };
+
+// A period of at least this many samples leaves a sine (or any wave that is low for
+// 4 tenths of its period) at least four samples below the re-arm level in every cycle.
+constexpr uint64_t SLOW_PERIOD_SAMPLES = 10;
 
 // What `measure` reports for one channel's window of samples.
 struct ChannelStats

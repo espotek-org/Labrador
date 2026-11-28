@@ -17,7 +17,9 @@ bool RisingCrossings::feed(uint64_t index, double volts, double* position)
     bool crossed = false;
     if (!m_armed)
     {
-        m_armed = volts < m_level - m_hysteresis;
+        m_below = volts < m_level - m_hysteresis ? m_below + 1 : 0;
+        const int needed = m_period >= SLOW_PERIOD_SAMPLES ? 2 : 1;
+        m_armed = m_below >= needed;
     }
     else if (volts >= m_level)
     {
@@ -27,6 +29,10 @@ bool RisingCrossings::feed(uint64_t index, double volts, double* position)
             m_have_previous && volts != m_previous ? (m_level - m_previous) / (volts - m_previous) : 0.0;
         *position = static_cast<double>(index) - 1.0 + std::clamp(fraction, 0.0, 1.0);
         m_armed = false;
+        m_below = 0;
+        m_period = m_have_crossing ? index - m_last_crossing : 0;
+        m_last_crossing = index;
+        m_have_crossing = true;
         crossed = true;
     }
     m_previous = volts;
