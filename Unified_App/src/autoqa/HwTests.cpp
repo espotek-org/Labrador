@@ -35,6 +35,14 @@ constexpr size_t CSV_KEEP_ROWS = 5000;    // rows saved per CSV artifact
 constexpr double SOAK_SECONDS = 60;
 constexpr double MAX_SHAPE_FREQUENCY_HZ = 20000; // above: under 19 samples a period
 const Wave WAVES[] = {Wave::Sine, Wave::Square, Wave::Triangle, Wave::Sawtooth};
+// The waveform tests run at 2 kHz and again at exactly 831 Hz (owner's requirement, a hard
+// constraint: every waveform test has an 831 Hz version). A 2 kHz period divides the 1 ms USB
+// frame (375 samples) evenly, so a frame that librador back-fills with the previous one, or an
+// endpoint a frame out of step, reads exactly like a clean capture. 831 Hz is 451.26 samples a
+// period, so a dropped, repeated or shifted frame shows up as a kink, a step, a wrong pulse
+// width or a wrong cycle count.
+constexpr double BASE_HZ = 2000;
+constexpr double ODD_HZ = 831.0;
 const char* TRANSPORTS[] = {"bulk", "iso1", "iso6"};
 
 double shapeLimit(Wave w)
@@ -286,19 +294,19 @@ class Suite
     void boardPresent(TestContext& ctx);
     void wiring(TestContext& ctx, int ch);
     void noise(TestContext& ctx, int ch);
-    void wave(TestContext& ctx, int ch, Wave w);
-    void bigSine(TestContext& ctx, int ch);
+    void wave(TestContext& ctx, int ch, Wave w, double hz);
+    void bigSine(TestContext& ctx, int ch, double hz);
     void dcLevels(TestContext& ctx);
-    void gain(TestContext& ctx, double g);
+    void gain(TestContext& ctx, double g, double hz);
     void sweep(TestContext& ctx, double f);
-    void modeScope1(TestContext& ctx);
-    void mode750k(TestContext& ctx);
+    void modeScope1(TestContext& ctx, double hz);
+    void mode750k(TestContext& ctx, double hz);
     void isolation(TestContext& ctx, int src, Wave w);
-    void trigger(TestContext& ctx, int ch, bool rising, double level, Wave w);
-    void triggerPlacement(TestContext& ctx);
+    void trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double hz);
+    void triggerPlacement(TestContext& ctx, double hz);
     void triggerTimeout(TestContext& ctx);
     void triggerDc(TestContext& ctx);
-    void transportMeasure(TestContext& ctx, const std::string& t);
+    void transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak);
     void transportSoak(TestContext& ctx, const std::string& t);
     void firmwareRoundTrip(TestContext& ctx);
     void ensureBundledFirmware(TestContext& ctx);
@@ -389,9 +397,9 @@ void Suite::noise(TestContext& ctx, int ch)
                 parked - tol::level(parked, 4), parked + tol::level(parked, 4));
 }
 
-void Suite::wave(TestContext& ctx, int ch, Wave w)
+void Suite::wave(TestContext& ctx, int ch, Wave w, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(w, 2000, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(w, hz, 2, 0.5);
     const std::string name = std::string("sg") + std::to_string(ch) + "_" + waveName(w);
     const Capture c = ch == 1 ? measure(ctx, name, spec, SignalSpec::off())
                               : measure(ctx, name, SignalSpec::off(), spec);
@@ -400,9 +408,9 @@ void Suite::wave(TestContext& ctx, int ch, Wave w)
               "SG" + std::to_string(ch) + " " + spec.text() + " -> CH" + std::to_string(ch) + ", gain 4");
 }
 
-void Suite::bigSine(TestContext& ctx, int ch)
+void Suite::bigSine(TestContext& ctx, int ch, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, 2000, 6, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 6, 0.5);
     const Capture c = ch == 1 ? measure(ctx, "big", spec, SignalSpec::off(), 2)
                               : measure(ctx, "big", SignalSpec::off(), spec, 2);
     ctx.measure("PSU", "V", c.psu_v, 8.0);
@@ -482,21 +490,21 @@ void Suite::dcLevels(TestContext& ctx)
 // One 2 kHz sine per scope gain, filling a good part of that gain's input range
 // (1.65 V +/- 23.65 V / gain) without clipping. The generators cannot go below
 // about 0.06 V or above 9.6 V, so the low gains' ranges are only partly used.
-SignalSpec gainSignal(double g)
+SignalSpec gainSignal(double g, double hz)
 {
-    if (g == 64) return SignalSpec::periodic(Wave::Sine, 2000, 0.4, 1.45);  // range 1.28-2.02 V
-    if (g == 32) return SignalSpec::periodic(Wave::Sine, 2000, 0.9, 1.2);   // 0.91-2.39 V
-    if (g == 16) return SignalSpec::periodic(Wave::Sine, 2000, 1.8, 0.75);  // 0.17-3.13 V
-    if (g == 8) return SignalSpec::periodic(Wave::Sine, 2000, 2.8, 0.3);    // -1.31-4.61 V
-    if (g == 4) return SignalSpec::periodic(Wave::Sine, 2000, 5, 0.5);      // -4.26-7.56 V
-    if (g == 2) return SignalSpec::periodic(Wave::Sine, 2000, 6, 0.5);      // -10.2-13.5 V
-    if (g == 1 || g == 0.5) return SignalSpec::periodic(Wave::Sine, 2000, 8, 0.5);
+    if (g == 64) return SignalSpec::periodic(Wave::Sine, hz, 0.4, 1.45);  // range 1.28-2.02 V
+    if (g == 32) return SignalSpec::periodic(Wave::Sine, hz, 0.9, 1.2);   // 0.91-2.39 V
+    if (g == 16) return SignalSpec::periodic(Wave::Sine, hz, 1.8, 0.75);  // 0.17-3.13 V
+    if (g == 8) return SignalSpec::periodic(Wave::Sine, hz, 2.8, 0.3);    // -1.31-4.61 V
+    if (g == 4) return SignalSpec::periodic(Wave::Sine, hz, 5, 0.5);      // -4.26-7.56 V
+    if (g == 2) return SignalSpec::periodic(Wave::Sine, hz, 6, 0.5);      // -10.2-13.5 V
+    if (g == 1 || g == 0.5) return SignalSpec::periodic(Wave::Sine, hz, 8, 0.5);
     throw std::logic_error("no signal for gain " + num(g));
 }
 
-void Suite::gain(TestContext& ctx, double g)
+void Suite::gain(TestContext& ctx, double g, double hz)
 {
-    const SignalSpec spec = gainSignal(g);
+    const SignalSpec spec = gainSignal(g, hz);
     const Capture c = measure(ctx, "gain_" + num(g), spec, spec, g);
     const double lsb = tol::lsbV(g);
     for (int ch = 1; ch <= 2; ch++)
@@ -528,18 +536,18 @@ void Suite::sweep(TestContext& ctx, double f)
     }
 }
 
-void Suite::modeScope1(TestContext& ctx)
+void Suite::modeScope1(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, 2000, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     const Capture c = measure(ctx, "scope1", spec, SignalSpec::off(), 4, ScopeMode::Ch1);
     ctx.measure("sample rate", "S/s", c.window.sample_rate_hz, 375000, 375000, 375000);
     ctx.measureText("CH2 streamed", c.window.ch2.empty() ? "no" : "yes", "no");
     checkWave(ctx, "CH1", c, 1, "scope1: SG1 " + spec.text() + " -> CH1");
 }
 
-void Suite::mode750k(TestContext& ctx)
+void Suite::mode750k(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, 10000, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     const Capture c = measure(ctx, "scope1_750k", spec, SignalSpec::off(), 4, ScopeMode::Ch1Fast);
     ctx.measure("sample rate", "S/s", c.window.sample_rate_hz, 750000, 750000, 750000);
     ctx.measureText("CH2 streamed", c.window.ch2.empty() ? "no" : "yes", "no");
@@ -581,9 +589,9 @@ void Suite::isolation(TestContext& ctx, int src, Wave w)
                                  std::to_string(src) + " swings 6 V");
 }
 
-void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w)
+void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(w, 2000, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(w, hz, 2, 0.5);
     DeviceSession& s = session();
     applyPsu(PSU_MIN_V);
     SignalOutput out[2] = {applySignal(1, ch == 1 ? spec : SignalSpec::off()),
@@ -668,9 +676,9 @@ void Suite::trigger(TestContext& ctx, int ch, bool rising, double level, Wave w)
                                  " edge should cross the dotted level at t=0");
 }
 
-void Suite::triggerPlacement(TestContext& ctx)
+void Suite::triggerPlacement(TestContext& ctx, double hz)
 {
-    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, 2000, 2, 0.5);
+    const SignalSpec spec = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
     DeviceSession& s = session();
     applyPsu(PSU_MIN_V);
     applySignal(1, spec);
@@ -739,7 +747,11 @@ void Suite::triggerDc(TestContext& ctx)
     ctx.measure("librador_capture_around_trigger result (-5: no trigger)", "", rc, -5, -5, -5);
 }
 
-void Suite::transportMeasure(TestContext& ctx, const std::string& t)
+// The 2 kHz measure decides whether the transport is usable (gates_soak): its result is the
+// condition the soak and the 831 Hz measure need. At 2 kHz the triangle runs at twice the
+// sine's frequency, which tells the inputs apart; at 831 Hz both run at exactly 831 Hz and the
+// wave shapes tell them apart.
+void Suite::transportMeasure(TestContext& ctx, const std::string& t, double hz, bool gates_soak)
 {
     m_session.reset();
     m_session = std::make_unique<DeviceSession>(false, parseTransport(t));
@@ -749,11 +761,13 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t)
 #ifdef __APPLE__
         const std::string reason = "librador runs only bulk on macOS (iso transports panic macOS 26's USB "
                                    "stack); asked for " + t + ", got " + active;
-        m_runner.setCondition("transport_" + t, false, reason);
+        if (gates_soak)
+            m_runner.setCondition("transport_" + t, false, reason);
         ctx.skip(reason);
 #else
         const std::string reason = "asked for transport " + t + " but librador used " + active;
-        m_runner.setCondition("transport_" + t, false, reason);
+        if (gates_soak)
+            m_runner.setCondition("transport_" + t, false, reason);
         ctx.fail(reason);
 #endif
     }
@@ -761,12 +775,13 @@ void Suite::transportMeasure(TestContext& ctx, const std::string& t)
     // Both inputs at once, with smooth waves: a square's edges couple into the
     // other input as single-sample spikes, and one landing on the sine's
     // mid-level crossing adds a false crossing (seen: 2990 Hz read for 2 kHz).
-    const SignalSpec a = SignalSpec::periodic(Wave::Sine, 2000, 2, 0.5);
-    const SignalSpec b = SignalSpec::periodic(Wave::Triangle, 4000, 1.5, 0.8);
+    const SignalSpec a = SignalSpec::periodic(Wave::Sine, hz, 2, 0.5);
+    const SignalSpec b = SignalSpec::periodic(Wave::Triangle, hz == BASE_HZ ? 2 * hz : hz, 1.5, 0.8);
     const Capture c = measure(ctx, t, a, b);
     checkWave(ctx, "CH1", c, 1, t + ": SG1 " + a.text() + " -> CH1");
     checkWave(ctx, "CH2", c, 2, t + ": SG2 " + b.text() + " -> CH2");
-    m_runner.setCondition("transport_" + t, true);
+    if (gates_soak)
+        m_runner.setCondition("transport_" + t, true);
 }
 
 void Suite::transportSoak(TestContext& ctx, const std::string& t)
@@ -937,45 +952,68 @@ void Suite::run()
     for (int ch = 1; ch <= 2; ch++)
     {
         for (const Wave w : WAVES)
+        {
             add("hw.siggen.ch" + std::to_string(ch) + "." + waveName(w) + "_2khz",
                 "SG" + std::to_string(ch) + " " + waveName(w) + ", 2 kHz, 0.5-2.5 V: frequency, levels and shape on CH" +
                     std::to_string(ch),
-                ch == 1 ? sg1 : sg2, [&, ch, w](TestContext& c) { wave(c, ch, w); });
+                ch == 1 ? sg1 : sg2, [&, ch, w](TestContext& c) { wave(c, ch, w, BASE_HZ); });
+            add("hw.siggen.ch" + std::to_string(ch) + "." + waveName(w) + "_831hz",
+                "SG" + std::to_string(ch) + " " + waveName(w) + ", 831 Hz, 0.5-2.5 V: frequency, levels and shape on CH" +
+                    std::to_string(ch),
+                ch == 1 ? sg1 : sg2, [&, ch, w](TestContext& c) { wave(c, ch, w, ODD_HZ); });
+        }
         add("hw.siggen.ch" + std::to_string(ch) + ".sine_6vpp_x3",
-            "SG" + std::to_string(ch) + " 6 Vpp sine through the x3 output stage (PSU raised to 8 V)",
-            ch == 1 ? sg1 : sg2, [&, ch](TestContext& c) { bigSine(c, ch); });
+            "SG" + std::to_string(ch) + " 6 Vpp 2 kHz sine through the x3 output stage (PSU raised to 8 V)",
+            ch == 1 ? sg1 : sg2, [&, ch](TestContext& c) { bigSine(c, ch, BASE_HZ); });
+        add("hw.siggen.ch" + std::to_string(ch) + ".sine_6vpp_x3_831hz",
+            "SG" + std::to_string(ch) + " 6 Vpp 831 Hz sine through the x3 output stage (PSU raised to 8 V)",
+            ch == 1 ? sg1 : sg2, [&, ch](TestContext& c) { bigSine(c, ch, ODD_HZ); });
     }
     add("hw.siggen.dc_levels", "DC levels 0.25-6 V on both generators read back on both inputs", both,
         [&](TestContext& c) { dcLevels(c); });
     for (const double g : {0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0})
     {
-        add("hw.gain.x" + idNum(g), "Scope gain x" + num(g) + ": a sine filling most of the range reads back right on both inputs",
-            both, [&, g](TestContext& c) { gain(c, g); });
+        add("hw.gain.x" + idNum(g), "Scope gain x" + num(g) + ": a 2 kHz sine filling most of the range reads back right on both inputs",
+            both, [&, g](TestContext& c) { gain(c, g, BASE_HZ); });
+        add("hw.gain.x" + idNum(g) + "_831hz",
+            "Scope gain x" + num(g) + ": an 831 Hz sine filling most of the range reads back right on both inputs", both,
+            [&, g](TestContext& c) { gain(c, g, ODD_HZ); });
     }
     for (const double f : {10.0, 50.0, 100.0, 354.1, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0})
     {
         add("hw.sweep.f" + idNum(f) + "hz", "Frequency sweep: " + num(f) + " Hz sine on each generator in turn, frequency, levels and shape",
             both, [&, f](TestContext& c) { sweep(c, f); });
     }
-    add("hw.mode.scope1", "Scope mode scope1 (CH1 only, 375 kS/s)", sg1, [&](TestContext& c) { modeScope1(c); });
+    add("hw.mode.scope1", "Scope mode scope1 (CH1 only, 375 kS/s) with a 2 kHz sine", sg1,
+        [&](TestContext& c) { modeScope1(c, BASE_HZ); });
+    add("hw.mode.scope1_831hz", "Scope mode scope1 (CH1 only, 375 kS/s) with an 831 Hz sine", sg1,
+        [&](TestContext& c) { modeScope1(c, ODD_HZ); });
     add("hw.mode.scope1_750k", "Scope mode scope1-750k (CH1 only, 750 kS/s) with a 10 kHz sine", sg1,
-        [&](TestContext& c) { mode750k(c); });
+        [&](TestContext& c) { mode750k(c, 10000); });
+    add("hw.mode.scope1_750k_831hz", "Scope mode scope1-750k (CH1 only, 750 kS/s) with an 831 Hz sine", sg1,
+        [&](TestContext& c) { mode750k(c, ODD_HZ); });
     for (const Wave w : {Wave::Sine, Wave::Square})
         for (int src = 1; src <= 2; src++)
             add("hw.isolation.sg" + std::to_string(src) + "_to_ch" + std::to_string(src == 1 ? 2 : 1) + "." +
                     waveName(w),
                 std::string("Crosstalk from a 6 Vpp ") + waveName(w) + " on SG" + std::to_string(src) + " into the idle input",
                 both, [&, src, w](TestContext& c) { isolation(c, src, w); });
-    add("hw.trigger.ch1_rising", "Trigger: CH1 rising through 1.5 V on a 2 kHz sine", sg1,
-        [&](TestContext& c) { trigger(c, 1, true, 1.5, Wave::Sine); });
-    add("hw.trigger.ch1_falling", "Trigger: CH1 falling through 1.0 V on a 2 kHz sine", sg1,
-        [&](TestContext& c) { trigger(c, 1, false, 1.0, Wave::Sine); });
-    add("hw.trigger.ch2_rising_square", "Trigger: CH2 rising through 1.5 V on a 2 kHz square", sg2,
-        [&](TestContext& c) { trigger(c, 2, true, 1.5, Wave::Square); });
-    add("hw.trigger.ch2_falling_triangle", "Trigger: CH2 falling through 2.0 V on a 2 kHz triangle", sg2,
-        [&](TestContext& c) { trigger(c, 2, false, 2.0, Wave::Triangle); });
-    add("hw.trigger.placement", "Trigger window placement: all-post, mostly-pre and long windows", sg1,
-        [&](TestContext& c) { triggerPlacement(c); });
+    for (const double f : {BASE_HZ, ODD_HZ})
+    {
+        const std::string sfx = f == BASE_HZ ? "" : "_831hz";
+        const std::string hz = f == BASE_HZ ? "2 kHz" : "831 Hz";
+        add("hw.trigger.ch1_rising" + sfx, "Trigger: CH1 rising through 1.5 V on a " + hz + " sine", sg1,
+            [&, f](TestContext& c) { trigger(c, 1, true, 1.5, Wave::Sine, f); });
+        add("hw.trigger.ch1_falling" + sfx, "Trigger: CH1 falling through 1.0 V on a " + hz + " sine", sg1,
+            [&, f](TestContext& c) { trigger(c, 1, false, 1.0, Wave::Sine, f); });
+        add("hw.trigger.ch2_rising_square" + sfx, "Trigger: CH2 rising through 1.5 V on a " + hz + " square", sg2,
+            [&, f](TestContext& c) { trigger(c, 2, true, 1.5, Wave::Square, f); });
+        add("hw.trigger.ch2_falling_triangle" + sfx, "Trigger: CH2 falling through 2.0 V on a " + hz + " triangle", sg2,
+            [&, f](TestContext& c) { trigger(c, 2, false, 2.0, Wave::Triangle, f); });
+        add("hw.trigger.placement" + sfx,
+            "Trigger window placement on a " + hz + " sine: all-post, mostly-pre and long windows", sg1,
+            [&, f](TestContext& c) { triggerPlacement(c, f); });
+    }
     add("hw.trigger.timeout_unreachable", "A trigger level above the signal times out cleanly", sg1,
         [&](TestContext& c) { triggerTimeout(c); });
     add("hw.trigger.no_false_trigger_on_dc", "A DC level on the trigger level does not trigger on noise", sg1,
@@ -984,8 +1022,12 @@ void Suite::run()
     {
         const std::string ts = t;
         add("hw.transport." + ts + ".measure",
-            "USB transport " + ts + ": connects and measures a sine on CH1 and a triangle on CH2", both,
-            [&, ts](TestContext& c) { transportMeasure(c, ts); });
+            "USB transport " + ts + ": connects and measures a 2 kHz sine on CH1 and a 4 kHz triangle on CH2", both,
+            [&, ts](TestContext& c) { transportMeasure(c, ts, BASE_HZ, true); });
+        add("hw.transport." + ts + ".measure_831hz",
+            "USB transport " + ts + ": an 831 Hz sine on CH1 and an 831 Hz triangle on CH2",
+            {"board", "sg1_ch1", "sg2_ch2", "transport_" + ts},
+            [&, ts](TestContext& c) { transportMeasure(c, ts, ODD_HZ, false); });
         add("hw.transport." + ts + ".soak",
             "USB transport " + ts + ": " + num(SOAK_SECONDS) + " s stream with no lost, corrupt or late frames",
             {"board", "transport_" + ts}, [&, ts](TestContext& c) { transportSoak(c, ts); });
